@@ -36,6 +36,9 @@ export function Drivers() {
   const [assignment, setAssignment] = useState({ driverId: '', vehiclePlate: '', workId: '', workName: '' });
   const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [workFilter, setWorkFilter] = useState('');
 
   const editingDriver = drivers.find(d => d.id === editingDriverId) || null;
 
@@ -151,7 +154,19 @@ export function Drivers() {
     }));
   };
 
-  const sortedDrivers = [...drivers].sort((a, b) => {
+  const filteredDrivers = drivers.filter(driver => {
+    const matchesSearch = 
+      driver.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.cpf?.includes(searchTerm) ||
+      driver.vehicleAssigned?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === '' || driver.status === statusFilter;
+    const matchesWork = workFilter === '' || driver.workName === workFilter;
+
+    return matchesSearch && matchesStatus && matchesWork;
+  });
+
+  const sortedDrivers = [...filteredDrivers].sort((a, b) => {
     const valA = a[sortConfig.key] || '';
     const valB = b[sortConfig.key] || '';
     
@@ -163,6 +178,12 @@ export function Drivers() {
     
     return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
   });
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setWorkFilter('');
+  };
 
   const availableVehicles = vehicles.filter(v => !drivers.some(d => d.vehicleAssigned === v.plate));
 
@@ -398,24 +419,55 @@ export function Drivers() {
       
       <motion.div className="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden mb-10" variants={itemVariants}>
         <div className="px-6 py-4 border-b border-outline-variant flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-on-surface-variant text-[12px] font-semibold">Disponibilidade:</span>
-              <select className="bg-surface-container-low border border-outline-variant rounded px-3 py-1 text-[13px] focus:ring-0">
-                <option>Todos os Motoristas</option>
-                <option>Disponível</option>
-              </select>
+          <div className="flex flex-wrap items-center gap-4 flex-1">
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+              <input 
+                type="text" 
+                placeholder="Buscar por nome, CPF ou placa..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-on-surface-variant text-[12px] font-semibold">Unidade:</span>
-              <select className="bg-surface-container-low border border-outline-variant rounded px-3 py-1 text-[13px] focus:ring-0">
-                <option>Todas as Regiões</option>
-                {works.map((work) => (
-                  <option key={work.id} value={work.name}>{work.name}</option>
-                ))}
-              </select>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-on-surface-variant text-[12px] font-semibold">Status:</span>
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-surface-container-low border border-outline-variant rounded px-3 py-1 text-[13px] focus:ring-0"
+                >
+                  <option value="">Todos</option>
+                  <option value="Disponível">Disponível</option>
+                  <option value="Em Rota">Em Rota</option>
+                  <option value="Em Intervalo">Em Intervalo</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-on-surface-variant text-[12px] font-semibold">Unidade:</span>
+                <select 
+                  value={workFilter}
+                  onChange={(e) => setWorkFilter(e.target.value)}
+                  className="bg-surface-container-low border border-outline-variant rounded px-3 py-1 text-[13px] focus:ring-0"
+                >
+                  <option value="">Todas as Regiões</option>
+                  {works.map((work) => (
+                    <option key={work.id} value={work.name}>{work.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
+          {(searchTerm || statusFilter || workFilter) && (
+            <button 
+              onClick={clearFilters}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-error hover:bg-error/10 rounded-lg text-xs font-semibold transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">filter_alt_off</span>
+              LIMPAR FILTROS
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
