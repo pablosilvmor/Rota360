@@ -112,16 +112,28 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
 
           // Pre-load vehicle image to handle CORS for PDF export
           const imgUrl = vehicleData.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800";
-          fetch(imgUrl)
-            .then(res => res.blob())
-            .then(blob => {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                if (isMounted) setVehicleImgDataUrl(reader.result as string);
-              };
-              reader.readAsDataURL(blob);
+          fetch(imgUrl, { mode: 'no-cors' }) // tenta carregar sem restrição
+            .then(() => {
+               // Se conseguir carregar, tenta converter para base64 para o PDF
+               const img = new Image();
+               img.crossOrigin = "anonymous";
+               img.onload = () => {
+                 const canvas = document.createElement('canvas');
+                 canvas.width = img.width;
+                 canvas.height = img.height;
+                 const ctx = canvas.getContext('2d');
+                 if (ctx) {
+                   ctx.drawImage(img, 0, 0);
+                   const dataUrl = canvas.toDataURL('image/jpeg');
+                   if (isMounted) setVehicleImgDataUrl(dataUrl);
+                 }
+               };
+               img.src = imgUrl;
             })
-            .catch(err => console.error("Error pre-loading vehicle image for PDF:", err));
+            .catch(err => {
+              console.warn("Imagem do veículo não pôde ser processada para o PDF (CORS):", err);
+              // Mantém nulo para usar fallback se necessário
+            });
         }
       } catch (error) {
         console.error('Error fetching vehicle:', error);
@@ -258,19 +270,22 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
       const element = document.getElementById('inspection-print-container');
       if (!element) return;
 
-      // Usando toJpeg com configurações robustas
+      // Usando toJpeg com configurações robustas para evitar erros de CORS/CSS
       const dataUrl = await htmlToImage.toJpeg(element, {
         quality: 0.95,
         pixelRatio: 2,
         backgroundColor: '#ffffff',
         skipFonts: true,
+        fontEmbedCSS: '', // Evita erro ao tentar ler CSS externo
         style: {
-          fontFamily: 'sans-serif'
+          fontFamily: 'Arial, sans-serif'
         },
         filter: (node: any) => {
           // Ignorar botões de ação e modais na exportação
-          if (node?.getAttribute && (node.getAttribute('data-html2canvas-ignore') === 'true' || node.classList?.contains('fixed'))) {
-            return false;
+          if (node?.getAttribute) {
+            const ignore = node.getAttribute('data-html2canvas-ignore') === 'true';
+            const isFixed = node.classList?.contains('fixed');
+            if (ignore || isFixed) return false;
           }
           return true;
         }
