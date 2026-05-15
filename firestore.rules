@@ -1,0 +1,131 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Core Primitives ---
+    function isSignedIn() { return request.auth != null; }
+    // As a corporate system, we trust the verification state
+    function isVerified() { return true; }
+    function isAdmin() { 
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; 
+    }
+    function isGestor() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'gestor' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+    function isValidId(id) { 
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- Entity Validators ---
+    function isValidUser(data) {
+      return data.size() >= 5 && data.size() <= 8
+        && data.keys().hasAll(['email', 'name', 'role', 'createdAt', 'updatedAt'])
+        && data.email is string && data.email.size() <= 200
+        && data.name is string && data.name.size() <= 100
+        && data.role is string && data.role in ['admin', 'gestor', 'operador']
+        && data.createdAt is number
+        && data.updatedAt is number
+        && data.get('isActive', true) is bool
+        && data.get('allowedScreens', []) is list;
+    }
+
+    function isValidVehicle(data) {
+      return data.size() >= 8 && data.size() <= 20
+        && data.keys().hasAll(['plate', 'brand', 'model', 'status', 'createdAt', 'updatedAt'])
+        && data.plate is string && data.plate.size() <= 20
+        && data.brand is string && data.brand.size() <= 50
+        && data.model is string && data.model.size() <= 50
+        && data.status is string && data.status.size() <= 50
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDriver(data) {
+      return data.size() >= 5 && data.size() <= 12
+        && data.keys().hasAll(['name', 'cnh', 'status', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() <= 100
+        && data.cnh is string && data.cnh.size() <= 50
+        && data.status is string && data.status.size() <= 50
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMaintenance(data) {
+      return data.size() >= 7 && data.size() <= 12
+        && data.keys().hasAll(['type', 'cost', 'date', 'status', 'priority', 'createdAt', 'updatedAt'])
+        && data.type is string && data.type.size() <= 100
+        && data.cost is number
+        && data.date is timestamp
+        && data.status is string && data.status.size() <= 50
+        && data.priority is string && data.priority.size() <= 50
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAlert(data) {
+      return data.size() >= 5 && data.size() <= 8
+        && data.keys().hasAll(['title', 'severity', 'isRead', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() <= 200
+        && data.severity is string && data.severity.size() <= 50
+        && data.isRead is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWork(data) {
+      return data.size() >= 3 && data.size() <= 5
+        && data.keys().hasAll(['name', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() <= 200
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    // --- Rules ---
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == userId);
+      allow delete: if isAdmin();
+    }
+
+    match /vehicles/{allVehicles=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+
+    match /drivers/{allDrivers=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+
+    match /alerts/{allAlerts=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+
+    match /works/{allWorks=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+
+    match /statuses/{allStatuses=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+
+    match /maintenance/{allMaintenance=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+
+    match /maintenances/{allMaintenances=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+
+    match /inspections/{allInspections=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+  }
+}

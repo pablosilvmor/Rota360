@@ -1,0 +1,530 @@
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MaintenanceAlertsConfig } from '../components/MaintenanceAlertsConfig';
+import { db, OperationType, handleFirestoreError } from '../lib/firebase';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc } from 'firebase/firestore';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { type: 'spring', stiffness: 300, damping: 24 }
+  }
+};
+
+export function Maintenance() {
+  const [isGenerateOSOpen, setIsGenerateOSOpen] = useState(false);
+  const [isScheduleMaintenanceOpen, setIsScheduleMaintenanceOpen] = useState(false);
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [osData, setOsData] = useState<any[]>([]);
+  const [works, setWorks] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState('Todos os Status');
+  const [newOS, setNewOS] = useState({ plate: '', priority: 'Média', description: '', provider: '', title: '', cost: '', obra: '' });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const stats = {
+    pending: osData.filter(os => os.status !== 'Concluído').length,
+    delayed: osData.filter(os => os.priority === 'Crítica' && os.status !== 'Concluído').length,
+    monthlyCost: osData.reduce((acc, os) => acc + (parseFloat(os.cost) || 0), 0)
+  };
+
+  useEffect(() => {
+    const q = query(collection(db, 'maintenance'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setOsData(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, error => {
+      handleFirestoreError(error, OperationType.LIST, 'maintenance');
+      setLoading(false);
+    });
+
+    const qWorks = query(collection(db, 'works'), orderBy('name', 'asc'));
+    const unsubscribeWorks = onSnapshot(qWorks, (snapshot) => {
+      setWorks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'works');
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeWorks();
+    };
+  }, []);
+
+  const handleCreateOS = async () => {
+    if(!newOS.plate || !newOS.title) return;
+    try {
+      await addDoc(collection(db, 'maintenance'), {
+        ...newOS,
+        status: 'Em Andamento',
+        icon: 'build',
+        color: 'primary',
+        createdAt: Date.now()
+      });
+      setIsGenerateOSOpen(false);
+      setNewOS({ plate: '', priority: 'Média', description: '', provider: '', title: '' });
+    } catch(e) {
+      handleFirestoreError(e, OperationType.CREATE, 'maintenance');
+    }
+  };
+
+  const filteredOsData = osData.filter(os => statusFilter === 'Todos os Status' || os.status === statusFilter);
+
+  return (
+    <motion.div 
+      className="pb-12 relative"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      <AnimatePresence>
+        {isGenerateOSOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsGenerateOSOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+                <h3 className="text-xl font-semibold text-on-surface">Gerar Ordem de Serviço (OS)</h3>
+                <button onClick={() => setIsGenerateOSOpen(false)} className="text-on-surface-variant hover:text-error transition-colors">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Placa ou Identificação do Veículo</label>
+                    <input type="text" value={newOS.plate} onChange={e => setNewOS({...newOS, plate: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="Placa do veículo..." />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Título do Serviço</label>
+                    <input type="text" value={newOS.title} onChange={e => setNewOS({...newOS, title: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="Título da OS..." />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Prioridade</label>
+                    <select value={newOS.priority} onChange={e => setNewOS({...newOS, priority: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
+                      <option>Baixa</option>
+                      <option>Média</option>
+                      <option>Alta</option>
+                      <option>Crítica</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Obra</label>
+                    <select value={newOS.obra} onChange={e => setNewOS({...newOS, obra: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
+                      <option value="">Selecione...</option>
+                      {works.map((work) => (
+                        <option key={work.id} value={work.name}>{work.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2 shadow-none">
+                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Fornecedor / Oficina</label>
+                    <select value={newOS.provider} onChange={e => setNewOS({...newOS, provider: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
+                      <option>Selecione um parceiro ou oficina interna</option>
+                      <option>Oficina Interna Matriz</option>
+                      <option>Precision Auto Motors</option>
+                      <option>Fleet Master Garage</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Custo Estimado (R$)</label>
+                    <input type="number" value={newOS.cost} onChange={e => setNewOS({...newOS, cost: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="0,00" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Descrição do Serviço</label>
+                    <textarea rows={3} value={newOS.description} onChange={e => setNewOS({...newOS, description: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="Descreva os problemas ou as tarefas da manutenção..."></textarea>
+                  </div>
+                </div>
+                <div className="pt-4 flex gap-4">
+                   <button onClick={() => setIsGenerateOSOpen(false)} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
+                   <button onClick={handleCreateOS} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">Confirmar OS</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {isScheduleMaintenanceOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsScheduleMaintenanceOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+                <h3 className="text-xl font-semibold text-on-surface">Agendar Nova Manutenção</h3>
+                <button onClick={() => setIsScheduleMaintenanceOpen(false)} className="text-on-surface-variant hover:text-error transition-colors">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Data do Agendamento</label>
+                    <input type="date" className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Horário (Opcional)</label>
+                    <input type="time" className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Veículo</label>
+                    <select className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
+                      <option>Selecione...</option>
+                      <option>ABC-1234 (Volvo FH)</option>
+                      <option>XYZ-9876 (Scania R450)</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Tipo de Intervenção Preventiva</label>
+                    <select className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
+                      <option>Revisão de Motor</option>
+                      <option>Troca de Óleo e Filtros</option>
+                      <option>Inspeção Pneus/Freio</option>
+                      <option>Manutenção Elétrica</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="pt-4 flex gap-4">
+                   <button onClick={() => setIsScheduleMaintenanceOpen(false)} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
+                   <button onClick={() => setIsScheduleMaintenanceOpen(false)} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">Agendar</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        {isMapOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsMapOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-4xl h-[80vh] overflow-hidden flex flex-col"
+            >
+              <div className="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+                <h3 className="text-xl font-semibold text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">map</span>
+                  Mapa de Centros de Serviço
+                </h3>
+                <button onClick={() => setIsMapOpen(false)} className="text-on-surface-variant hover:text-error transition-colors">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="flex-1 bg-surface-container-highest relative">
+                <img 
+                  src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=1200" 
+                  alt="Map Placeholder" 
+                  className="w-full h-full object-cover opacity-70 mix-blend-luminosity"
+                />
+                <div className="absolute inset-0 bg-primary/5 flex items-center justify-center">
+                  {/* Fake map pins */}
+                  <div className="absolute top-1/4 left-1/3 text-error drop-shadow-md flex flex-col items-center hover:scale-110 transition-transform cursor-pointer">
+                    <span className="material-symbols-outlined text-[32px]" style={{fontVariationSettings: "'FILL' 1"}}>location_on</span>
+                    <span className="bg-white text-[10px] font-bold px-2 py-0.5 rounded shadow whitespace-nowrap -mt-1">Oficina Matriz</span>
+                  </div>
+                  <div className="absolute top-1/2 right-1/4 text-primary drop-shadow-md flex flex-col items-center hover:scale-110 transition-transform cursor-pointer">
+                    <span className="material-symbols-outlined text-[32px]" style={{fontVariationSettings: "'FILL' 1"}}>location_on</span>
+                    <span className="bg-white text-[10px] font-bold px-2 py-0.5 rounded shadow whitespace-nowrap -mt-1">Precision Auto Motors</span>
+                  </div>
+                  <div className="absolute bottom-1/3 left-1/2 text-primary drop-shadow-md flex flex-col items-center hover:scale-110 transition-transform cursor-pointer">
+                    <span className="material-symbols-outlined text-[32px]" style={{fontVariationSettings: "'FILL' 1"}}>location_on</span>
+                    <span className="bg-white text-[10px] font-bold px-2 py-0.5 rounded shadow whitespace-nowrap -mt-1">Fleet Master Garage</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Page Header */}
+      <motion.div className="flex justify-between items-end mb-8" variants={itemVariants}>
+        <div>
+          <h2 className="text-[32px] font-semibold text-primary leading-[1.3] tracking-[-0.01em]">Controle de Manutenção</h2>
+          <p className="text-base text-on-surface-variant mt-2">Supervisione cronogramas, ordens de serviço e custos operacionais.</p>
+        </div>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setIsGenerateOSOpen(true)}
+            className="px-6 py-2.5 bg-surface border border-outline-variant text-on-surface rounded-lg text-sm font-semibold hover:bg-surface-container-high transition-colors flex items-center gap-2 active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[20px]">description</span>
+            Gerar OS
+          </button>
+          <button 
+            onClick={() => setIsScheduleMaintenanceOpen(true)}
+            className="px-6 py-2.5 bg-primary-container text-on-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            Agendar Nova Manutenção
+          </button>
+        </div>
+      </motion.div>
+
+      {/* KPI Cards Section */}
+      <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10" variants={containerVariants}>
+        {/* KPI 1 */}
+        <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm hover:-translate-y-1 transition-transform duration-300">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-secondary-container rounded-lg">
+              <span className="material-symbols-outlined text-on-secondary-container">calendar_today</span>
+            </div>
+            <span className="text-xs text-on-surface-variant flex items-center gap-1">
+              Mês Atual <span className="material-symbols-outlined text-[14px]">info</span>
+            </span>
+          </div>
+          <p className="text-on-surface-variant text-sm font-semibold">Serviços Pendentes</p>
+          <h3 className="text-[48px] font-bold text-primary mt-1 leading-[1.2] tracking-[-0.02em]">{stats.pending}</h3>
+          <p className="text-xs text-on-surface-variant mt-2">
+            <span className="text-secondary font-bold">{Math.ceil(stats.pending / 3)}</span> agendados para esta semana
+          </p>
+        </motion.div>
+
+        {/* KPI 2 */}
+        <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm hover:-translate-y-1 transition-transform duration-300">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-error-container rounded-lg">
+              <span className="material-symbols-outlined text-on-error-container">warning</span>
+            </div>
+            <span className="px-2 py-1 bg-error-container text-on-error-container rounded text-[10px] font-bold">URGENTE</span>
+          </div>
+          <p className="text-on-surface-variant text-sm font-semibold">Manutenções Atrasadas</p>
+          <h3 className="text-[48px] font-bold text-error mt-1 leading-[1.2] tracking-[-0.02em]">{stats.delayed.toString().padStart(2, '0')}</h3>
+          <p className="text-xs text-on-surface-variant mt-2">Impacto crítico na disponibilidade da frota</p>
+        </motion.div>
+
+        {/* KPI 3 */}
+        <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm hover:-translate-y-1 transition-transform duration-300">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-tertiary-fixed rounded-lg">
+              <span className="material-symbols-outlined text-on-tertiary-fixed-variant">payments</span>
+            </div>
+            <span className="text-secondary font-bold text-sm">+12% vs mês ant.</span>
+          </div>
+          <p className="text-on-surface-variant text-sm font-semibold">Custo Mensal de Serviço</p>
+          <h3 className="text-[48px] font-bold text-primary mt-1 leading-[1.2] tracking-[-0.02em]">R$ {stats.monthlyCost.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</h3>
+          <p className="text-xs text-on-surface-variant mt-2">Utilização do orçamento: 78%</p>
+        </motion.div>
+      </motion.div>
+
+      <MaintenanceAlertsConfig />
+
+      {/* Main Content Layout (Bento Style) */}
+      <motion.div className="grid grid-cols-12 gap-6" variants={containerVariants}>
+        {/* Calendar View (Left Column) */}
+        <motion.div className="col-span-12 lg:col-span-4 space-y-6" variants={itemVariants}>
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <div className="p-5 border-b border-outline-variant flex justify-between items-center">
+              <h4 className="text-[18px] font-semibold text-primary">Calendário de Serviços</h4>
+              <div className="flex gap-2">
+                <button className="p-1 hover:bg-surface-container-high rounded"><span className="material-symbols-outlined">chevron_left</span></button>
+                <button className="p-1 hover:bg-surface-container-high rounded"><span className="material-symbols-outlined">chevron_right</span></button>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="text-center font-bold text-sm mb-4">OUTUBRO 2023</div>
+              <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold mb-2">
+                <div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div>
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                {/* Day Cells */}
+                <div className="h-10 flex items-center justify-center text-on-surface-variant opacity-30">27</div>
+                <div className="h-10 flex items-center justify-center text-on-surface-variant opacity-30">28</div>
+                <div className="h-10 flex items-center justify-center text-on-surface-variant opacity-30">29</div>
+                <div className="h-10 flex items-center justify-center text-on-surface-variant opacity-30">30</div>
+                <div className="h-10 flex items-center justify-center relative bg-surface-container-high rounded-full">1 <span className="absolute bottom-1 w-1 h-1 bg-secondary rounded-full"></span></div>
+                <div className="h-10 flex items-center justify-center">2</div>
+                <div className="h-10 flex items-center justify-center">3</div>
+                <div className="h-10 flex items-center justify-center">4</div>
+                <div className="h-10 flex items-center justify-center bg-primary-container text-on-primary rounded-full font-bold">5</div>
+                <div className="h-10 flex items-center justify-center relative">6 <span className="absolute bottom-1 w-1 h-1 bg-error rounded-full"></span></div>
+                <div className="h-10 flex items-center justify-center">7</div>
+                <div className="h-10 flex items-center justify-center">8</div>
+                <div className="h-10 flex items-center justify-center relative">9 <span className="absolute bottom-1 w-1 h-1 bg-secondary rounded-full"></span></div>
+                <div className="h-10 flex items-center justify-center">10</div>
+
+                <div className="col-span-7 pt-4 mt-4 border-t border-outline-variant">
+                  <p className="text-sm font-semibold mb-3">Foco de Hoje</p>
+                  <div className="bg-surface-container-low p-3 rounded-lg mb-2 border-l-4 border-secondary">
+                    <p className="font-semibold text-sm">Troca de Óleo: TRK-9204</p>
+                    <p className="text-xs text-on-surface-variant">09:00 AM • Precision Auto</p>
+                  </div>
+                  <div className="bg-surface-container-low p-3 rounded-lg border-l-4 border-primary mt-2">
+                    <p className="font-semibold text-sm">Freios: VAN-3312</p>
+                    <p className="text-xs text-on-surface-variant">02:30 PM • Fleet Master Garage</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Visual Asset Card */}
+          <div className="relative h-64 rounded-2xl overflow-hidden shadow-sm group">
+            <div className="absolute inset-0 bg-gradient-to-t from-primary-container/90 to-transparent z-10"></div>
+            <img alt="Centro de manutenção" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&q=80&w=800"/>
+            <div className="absolute bottom-0 left-0 p-6 z-20">
+              <h5 className="text-on-primary text-[20px] font-semibold">Centros de Serviço</h5>
+              <p className="text-on-primary-container text-base opacity-90 mt-1">Veja 18 parceiros certificados em todo o país.</p>
+              <button onClick={() => setIsMapOpen(true)} className="mt-4 px-4 py-2 bg-on-primary-fixed-variant text-on-primary rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-primary-fixed transition-colors">
+                Ver Mapa <span className="material-symbols-outlined text-[16px]">location_on</span>
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Service Orders List (Right Column) */}
+        <motion.div className="col-span-12 lg:col-span-8" variants={itemVariants}>
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+            <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-white">
+              <h4 className="text-[18px] font-semibold text-primary">Ordens de Serviço (OS)</h4>
+              <div className="flex gap-2">
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-surface-container-low border-none rounded-lg text-sm font-semibold focus:ring-0 px-4 py-2 outline-none">
+                  <option>Todos os Status</option>
+                  <option>Agendado</option>
+                  <option>Em Andamento</option>
+                  <option>Concluído</option>
+                </select>
+                <button className="p-2 border border-outline-variant rounded-lg hover:bg-surface-container-high transition-colors">
+                  <span className="material-symbols-outlined">filter_list</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-surface-container-low border-b border-outline-variant">
+                    <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">PLACA DO VEÍCULO</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">TIPO DE SERVIÇO</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">FORNECEDOR</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">PRIORIDADE</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">STATUS</th>
+                    <th className="px-6 py-4"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {filteredOsData.map(os => (
+                    <tr key={os.id} className="hover:bg-surface-container-lowest transition-colors group bg-white">
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 bg-surface-container-high rounded-lg flex items-center justify-center`}>
+                            <span className={`material-symbols-outlined text-${os.color}`}>{os.icon}</span>
+                          </div>
+                          <span className="font-bold text-on-surface">{os.plate}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex flex-col">
+                          <span className="text-base font-bold">{os.title}</span>
+                          <span className="text-xs text-on-surface-variant mt-1">{os.description}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-base">{os.provider}</td>
+                      <td className="px-6 py-5">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[12px] font-bold ${os.priority === 'Alta' ? 'bg-error-container text-on-error-container' : os.priority === 'Média' ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                          {os.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full bg-${os.color}`}></span>
+                          <span className="text-sm font-semibold">{os.status}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        {deletingId === os.id ? (
+                          <div className="flex items-center gap-2 justify-end animate-in fade-in zoom-in duration-200">
+                            <button 
+                              onClick={() => setDeletingId(null)}
+                              className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all"
+                            >
+                              Cancelar
+                            </button>
+                            <button 
+                              onClick={async () => {
+                                await deleteDoc(doc(db, 'maintenance', os.id));
+                                setDeletingId(null);
+                              }}
+                              className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all"
+                            >
+                              Confirmar
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => setDeletingId(os.id)}
+                            className="p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error-container hover:text-error rounded-full"
+                          >
+                            <span className="material-symbols-outlined">delete</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredOsData.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">
+                        Nenhuma OS encontrada para os critérios informados.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="p-4 border-t border-outline-variant flex justify-between items-center bg-white mt-auto">
+              <span className="text-xs text-on-surface-variant">Exibindo 3 de 150 entradas</span>
+              <div className="flex gap-1">
+                <button className="px-3 py-1 bg-surface-container-high rounded text-sm font-semibold">1</button>
+                <button className="px-3 py-1 hover:bg-surface-container-high rounded text-sm font-semibold">2</button>
+                <button className="px-3 py-1 hover:bg-surface-container-high rounded text-sm font-semibold">3</button>
+                <span className="px-2">...</span>
+                <button className="px-3 py-1 hover:bg-surface-container-high rounded text-sm font-semibold">50</button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Floating Action Component */}
+      <motion.div className="mt-12 p-8 rounded-2xl bg-primary-container text-on-primary relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8 shadow-xl" variants={itemVariants}>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-fixed/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+        <div className="z-10 text-center md:text-left">
+          <h3 className="text-[24px] font-semibold mb-2">Inteligência de Manutenção Operacional</h3>
+          <p className="text-on-primary-container max-w-xl opacity-90 leading-relaxed text-base">Nosso motor de manutenção preditiva impulsionado por IA identifica falhas potenciais antes que elas ocorram. Solicite um relatório completo de auditoria da frota hoje mesmo.</p>
+        </div>
+        <div className="z-10 flex gap-4">
+          <button className="px-8 py-4 bg-primary-fixed text-on-primary-fixed font-bold rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg">
+            Ver Motor de Predição
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}

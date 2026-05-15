@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["email", "name", "role", "createdAt", "updatedAt"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "Fleet vehicle",
+      "type": "object",
+      "properties": {
+        "plate": { "type": "string" },
+        "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "chassis": { "type": "string" },
+        "fuelType": { "type": "string" },
+        "color": { "type": "string" },
+        "bodywork": { "type": "string" },
+        "exerciceYear": { "type": "string" },
+        "exerciceStatus": { "type": "string" },
+        "currentKm": { "type": "number" },
+        "status": { "type": "string" },
+        "costCenter": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "odometer": { "type": "number" },
+        "lastServiceKm": { "type": "number" },
+        "nextServiceKm": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["plate", "brand", "model", "status", "createdAt", "updatedAt"]
+    },
+    "Driver": {
+      "title": "Driver",
+      "description": "Driver of the fleet",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "cnh": { "type": "string" },
+        "cnhCategory": { "type": "string" },
+        "cnhExpiration": { "type": "number" },
+        "status": { "type": "string" },
+        "score": { "type": "number" },
+        "vehicleId": { "type": "string" },
+        "unit": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "cnh", "status", "createdAt", "updatedAt"]
+    },
+    "Maintenance": {
+      "title": "Maintenance",
+      "description": "Maintenance record for a vehicle",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "provider": { "type": "string" },
+        "cost": { "type": "number" },
+        "date": { "type": "number" },
+        "kmAtMaintenance": { "type": "number" },
+        "nextMaintenanceKm": { "type": "number" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["type", "cost", "date", "status", "priority", "createdAt", "updatedAt"]
+    },
+    "Alert": {
+      "title": "Alert",
+      "description": "System alert",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "severity": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "severity", "isRead", "createdAt", "updatedAt"]
+    },
+    "Work": {
+      "title": "Work",
+      "description": "Construction site or work location",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "createdAt", "updatedAt"]
+    },
+    "Status": {
+      "title": "Status",
+      "description": "Vehicle or Driver status (e.g., Active, Inactive)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles. Anyone signed in can read, only admin can write, or self can write certain fields."
+    },
+    "/vehicles/{vehicleId}": {
+      "schema": { "$ref": "#/entities/Vehicle" },
+      "description": "Fleet vehicles"
+    },
+    "/vehicles/{vehicleId}/maintenances/{maintenanceId}": {
+      "schema": { "$ref": "#/entities/Maintenance" },
+      "description": "Maintenance records"
+    },
+    "/drivers/{driverId}": {
+      "schema": { "$ref": "#/entities/Driver" },
+      "description": "Drivers"
+    },
+    "/alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/Alert" },
+      "description": "System alerts"
+    },
+    "/works/{workId}": {
+      "schema": { "$ref": "#/entities/Work" },
+      "description": "Work locations"
+    },
+    "/statuses/{statusId}": {
+      "schema": { "$ref": "#/entities/Status" },
+      "description": "Managed statuses"
+    }
+  }
+}
