@@ -113,6 +113,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
           // Pre-load vehicle image to handle CORS for PDF export
           const imgUrl = vehicleData.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800";
           
+          const proxyImgUrl = `https://corsproxy.io/?${encodeURIComponent(imgUrl)}`;
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => {
@@ -133,7 +134,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
           img.onerror = () => {
             console.warn("Failed to load image for PDF pre-load:", imgUrl);
           };
-          img.src = imgUrl;
+          img.src = proxyImgUrl;
         }
       } catch (error) {
         console.error('Error fetching vehicle:', error);
@@ -267,79 +268,125 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
   const exportToPDF = async () => {
     setIsExporting(true);
     try {
-      const element = document.getElementById('inspection-print-container');
-      if (!element) return;
+      const { jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
 
-      // Adiciona uma classe temporária para garantir fundo branco e padding na impressão
-      element.classList.add('bg-white');
-      element.style.padding = '20px';
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      pdf.setFont('helvetica');
 
-      const dataUrl = await htmlToImage.toJpeg(element, {
-        quality: 1.0,
-        pixelRatio: 3, 
-        backgroundColor: '#ffffff',
-        skipFonts: true,
-        fontEmbedCSS: '',
-        imagePlaceholder: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=200', // Placeholder se a imagem falhar
-        filter: (node: any) => {
-          if (node?.getAttribute) {
-            const ignore = node.getAttribute('data-html2canvas-ignore') === 'true';
-            const isFixed = node.classList?.contains('fixed');
-            const isButton = node.tagName === 'BUTTON';
-            const isSearch = node.placeholder?.toLowerCase().includes('buscar');
-            if (ignore || isFixed || isButton || isSearch) return false;
-          }
-          return true;
+      // Cabeçalho (1a página)
+      let startY = 15;
+
+      // Imagem do veículo
+      if (vehicleImgDataUrl) {
+         pdf.addImage(vehicleImgDataUrl, 'JPEG', 14, startY, 20, 20);
+         pdf.setFontSize(16);
+         pdf.setFont('helvetica', 'bold');
+         pdf.text(`Inspecao: ${vehicle.plate}`, 38, startY + 8);
+         pdf.setFontSize(10);
+         pdf.setFont('helvetica', 'normal');
+         pdf.text(`${vehicle.model}`, 38, startY + 14);
+      } else {
+         pdf.setFontSize(16);
+         pdf.setFont('helvetica', 'bold');
+         pdf.text(`Inspecao: ${vehicle.plate}`, 14, startY + 8);
+         pdf.setFontSize(10);
+         pdf.setFont('helvetica', 'normal');
+         pdf.text(`${vehicle.model}`, 14, startY + 14);
+      }
+
+      // Box do KM Atual
+      pdf.setFillColor(241, 245, 249);
+      pdf.roundedRect(pageWidth - 54, startY, 40, 20, 2, 2, 'F');
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('KM ATUAL', pageWidth - 50, startY + 6);
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(formatKM(currentKM), pageWidth - 50, startY + 14);
+
+      startY += 30;
+      
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`Itens de Inspecao (${filteredItems.length})`, 14, startY);
+      
+      startY += 5;
+
+      // Preparar Dados da Tabela
+      const tableData = sortedItems.map(item => {
+        const record = records[item.id] || { conformity: '', serviceExecuted: '', lastMaintenanceKM: 0, nextMaintenanceKM: 0 };
+        const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
+        
+        let progressPercent = 0;
+        let kmSinceLast = currentVehicleKM - record.lastMaintenanceKM;
+        if (item.periodicityKM > 0) {
+           progressPercent = Math.min(100, Math.max(0, (kmSinceLast / item.periodicityKM) * 100));
+        }
+        
+        const remainingKM = record.nextMaintenanceKM - currentVehicleKM;
+        let progressText = `${Math.round(progressPercent)}%`;
+        let desc = progressPercent >= 100 
+           ? `VENCIDO HA ${formatKM(Math.abs(remainingKM))} KM`
+           : `RESTAM ${formatKM(remainingKM)} KM`;
+
+        return [
+           `${item.name}\nPeriodicidade: ${formatKM(item.periodicityKM)} km`,
+           record.conformity || '-',
+           record.serviceExecuted || '-',
+           formatKM(record.lastMaintenanceKM),
+           `Prox: ${formatKM(record.nextMaintenanceKM)}\n${desc}\nProgresso: ${progressText}`
+        ];
+      });
+
+      autoTable(pdf, {
+        startY: startY,
+        head: [['ITEM', 'ACOES', 'SERVICO EXECUTADO', 'ULTIMA MANUT.', 'PROGRESSO']],
+        body: tableData,
+        theme: 'grid',
+        styles: {
+           font: 'helvetica',
+           fontSize: 8,
+           cellPadding: { top: 4, right: 4, bottom: 4, left: 4 },
+           valign: 'middle'
+        },
+        headStyles: {
+           fillColor: [248, 250, 252],
+           textColor: [100, 116, 139],
+           fontStyle: 'bold',
+           fontSize: 7,
+           halign: 'left',
+           lineColor: [226, 232, 240],   
+           lineWidth: 0.1
+        },
+        bodyStyles: {
+           lineColor: [226, 232, 240],
+           lineWidth: 0.1
+        },
+        columnStyles: {
+           0: { cellWidth: 60 },
+           1: { halign: 'center' },
+           2: { halign: 'center' },
+           3: { halign: 'center' },
+           4: { halign: 'left', fontStyle: 'bold' }
+        },
+        didDrawPage: function () {
+            const pageCount = pdf.internal.getNumberOfPages();
+            pdf.setFontSize(8);
+            pdf.setTextColor(150);
+            pdf.text('By Pablo Moreira', 14, pageHeight - 10);
+            const pageCountStr = `Pagina ${pageCount}`;
+            pdf.text(pageCountStr, pageWidth - 14 - pdf.getTextWidth(pageCountStr), pageHeight - 10);
         }
       });
       
-      // Remove estilos temporários
-      element.classList.remove('bg-white');
-      element.style.padding = '';
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      // Margens do documento
-      const margin = 10;
-      const contentWidth = pdfWidth - (2 * margin);
-      const contentHeight = pdfHeight - (2 * margin);
-      
-      const imgWidth = contentWidth;
-      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-      
-      let heightLeft = imgHeight;
-      let position = margin;
-      let pageNumber = 1;
-
-      const addFooter = (page: number) => {
-        pdf.setFontSize(8);
-        pdf.setTextColor(100, 100, 100);
-        pdf.text('By Pablo Moreira', margin, pdfHeight - 8);
-        pdf.text(`${page}`, pdfWidth - margin - 5, pdfHeight - 8);
-      };
-
-      // Primeira página
-      pdf.addImage(dataUrl, 'JPEG', margin, position, imgWidth, imgHeight);
-      addFooter(pageNumber);
-      heightLeft -= contentHeight;
-
-      // Adiciona novas páginas para o conteúdo restante
-      while (heightLeft > 0) {
-        pdf.addPage();
-        pageNumber++;
-        position = heightLeft - imgHeight + margin;
-        pdf.addImage(dataUrl, 'JPEG', margin, position, imgWidth, imgHeight);
-        addFooter(pageNumber);
-        heightLeft -= contentHeight;
-      }
-
       pdf.save(`Relatorio_Inspecao_${vehicle.plate}.pdf`);
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
-      alert('Houve um problema ao gerar o PDF. Se o erro persistir, abra o sistema em uma nova aba do navegador.');
+      alert('Houve um problema ao gerar o PDF. Se o erro persistir, atualize a pagina.');
     } finally {
       setIsExporting(false);
     }
