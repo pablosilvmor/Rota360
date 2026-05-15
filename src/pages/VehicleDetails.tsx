@@ -146,6 +146,18 @@ export function VehicleDetails({ vehicle, onBack, onEdit, onDelete }: VehicleDet
               <span className="text-on-surface-variant text-sm font-medium">Centro de Custo</span>
               <span className="font-bold text-sm">{vehicle.costCenter}</span>
             </div>
+            <div className="py-3.5 flex justify-between items-center">
+              <span className="text-on-surface-variant text-sm font-medium">Lotação</span>
+              <span className="font-bold text-sm">{vehicle.capacity || '-'}</span>
+            </div>
+            <div className="py-3.5 flex justify-between items-center">
+              <span className="text-on-surface-variant text-sm font-medium">Peso Bruto Total (PBT)</span>
+              <span className="font-bold text-sm">{vehicle.grossWeight || '-'}</span>
+            </div>
+            <div className="py-3.5 flex justify-between items-center">
+              <span className="text-on-surface-variant text-sm font-medium">CNPJ / CPF</span>
+              <span className="font-bold text-sm">{vehicle.ownerCnpj || '-'}</span>
+            </div>
             {vehicle.observation && (
               <div className="py-3.5 flex flex-col gap-2">
                 <span className="text-on-surface-variant text-sm font-medium">Observação</span>

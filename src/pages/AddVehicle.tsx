@@ -10,7 +10,7 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
   const [works, setWorks] = useState<any[]>([]);
   const [vehicleData, setVehicleData] = useState(vehicleToEdit || {
     plate: '', renavam: '', brand: '', model: '', modelYear: '', chassis: '', fuelType: '', color: '', bodywork: '', costCenter: '', status: 'Ativo',
-    exerciceYear: '', exerciceStatus: '', imageUrl: '', observation: ''
+    exerciceYear: '', exerciceStatus: '', imageUrl: '', observation: '', capacity: '', grossWeight: '', ownerCnpj: ''
   });
 
   useEffect(() => {
@@ -101,13 +101,17 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
       - model: modelo
       - modelYear: ano modelo
       - chassis: CHASSI ou chassi
+      - capacity: LOTAÇÃO ou capacidade de passageiros
+      - grossWeight: PBT ou PESO BRUTO TOTAL
+      - ownerCnpj: CPF / CNPJ do proprietário
+      - observation: OBSERVAÇÕES DO VEÍCULO (leia o bloco de observações com atenção)
       - fuelType: procure o campo COMBUSTÍVEL no documento (ex: DIESEL S10, GASOLINA, FLEX, etc)
       - color: procure o campo COR PREDOMINANTE no documento
       - bodywork: procure o campo ESPÉCIE/TIPO ou CARROCERIA no documento
       - exerciceYear: procure o campo EXERCÍCIO (ano) no documento
       - costCenter: centro de custo (tente inferir ou deixe vazio se não encontrar pistas)
       Retorne APENAS o JSON puro. Não inclua \`\`\`json ou texto extra.
-Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Mercedes-Benz", "model": "Sprinter 516 CDI", "modelYear": "2024", "chassis": "WDBCF56789G123456", "fuelType": "DIESEL S10", "color": "BRANCO", "bodywork": "CAMINHÃO/FURGÃO", "exerciceYear": "2024", "costCenter": "Logística - Região Sul" }`;
+Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Mercedes-Benz", "model": "Sprinter 516 CDI", "modelYear": "2024", "chassis": "WDBCF56789G123456", "capacity": "19P", "grossWeight": "3.85", "ownerCnpj": "26.005.751/0001-94", "observation": "ALIENAÇÃO FIDUCIÁRIA", "fuelType": "DIESEL S10", "color": "BRANCO", "bodywork": "CAMINHÃO/FURGÃO", "exerciceYear": "2024", "costCenter": "Logística - Região Sul" }`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -140,6 +144,10 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
         model: data.model || '',
         modelYear: data.modelYear || '',
         chassis: data.chassis || '',
+        capacity: data.capacity || '',
+        grossWeight: data.grossWeight || '',
+        ownerCnpj: data.ownerCnpj || '',
+        observation: data.observation || '',
         fuelType: data.fuelType || 'DIESEL S10',
         color: data.color || '',
         bodywork: data.bodywork || '',
@@ -366,6 +374,39 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface font-mono focus:outline-none focus:border-primary" 
                     value={vehicleData.chassis} 
                     onChange={(e) => setVehicleData({ ...vehicleData, chassis: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div>
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
+                    Lotação {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  </label>
+                  <input 
+                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    value={vehicleData.capacity || ''} 
+                    onChange={(e) => setVehicleData({ ...vehicleData, capacity: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
+                    PBT (Peso Bruto Total) {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  </label>
+                  <input 
+                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    value={vehicleData.grossWeight || ''} 
+                    onChange={(e) => setVehicleData({ ...vehicleData, grossWeight: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
+                    CNPJ / CPF do Proprietário {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  </label>
+                  <input 
+                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface font-mono focus:outline-none focus:border-primary" 
+                    value={vehicleData.ownerCnpj || ''} 
+                    onChange={(e) => setVehicleData({ ...vehicleData, ownerCnpj: e.target.value })}
                   />
                 </div>
               </div>

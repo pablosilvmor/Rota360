@@ -113,11 +113,16 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
           // Pre-load vehicle image to handle CORS for PDF export
           const imgUrl = vehicleData.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800";
           
-          // Sempre usar wsrv.nl no proxy para evitar problemas CORS com imagens de qualquer domínio
-          const proxyImgUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}`;
-
+          const proxies = [
+            `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}`,
+            `https://corsproxy.io/?${encodeURIComponent(imgUrl)}`,
+            imgUrl
+          ];
+          
+          let proxyIdx = 0;
           const img = new Image();
           img.crossOrigin = "anonymous";
+          
           img.onload = () => {
             try {
               const canvas = document.createElement('canvas');
@@ -133,10 +138,17 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
               console.warn("CORS blocked canvas export for image:", imgUrl);
             }
           };
+          
           img.onerror = () => {
-            console.warn("Failed to load image for PDF pre-load:", imgUrl);
+             proxyIdx++;
+             if (proxyIdx < proxies.length) {
+                img.src = proxies[proxyIdx];
+             } else {
+                console.warn("Failed to load image from all proxies:", imgUrl);
+             }
           };
-          img.src = proxyImgUrl;
+          
+          img.src = proxies[0];
         }
       } catch (error) {
         console.error('Error fetching vehicle:', error);
@@ -280,7 +292,10 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
       pdf.setFont('helvetica');
 
       // Preparar Dados da Tabela
-      const tableData = sortedItems.map(item => {
+      const tableData: any[] = [];
+      
+      sortedItems.forEach(item => {
+        if (!item || !item.id) return;
         const record = records[item.id] || { conformity: '', serviceExecuted: '', lastMaintenanceKM: 0, nextMaintenanceKM: 0 };
         const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
         
@@ -296,13 +311,13 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
            ? `VENCIDO HÁ ${formatKM(Math.abs(remainingKM))} KM`
            : `RESTAM ${formatKM(remainingKM)} KM`;
 
-        return [
+        tableData.push([
            `${item.name}\nPeriodicidade: ${formatKM(item.periodicityKM)} km`,
            record.conformity || '-',
            record.serviceExecuted || '-',
            formatKM(record.lastMaintenanceKM),
            `Próx: ${formatKM(record.nextMaintenanceKM)}\n${desc}\nProgresso: ${progressText}\n`
-        ];
+        ]);
       });
 
       autoTable(pdf, {
