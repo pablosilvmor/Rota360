@@ -112,28 +112,28 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
 
           // Pre-load vehicle image to handle CORS for PDF export
           const imgUrl = vehicleData.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800";
-          fetch(imgUrl, { mode: 'no-cors' }) // tenta carregar sem restrição
-            .then(() => {
-               // Se conseguir carregar, tenta converter para base64 para o PDF
-               const img = new Image();
-               img.crossOrigin = "anonymous";
-               img.onload = () => {
-                 const canvas = document.createElement('canvas');
-                 canvas.width = img.width;
-                 canvas.height = img.height;
-                 const ctx = canvas.getContext('2d');
-                 if (ctx) {
-                   ctx.drawImage(img, 0, 0);
-                   const dataUrl = canvas.toDataURL('image/jpeg');
-                   if (isMounted) setVehicleImgDataUrl(dataUrl);
-                 }
-               };
-               img.src = imgUrl;
-            })
-            .catch(err => {
-              console.warn("Imagem do veículo não pôde ser processada para o PDF (CORS):", err);
-              // Mantém nulo para usar fallback se necessário
-            });
+          
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL('image/jpeg');
+                if (isMounted) setVehicleImgDataUrl(dataUrl);
+              }
+            } catch (e) {
+              console.warn("CORS blocked canvas export for image:", imgUrl);
+            }
+          };
+          img.onerror = () => {
+            console.warn("Failed to load image for PDF pre-load:", imgUrl);
+          };
+          img.src = imgUrl;
         }
       } catch (error) {
         console.error('Error fetching vehicle:', error);
@@ -270,42 +270,76 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
       const element = document.getElementById('inspection-print-container');
       if (!element) return;
 
-      // Usando toJpeg com configurações robustas para evitar erros de CORS/CSS
+      // Adiciona uma classe temporária para garantir fundo branco e padding na impressão
+      element.classList.add('bg-white');
+      element.style.padding = '20px';
+
       const dataUrl = await htmlToImage.toJpeg(element, {
-        quality: 0.95,
-        pixelRatio: 2,
+        quality: 1.0,
+        pixelRatio: 3, 
         backgroundColor: '#ffffff',
         skipFonts: true,
-        fontEmbedCSS: '', // Evita erro ao tentar ler CSS externo
-        style: {
-          fontFamily: 'Arial, sans-serif'
-        },
+        fontEmbedCSS: '',
+        imagePlaceholder: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=200', // Placeholder se a imagem falhar
         filter: (node: any) => {
-          // Ignorar botões de ação e modais na exportação
           if (node?.getAttribute) {
             const ignore = node.getAttribute('data-html2canvas-ignore') === 'true';
             const isFixed = node.classList?.contains('fixed');
-            if (ignore || isFixed) return false;
+            const isButton = node.tagName === 'BUTTON';
+            const isSearch = node.placeholder?.toLowerCase().includes('buscar');
+            if (ignore || isFixed || isButton || isSearch) return false;
           }
           return true;
         }
       });
       
-      const pdf = new jsPDF({
-        orientation: 'p',
-        unit: 'mm',
-        format: 'a4'
-      });
+      // Remove estilos temporários
+      element.classList.remove('bg-white');
+      element.style.padding = '';
 
+      const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(dataUrl);
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Margens do documento
+      const margin = 10;
+      const contentWidth = pdfWidth - (2 * margin);
+      const contentHeight = pdfHeight - (2 * margin);
+      
+      const imgWidth = contentWidth;
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+      
+      let heightLeft = imgHeight;
+      let position = margin;
+      let pageNumber = 1;
 
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Inspecao_${vehicle.plate}.pdf`);
+      const addFooter = (page: number) => {
+        pdf.setFontSize(8);
+        pdf.setTextColor(100, 100, 100);
+        pdf.text('By Pablo Moreira', margin, pdfHeight - 8);
+        pdf.text(`${page}`, pdfWidth - margin - 5, pdfHeight - 8);
+      };
+
+      // Primeira página
+      pdf.addImage(dataUrl, 'JPEG', margin, position, imgWidth, imgHeight);
+      addFooter(pageNumber);
+      heightLeft -= contentHeight;
+
+      // Adiciona novas páginas para o conteúdo restante
+      while (heightLeft > 0) {
+        pdf.addPage();
+        pageNumber++;
+        position = heightLeft - imgHeight + margin;
+        pdf.addImage(dataUrl, 'JPEG', margin, position, imgWidth, imgHeight);
+        addFooter(pageNumber);
+        heightLeft -= contentHeight;
+      }
+
+      pdf.save(`Relatorio_Inspecao_${vehicle.plate}.pdf`);
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
-      alert('Houve um problema ao gerar o PDF. Recomendamos abrir o aplicativo em uma aba separada (fora do preview) ou usar o Google Chrome para esta operação.');
+      alert('Houve um problema ao gerar o PDF. Se o erro persistir, abra o sistema em uma nova aba do navegador.');
     } finally {
       setIsExporting(false);
     }
