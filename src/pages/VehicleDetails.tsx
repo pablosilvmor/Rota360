@@ -2,12 +2,13 @@ import { motion } from 'framer-motion';
 
 interface VehicleDetailsProps {
   vehicle: any;
+  assignedDriver: any;
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export function VehicleDetails({ vehicle, onBack, onEdit, onDelete }: VehicleDetailsProps) {
+export function VehicleDetails({ vehicle, assignedDriver, onBack, onEdit, onDelete }: VehicleDetailsProps) {
   const containerVariants = {
     hidden: { opacity: 0, x: 20 },
     visible: { opacity: 1, x: 0, transition: { duration: 0.4 } }
@@ -212,17 +213,28 @@ export function VehicleDetails({ vehicle, onBack, onEdit, onDelete }: VehicleDet
 
         <div className="col-span-12 lg:col-span-3 bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm flex flex-col justify-between items-center text-center">
           <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-4 w-full text-left">Motorista Atribuído</h3>
-          <div className="mb-4">
-            <div className="h-24 w-24 rounded-full mx-auto overflow-hidden mb-4 border-2 border-primary-fixed p-1 bg-surface-container-low">
-              <img className="h-full w-full rounded-full object-cover p-2" src="https://cdn-icons-png.flaticon.com/512/1535/1535791.png" alt="Motorista" />
+          {assignedDriver ? (
+            <>
+              <div className="mb-4">
+                <div className="h-24 w-24 rounded-full mx-auto overflow-hidden mb-4 border-2 border-primary-fixed p-1 bg-surface-container-low">
+                   <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-2xl">
+                     {assignedDriver.name?.charAt(0).toUpperCase()}
+                   </div>
+                </div>
+                <h4 className="text-[20px] font-bold leading-none mb-1">{assignedDriver.name}</h4>
+                <p className="text-sm text-on-surface-variant font-medium">Cat. {assignedDriver.cnhCategory}</p>
+              </div>
+              <div className="w-full bg-surface-container px-4 py-2.5 rounded-lg flex justify-between items-center">
+                 <span className="text-[10px] font-bold text-on-surface-variant uppercase">Status</span>
+                 <span className="text-sm font-bold text-emerald-600">{assignedDriver.status}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8">
+              <span className="material-symbols-outlined text-4xl text-on-surface-variant/30 mb-2">person_off</span>
+              <p className="text-sm font-medium text-on-surface-variant">Nenhum motorista atribuído</p>
             </div>
-            <h4 className="text-[20px] font-bold leading-none mb-1">Marcus Thorne</h4>
-            <p className="text-sm text-on-surface-variant font-medium">Comercial Classe B</p>
-          </div>
-          <div className="w-full bg-surface-container px-4 py-2.5 rounded-lg flex justify-between items-center">
-             <span className="text-[10px] font-bold text-on-surface-variant uppercase">Fim do Turno</span>
-             <span className="text-sm font-bold">17:45</span>
-          </div>
+          )}
         </div>
       </div>
     </motion.div>

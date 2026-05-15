@@ -35,6 +35,7 @@ export function Fleet() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,6 +44,7 @@ export function Fleet() {
 
   const editingVehicle = vehicles.find(v => v.id === editingVehicleId) || null;
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId) || null;
+  const assignedDriver = drivers.find(d => d.vehicleAssigned === selectedVehicle?.plate) || null;
 
   useEffect(() => {
     // Listen to vehicles
@@ -83,10 +85,19 @@ export function Fleet() {
       handleFirestoreError(error, OperationType.LIST, 'statuses');
     });
 
+    // Listen to drivers
+    const qDrivers = query(collection(db, 'drivers'));
+    const unsubscribeDrivers = onSnapshot(qDrivers, (snapshot) => {
+      setDrivers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, error => {
+      handleFirestoreError(error, OperationType.LIST, 'drivers');
+    });
+
     return () => {
       unsubscribeVehicles();
       unsubscribeWorks();
       unsubscribeStatuses();
+      unsubscribeDrivers();
     };
   }, []);
 
@@ -136,6 +147,7 @@ export function Fleet() {
   if (selectedVehicle) {
     return <VehicleDetails 
       vehicle={selectedVehicle} 
+      assignedDriver={assignedDriver}
       onBack={() => setSearchParams({})} 
       onDelete={() => {
         handleDelete(selectedVehicle.id);

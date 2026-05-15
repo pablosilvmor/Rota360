@@ -31,7 +31,9 @@ export function Drivers() {
 
   const [drivers, setDrivers] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assignment, setAssignment] = useState({ driverId: '', vehiclePlate: '', workId: '', workName: '' });
   const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
 
@@ -83,11 +85,37 @@ export function Drivers() {
       handleFirestoreError(error, OperationType.LIST, 'works');
     });
 
+    const qVehicles = query(collection(db, 'vehicles'), orderBy('plate', 'asc'));
+    const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
+      setVehicles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'vehicles');
+    });
+
     return () => {
       unsubscribeDrivers();
       unsubscribeWorks();
+      unsubscribeVehicles();
     };
   }, []);
+
+  const handleConfirmAssignment = async () => {
+    if (!assignment.driverId || !assignment.vehiclePlate) return;
+    try {
+      const driverRef = doc(db, 'drivers', assignment.driverId);
+      await updateDoc(driverRef, {
+        vehicleAssigned: assignment.vehiclePlate,
+        workId: assignment.workId || '',
+        workName: assignment.workName || '',
+        status: 'Em Rota',
+        updatedAt: Date.now()
+      });
+      setSearchParams({});
+      setAssignment({ driverId: '', vehiclePlate: '', workId: '', workName: '' });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'drivers');
+    }
+  };
 
   const handleSaveDriver = async () => {
     if(!newDriver.name || !newDriver.cpf) return;
@@ -136,6 +164,8 @@ export function Drivers() {
     return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
   });
 
+  const availableVehicles = vehicles.filter(v => !drivers.some(d => d.vehicleAssigned === v.plate));
+
   const SortButton = ({ column, label }: { column: string, label: string }) => (
     <th 
       className="px-6 py-4 uppercase tracking-wider cursor-pointer hover:bg-surface-container transition-colors group"
@@ -178,33 +208,59 @@ export function Drivers() {
               <div className="p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-on-surface-variant mb-2">Motorista</label>
-                  <select className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
-                    <option>Selecione um motorista...</option>
-                    <option>Ricardo Santos (#DR-8821)</option>
-                    <option>Elena Gilbert (#DR-9012)</option>
-                    <option>Marco Vianna (#DR-7742)</option>
+                  <select 
+                    className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
+                    value={assignment.driverId}
+                    onChange={(e) => setAssignment({ ...assignment, driverId: e.target.value })}
+                  >
+                    <option value="">Selecione um motorista...</option>
+                    {drivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>{driver.name} ({driver.cpf})</option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-on-surface-variant mb-2">Veículo Disponível</label>
-                  <select className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
-                    <option>Selecione um veículo...</option>
-                    <option>Volvo FH Electric (TRK-2109)</option>
-                    <option>Audi A6 Limousine (EXE-5510)</option>
+                  <select 
+                    className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
+                    value={assignment.vehiclePlate}
+                    onChange={(e) => setAssignment({ ...assignment, vehiclePlate: e.target.value })}
+                  >
+                    <option value="">Selecione um veículo...</option>
+                    {availableVehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.plate}>{vehicle.plate} - {vehicle.model}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-on-surface-variant mb-2">Obra (Opcional)</label>
-                  <select className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
+                  <select 
+                    className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
+                    value={assignment.workId}
+                    onChange={(e) => {
+                      const selectedWork = works.find(w => w.id === e.target.value);
+                      setAssignment({ 
+                        ...assignment, 
+                        workId: e.target.value, 
+                        workName: selectedWork ? selectedWork.name : '' 
+                      });
+                    }}
+                  >
                     <option value="">Nenhuma obra atribuída...</option>
                     {works.map((work) => (
-                      <option key={work.id} value={work.name}>{work.name}</option>
+                      <option key={work.id} value={work.id}>{work.name}</option>
                     ))}
                   </select>
                 </div>
                 <div className="pt-4 flex gap-4">
                    <button onClick={() => setSearchParams({})} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
-                   <button onClick={() => setSearchParams({})} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">Confirmar Atribuição</button>
+                   <button 
+                     onClick={handleConfirmAssignment} 
+                     disabled={!assignment.driverId || !assignment.vehiclePlate}
+                     className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                   >
+                     Confirmar Atribuição
+                   </button>
                 </div>
               </div>
             </motion.div>
