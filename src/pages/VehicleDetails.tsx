@@ -213,8 +213,8 @@ export function VehicleDetails({ vehicle, onBack, onEdit, onDelete }: VehicleDet
         <div className="col-span-12 lg:col-span-3 bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm flex flex-col justify-between items-center text-center">
           <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-4 w-full text-left">Motorista Atribuído</h3>
           <div className="mb-4">
-            <div className="h-24 w-24 rounded-full mx-auto overflow-hidden mb-4 border-2 border-primary-fixed p-1">
-              <img className="h-full w-full rounded-full object-cover" src="https://images.unsplash.com/photo-1544256718-3bcf237f3974?auto=format&fit=crop&q=80&w=200" alt="Motorista" />
+            <div className="h-24 w-24 rounded-full mx-auto overflow-hidden mb-4 border-2 border-primary-fixed p-1 bg-surface-container-low">
+              <img className="h-full w-full rounded-full object-cover p-2" src="https://cdn-icons-png.flaticon.com/512/1535/1535791.png" alt="Motorista" />
             </div>
             <h4 className="text-[20px] font-bold leading-none mb-1">Marcus Thorne</h4>
             <p className="text-sm text-on-surface-variant font-medium">Comercial Classe B</p>

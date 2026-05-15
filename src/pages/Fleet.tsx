@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { AddVehicle } from './AddVehicle';
 import { VehicleDetails } from './VehicleDetails';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -26,17 +27,22 @@ const itemVariants = {
 };
 
 export function Fleet() {
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState<any>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isAdding = searchParams.get('add') === 'true';
+  const editingVehicleId = searchParams.get('editId');
+  const selectedVehicleId = searchParams.get('vehicleId');
+
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterWork, setFilterWork] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
+  const editingVehicle = vehicles.find(v => v.id === editingVehicleId) || null;
+  const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId) || null;
 
   useEffect(() => {
     // Listen to vehicles
@@ -124,20 +130,19 @@ export function Fleet() {
   });
 
   if (isAdding || editingVehicle) {
-    return <AddVehicle vehicleToEdit={editingVehicle} onCancel={() => { setIsAdding(false); setEditingVehicle(null); }} onSave={() => { setIsAdding(false); setEditingVehicle(null); }} />;
+    return <AddVehicle vehicleToEdit={editingVehicle} onCancel={() => setSearchParams({})} onSave={() => setSearchParams({})} />;
   }
 
   if (selectedVehicle) {
     return <VehicleDetails 
       vehicle={selectedVehicle} 
-      onBack={() => setSelectedVehicle(null)} 
+      onBack={() => setSearchParams({})} 
       onDelete={() => {
         handleDelete(selectedVehicle.id);
-        setSelectedVehicle(null);
+        setSearchParams({});
       }}
       onEdit={() => {
-        setEditingVehicle(selectedVehicle);
-        setSelectedVehicle(null);
+        setSearchParams({ editId: selectedVehicle.id });
       }} 
     />;
   }
@@ -163,7 +168,7 @@ export function Fleet() {
           <p className="text-base text-on-surface-variant">Supervisione e gerencie seus ativos operacionais com inteligência de precisão.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setIsAdding(true)} className="px-5 py-2.5 bg-primary text-on-primary rounded-lg hover:opacity-90 transition-all active:scale-95 flex items-center gap-2 shadow-lg font-semibold text-sm">
+          <button onClick={() => setSearchParams({ add: 'true' })} className="px-5 py-2.5 bg-primary text-on-primary rounded-lg hover:opacity-90 transition-all active:scale-95 flex items-center gap-2 shadow-lg font-semibold text-sm">
             <span className="material-symbols-outlined text-[20px]">add</span>
             Adicionar Veículo
           </button>
@@ -272,7 +277,7 @@ export function Fleet() {
             <p className="text-on-surface-variant mt-2">Tente ajustar seus filtros ou cadastre um novo veículo.</p>
             {!searchTerm && !filterWork && !filterStatus && (
               <button 
-                onClick={() => setIsAdding(true)}
+                onClick={() => setSearchParams({ add: 'true' })}
                 className="mt-6 px-6 py-2 bg-primary text-on-primary rounded-lg font-bold"
               >
                 Cadastrar Primeiro Veículo
@@ -289,7 +294,7 @@ export function Fleet() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 variants={itemVariants} 
-                onClick={() => setSelectedVehicle(vehicle)}
+                onClick={() => setSearchParams({ vehicleId: vehicle.id })}
                 className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer"
               >
                 <div className="relative h-56 overflow-hidden bg-white border-b border-outline-variant/30 flex items-center justify-center p-4">
@@ -310,6 +315,10 @@ export function Fleet() {
                       <h3 className="font-bold text-[28px] text-primary leading-none mb-1">{vehicle.plate}</h3>
                       <p className="text-sm text-on-surface-variant font-medium">{vehicle.brand} {vehicle.model}</p>
                       {vehicle.bodywork && <p className="text-xs text-on-surface-variant/80 uppercase font-bold tracking-wide mt-1">{vehicle.bodywork}</p>}
+                      <div className="flex items-center gap-1 mt-2 text-on-surface-variant bg-surface-container w-fit px-2 py-0.5 rounded">
+                         <span className="material-symbols-outlined text-[14px]">domain</span>
+                         <span className="text-xs font-semibold">{vehicle.work || 'Não atribuída'}</span>
+                      </div>
                     </div>
                     <div className="relative group/menu">
                       <button 
@@ -320,7 +329,7 @@ export function Fleet() {
                       </button>
                       <div className="absolute right-0 top-full mt-1 bg-white border border-outline-variant rounded-lg shadow-lg py-2 w-32 z-30 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all">
                         <button 
-                          onClick={(e) => { e.stopPropagation(); setEditingVehicle(vehicle); }} 
+                          onClick={(e) => { e.stopPropagation(); setSearchParams({ editId: vehicle.id }); }} 
                           className="w-full text-left px-4 py-2 hover:bg-surface-container text-sm transition-colors"
                         >
                           Editar
@@ -364,6 +373,7 @@ export function Fleet() {
                   <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">PLACA</th>
                   <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">MODELO</th>
                   <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">ESPÉCIE / TIPO</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">OBRA</th>
                   <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant text-right">AÇÕES</th>
                 </tr>
               </thead>
@@ -373,8 +383,14 @@ export function Fleet() {
                     <td className="px-6 py-4"><span className="text-sm font-semibold text-primary">{vehicle.plate}</span></td>
                     <td className="px-6 py-4 text-sm font-medium">{vehicle.brand} {vehicle.model}</td>
                     <td className="px-6 py-4 text-sm uppercase">{vehicle.bodywork || '-'}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <div className="flex items-center gap-1 text-on-surface-variant bg-surface-container w-fit px-2 py-0.5 rounded">
+                        <span className="material-symbols-outlined text-[14px]">domain</span>
+                        <span className="text-xs font-semibold">{vehicle.work || 'Não atribuída'}</span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={(e) => { e.stopPropagation(); setSelectedVehicle(vehicle); }} className="text-on-surface-variant hover:text-primary transition-colors">
+                      <button onClick={(e) => { e.stopPropagation(); setSearchParams({ vehicleId: vehicle.id }); }} className="text-on-surface-variant hover:text-primary transition-colors">
                         <span className="material-symbols-outlined">visibility</span>
                       </button>
                     </td>

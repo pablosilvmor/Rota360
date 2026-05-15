@@ -432,6 +432,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                       <option value="DIESEL S10">DIESEL S10</option>
                       <option value="DIESEL">DIESEL</option>
                       <option value="GASOLINA">GASOLINA</option>
+                      <option value="ALCOOL/GASOLINA">ALCOOL/GASOLINA</option>
                       <option value="ETANOL">ETANOL</option>
                       <option value="FLEX">FLEX (ALCOOL/GASOL)</option>
                       <option value="ELÉTRICO">ELÉTRICO</option>

@@ -1353,6 +1353,10 @@ export function Inspections() {
                       <div>
                         <h3 className="text-xl font-bold text-on-surface leading-none mb-1">{vehicle.plate}</h3>
                         <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{vehicle.brand} {vehicle.model}</p>
+                        <div className="flex items-center gap-1 mt-2 text-on-surface-variant bg-surface-container-high w-fit px-2 py-0.5 rounded">
+                          <span className="material-symbols-outlined text-[12px]">domain</span>
+                          <span className="text-[10px] font-bold uppercase">{vehicle.work || 'Não atribuída'}</span>
+                        </div>
                       </div>
                     </div>
                     

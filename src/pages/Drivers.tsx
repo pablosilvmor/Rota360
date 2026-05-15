@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc } from 'firebase/firestore';
@@ -23,8 +24,9 @@ const itemVariants = {
 };
 
 export function Drivers() {
-  const [isAssignVehicleOpen, setIsAssignVehicleOpen] = useState(false);
-  const [isAddDriverOpen, setIsAddDriverOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isAssignVehicleOpen = searchParams.get('assign') === 'true';
+  const isAddDriverOpen = searchParams.get('add') === 'true';
   const [drivers, setDrivers] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +80,7 @@ export function Drivers() {
         rating: 5.0,
         createdAt: Date.now()
       });
-      setIsAddDriverOpen(false);
+      setSearchParams({});
       setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
     } catch(e) {
       handleFirestoreError(e, OperationType.CREATE, 'drivers');
@@ -97,7 +99,7 @@ export function Drivers() {
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => setIsAssignVehicleOpen(false)}
+            onClick={() => setSearchParams({})}
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
@@ -106,7 +108,7 @@ export function Drivers() {
             >
               <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
                 <h3 className="text-xl font-semibold text-on-surface">Atribuir Veículo</h3>
-                <button onClick={() => setIsAssignVehicleOpen(false)} className="text-on-surface-variant hover:text-error transition-colors">
+                <button onClick={() => setSearchParams({})} className="text-on-surface-variant hover:text-error transition-colors">
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
@@ -138,8 +140,8 @@ export function Drivers() {
                   </select>
                 </div>
                 <div className="pt-4 flex gap-4">
-                   <button onClick={() => setIsAssignVehicleOpen(false)} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
-                   <button onClick={() => setIsAssignVehicleOpen(false)} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">Confirmar Atribuição</button>
+                   <button onClick={() => setSearchParams({})} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
+                   <button onClick={() => setSearchParams({})} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">Confirmar Atribuição</button>
                 </div>
               </div>
             </motion.div>
@@ -150,7 +152,7 @@ export function Drivers() {
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => setIsAddDriverOpen(false)}
+            onClick={() => setSearchParams({})}
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
@@ -159,7 +161,7 @@ export function Drivers() {
             >
               <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
                 <h3 className="text-xl font-semibold text-on-surface">Adicionar Novo Motorista</h3>
-                <button onClick={() => setIsAddDriverOpen(false)} className="text-on-surface-variant hover:text-error transition-colors">
+                <button onClick={() => setSearchParams({})} className="text-on-surface-variant hover:text-error transition-colors">
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
@@ -185,15 +187,32 @@ export function Drivers() {
                         <option>C</option>
                         <option>D</option>
                         <option>E</option>
+                        <option>AB</option>
+                        <option>AC</option>
+                        <option>AD</option>
+                        <option>AE</option>
                      </select>
                    </div>
                    <div className="col-span-1">
                      <label className="block text-sm font-semibold text-on-surface-variant mb-2">Validade CNH</label>
-                     <input type="date" value={newDriver.validUntil} onChange={e => setNewDriver({...newDriver, validUntil: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" />
+                     <input 
+                       type="date" 
+                       value={newDriver.validUntil} 
+                       onChange={e => setNewDriver({...newDriver, validUntil: e.target.value})} 
+                       onPaste={(e) => {
+                         const pastedText = e.clipboardData.getData('text');
+                         const dateMatch = pastedText.match(/(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})/);
+                         if (dateMatch) {
+                           e.preventDefault();
+                           setNewDriver({...newDriver, validUntil: `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`});
+                         }
+                       }}
+                       className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" 
+                     />
                    </div>
                 </div>
                 <div className="pt-4 flex gap-4">
-                   <button onClick={() => setIsAddDriverOpen(false)} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
+                   <button onClick={() => setSearchParams({})} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
                    <button onClick={handleAddDriver} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">Cadastrar Motorista</button>
                 </div>
               </div>
@@ -209,14 +228,14 @@ export function Drivers() {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setIsAssignVehicleOpen(true)}
+            onClick={() => setSearchParams({ assign: 'true' })}
             className="flex items-center gap-2 px-6 py-2.5 border border-outline-variant rounded-lg text-sm font-semibold text-on-surface hover:bg-surface-container-low transition-colors active:scale-95"
           >
             <span className="material-symbols-outlined text-[20px]">link</span>
             Atribuir Veículo
           </button>
           <button 
-            onClick={() => setIsAddDriverOpen(true)}
+            onClick={() => setSearchParams({ add: 'true' })}
             className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:opacity-90 shadow-md active:scale-95 transition-all"
           >
             <span className="material-symbols-outlined text-[20px]">person_add</span>
