@@ -156,10 +156,16 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
         costCenter: data.costCenter || 'Logística - Região Sul',
         status: 'Ativo'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro OCR:", error);
       setOcrStatus('idle');
-      alert(`Houve um erro no processamento inteligente: ${error instanceof Error ? error.message : 'Erro desconhecido'}. Tente novamente ou insira os dados manualmente.`);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('429') || errorMessage.includes('quota')) {
+        alert('Limite de uso inteligente atingido. Aguarde cerca de 1 minuto e tente novamente, ou insira os dados manualmente. (Erro de Cota API)');
+      } else {
+        alert(`Houve um erro no processamento: ${errorMessage}. Tente novamente ou insira os dados manualmente.`);
+      }
     }
   };
 

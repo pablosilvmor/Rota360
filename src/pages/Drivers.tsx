@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -27,10 +27,29 @@ export function Drivers() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isAssignVehicleOpen = searchParams.get('assign') === 'true';
   const isAddDriverOpen = searchParams.get('add') === 'true';
+  const editingDriverId = searchParams.get('editId');
+
   const [drivers, setDrivers] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+
+  const editingDriver = drivers.find(d => d.id === editingDriverId) || null;
+
+  useEffect(() => {
+    if (editingDriver) {
+      setNewDriver({
+        name: editingDriver.name || '',
+        cpf: editingDriver.cpf || '',
+        cnh: editingDriver.cnh || '',
+        cnhCategory: editingDriver.cnhCategory || 'A',
+        validUntil: editingDriver.validUntil || ''
+      });
+    } else {
+      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
+    }
+  }, [editingDriver]);
 
   const stats = {
     total: drivers.length,
@@ -49,7 +68,7 @@ export function Drivers() {
   };
 
   useEffect(() => {
-    const qDrivers = query(collection(db, 'drivers'), orderBy('createdAt', 'desc'));
+    const qDrivers = query(collection(db, 'drivers'));
     const unsubscribeDrivers = onSnapshot(qDrivers, (snapshot) => {
       setDrivers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -70,22 +89,66 @@ export function Drivers() {
     };
   }, []);
 
-  const handleAddDriver = async () => {
+  const handleSaveDriver = async () => {
     if(!newDriver.name || !newDriver.cpf) return;
     try {
-      await addDoc(collection(db, 'drivers'), {
-        ...newDriver,
-        status: 'Disponível',
-        vehicleAssigned: '',
-        rating: 5.0,
-        createdAt: Date.now()
-      });
+      if (editingDriverId) {
+        const driverRef = doc(db, 'drivers', editingDriverId);
+        const { id, createdAt, ...rest } = editingDriver;
+        await updateDoc(driverRef, {
+          ...rest,
+          ...newDriver,
+          updatedAt: Date.now()
+        });
+      } else {
+        await addDoc(collection(db, 'drivers'), {
+          ...newDriver,
+          status: 'Disponível',
+          vehicleAssigned: '',
+          rating: 5.0,
+          createdAt: Date.now()
+        });
+      }
       setSearchParams({});
       setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
     } catch(e) {
-      handleFirestoreError(e, OperationType.CREATE, 'drivers');
+      handleFirestoreError(e, editingDriverId ? OperationType.UPDATE : OperationType.CREATE, 'drivers');
     }
   };
+
+  const handleSort = (key: string) => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedDrivers = [...drivers].sort((a, b) => {
+    const valA = a[sortConfig.key] || '';
+    const valB = b[sortConfig.key] || '';
+    
+    if (typeof valA === 'string') {
+      return sortConfig.direction === 'asc' 
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    }
+    
+    return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+  });
+
+  const SortButton = ({ column, label }: { column: string, label: string }) => (
+    <th 
+      className="px-6 py-4 uppercase tracking-wider cursor-pointer hover:bg-surface-container transition-colors group"
+      onClick={() => handleSort(column)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <span className={`material-symbols-outlined text-[16px] transition-all ${sortConfig.key === column ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-50'}`}>
+          {sortConfig.key === column && sortConfig.direction === 'desc' ? 'arrow_downward' : 'arrow_upward'}
+        </span>
+      </div>
+    </th>
+  );
 
   return (
     <motion.div 
@@ -148,7 +211,7 @@ export function Drivers() {
           </motion.div>
         )}
 
-        {isAddDriverOpen && (
+        {(isAddDriverOpen || editingDriverId) && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
@@ -160,7 +223,7 @@ export function Drivers() {
               className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col"
             >
               <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
-                <h3 className="text-xl font-semibold text-on-surface">Adicionar Novo Motorista</h3>
+                <h3 className="text-xl font-semibold text-on-surface">{editingDriverId ? 'Editar Motorista' : 'Adicionar Novo Motorista'}</h3>
                 <button onClick={() => setSearchParams({})} className="text-on-surface-variant hover:text-error transition-colors">
                   <span className="material-symbols-outlined">close</span>
                 </button>
@@ -213,7 +276,7 @@ export function Drivers() {
                 </div>
                 <div className="pt-4 flex gap-4">
                    <button onClick={() => setSearchParams({})} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
-                   <button onClick={handleAddDriver} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">Cadastrar Motorista</button>
+                   <button onClick={handleSaveDriver} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">{editingDriverId ? 'Salvar Alterações' : 'Cadastrar Motorista'}</button>
                 </div>
               </div>
             </motion.div>
@@ -302,16 +365,16 @@ export function Drivers() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-low text-on-surface-variant text-sm font-semibold">
-                <th className="px-6 py-4 uppercase tracking-wider">Perfil do Motorista</th>
-                <th className="px-6 py-4 uppercase tracking-wider">Placa do Veículo</th>
-                <th className="px-6 py-4 uppercase tracking-wider">Status da CNH</th>
-                <th className="px-6 py-4 uppercase tracking-wider">Desempenho</th>
-                <th className="px-6 py-4 uppercase tracking-wider">Status</th>
+                <SortButton column="name" label="Perfil do Motorista" />
+                <SortButton column="vehicleAssigned" label="Placa do Veículo" />
+                <SortButton column="cnhCategory" label="Status da CNH" />
+                <SortButton column="rating" label="Desempenho" />
+                <SortButton column="status" label="Status" />
                 <th className="px-6 py-4 uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
-              {drivers.map(driver => (
+              {sortedDrivers.map(driver => (
                 <tr key={driver.id} className="hover:bg-surface-container transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -348,9 +411,22 @@ export function Drivers() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={async () => await deleteDoc(doc(db, 'drivers', driver.id))} className="text-error hover:text-error/80 transition-colors">
-                      <span className="material-symbols-outlined">delete</span>
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button 
+                        onClick={() => setSearchParams({ editId: driver.id })}
+                        className="text-on-surface-variant hover:text-primary transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
+                        title="Editar Motorista"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">edit</span>
+                      </button>
+                      <button 
+                        onClick={async () => await deleteDoc(doc(db, 'drivers', driver.id))} 
+                        className="text-error hover:text-error/80 transition-colors p-1.5 hover:bg-error/10 rounded-lg"
+                        title="Excluir Motorista"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
