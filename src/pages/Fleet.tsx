@@ -6,6 +6,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { SearchableSelect } from '../components/SearchableSelect';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -211,30 +212,28 @@ export function Fleet() {
           </div>
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-sm font-semibold text-on-surface-variant mb-2">Obra</label>
-          <select 
+          <SearchableSelect 
+            label="Obra"
+            placeholder="Todas as Obras"
+            options={[
+              { value: '', label: 'Todas as Obras' },
+              ...works.map(work => ({ value: work.name, label: work.name }))
+            ]}
             value={filterWork}
-            onChange={(e) => setFilterWork(e.target.value)}
-            className="w-full bg-transparent border-b border-outline-variant py-2 focus:border-primary outline-none text-base"
-          >
-            <option value="">Todas as Obras</option>
-            {works.map((work) => (
-              <option key={work.id} value={work.name}>{work.name}</option>
-            ))}
-          </select>
+            onChange={(val) => setFilterWork(val)}
+          />
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-sm font-semibold text-on-surface-variant mb-2">Status</label>
-          <select 
+          <SearchableSelect 
+            label="Status"
+            placeholder="Todos os Status"
+            options={[
+              { value: '', label: 'Todos os Status' },
+              ...statuses.map(s => ({ value: s.name, label: s.name }))
+            ]}
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full bg-transparent border-b border-outline-variant py-2 focus:border-primary outline-none text-base"
-          >
-            <option value="">Todos os Status</option>
-            {statuses.map(s => (
-              <option key={s.id} value={s.name}>{s.name}</option>
-            ))}
-          </select>
+            onChange={(val) => setFilterStatus(val)}
+          />
         </div>
         
         <div className="flex items-center gap-4 pt-6">

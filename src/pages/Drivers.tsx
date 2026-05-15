@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { SearchableSelect } from '../components/SearchableSelect';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -184,7 +185,6 @@ export function Drivers() {
     setStatusFilter('');
     setWorkFilter('');
   };
-
   const availableVehicles = vehicles.filter(v => !drivers.some(d => d.vehicleAssigned === v.plate));
 
   const SortButton = ({ column, label }: { column: string, label: string }) => (
@@ -227,52 +227,34 @@ export function Drivers() {
                 </button>
               </div>
               <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Motorista</label>
-                  <select 
-                    className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
-                    value={assignment.driverId}
-                    onChange={(e) => setAssignment({ ...assignment, driverId: e.target.value })}
-                  >
-                    <option value="">Selecione um motorista...</option>
-                    {drivers.map((driver) => (
-                      <option key={driver.id} value={driver.id}>{driver.name} ({driver.cpf})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Veículo Disponível</label>
-                  <select 
-                    className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
-                    value={assignment.vehiclePlate}
-                    onChange={(e) => setAssignment({ ...assignment, vehiclePlate: e.target.value })}
-                  >
-                    <option value="">Selecione um veículo...</option>
-                    {availableVehicles.map((vehicle) => (
-                      <option key={vehicle.id} value={vehicle.plate}>{vehicle.plate} - {vehicle.model}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Obra (Opcional)</label>
-                  <select 
-                    className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
-                    value={assignment.workId}
-                    onChange={(e) => {
-                      const selectedWork = works.find(w => w.id === e.target.value);
-                      setAssignment({ 
-                        ...assignment, 
-                        workId: e.target.value, 
-                        workName: selectedWork ? selectedWork.name : '' 
-                      });
-                    }}
-                  >
-                    <option value="">Nenhuma obra atribuída...</option>
-                    {works.map((work) => (
-                      <option key={work.id} value={work.id}>{work.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect 
+                  label="Motorista"
+                  placeholder="Selecione um motorista..."
+                  options={drivers.map(d => ({ value: d.id, label: `${d.name} (${d.cpf})` }))}
+                  value={assignment.driverId}
+                  onChange={(val) => setAssignment({ ...assignment, driverId: val })}
+                />
+                <SearchableSelect 
+                  label="Veículo Disponível"
+                  placeholder="Selecione um veículo..."
+                  options={availableVehicles.map(v => ({ value: v.plate, label: `${v.plate} - ${v.model}` }))}
+                  value={assignment.vehiclePlate}
+                  onChange={(val) => setAssignment({ ...assignment, vehiclePlate: val })}
+                />
+                <SearchableSelect 
+                  label="Obra (Opcional)"
+                  placeholder="Nenhuma obra atribuída..."
+                  options={works.map(w => ({ value: w.id, label: w.name }))}
+                  value={assignment.workId}
+                  onChange={(val) => {
+                    const selectedWork = works.find(w => w.id === val);
+                    setAssignment({ 
+                      ...assignment, 
+                      workId: val, 
+                      workName: selectedWork ? selectedWork.name : '' 
+                    });
+                  }}
+                />
                 <div className="pt-4 flex gap-4">
                    <button onClick={() => setSearchParams({})} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
                    <button 
@@ -320,18 +302,23 @@ export function Drivers() {
                      <input type="text" value={newDriver.cnh} onChange={e => setNewDriver({...newDriver, cnh: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="Número do registro" />
                    </div>
                    <div className="col-span-1">
-                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Categoria CNH</label>
-                     <select value={newDriver.cnhCategory} onChange={e => setNewDriver({...newDriver, cnhCategory: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
-                        <option>A</option>
-                        <option>B</option>
-                        <option>C</option>
-                        <option>D</option>
-                        <option>E</option>
-                        <option>AB</option>
-                        <option>AC</option>
-                        <option>AD</option>
-                        <option>AE</option>
-                     </select>
+                     <SearchableSelect 
+                       label="Categoria CNH"
+                       placeholder="Selecione..."
+                       options={[
+                         { value: 'A', label: 'A' },
+                         { value: 'B', label: 'B' },
+                         { value: 'C', label: 'C' },
+                         { value: 'D', label: 'D' },
+                         { value: 'E', label: 'E' },
+                         { value: 'AB', label: 'AB' },
+                         { value: 'AC', label: 'AC' },
+                         { value: 'AD', label: 'AD' },
+                         { value: 'AE', label: 'AE' },
+                       ]}
+                       value={newDriver.cnhCategory}
+                       onChange={val => setNewDriver({...newDriver, cnhCategory: val})}
+                     />
                    </div>
                    <div className="col-span-1">
                      <label className="block text-sm font-semibold text-on-surface-variant mb-2">Validade CNH</label>
@@ -433,29 +420,33 @@ export function Drivers() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <span className="text-on-surface-variant text-[12px] font-semibold">Status:</span>
-                <select 
+                <SearchableSelect 
+                  placeholder="Todos"
+                  options={[
+                    { value: '', label: 'Todos' },
+                    { value: 'Disponível', label: 'Disponível' },
+                    { value: 'Em Rota', label: 'Em Rota' },
+                    { value: 'Em Intervalo', label: 'Em Intervalo' },
+                  ]}
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-surface-container-low border border-outline-variant rounded px-3 py-1 text-[13px] focus:ring-0"
-                >
-                  <option value="">Todos</option>
-                  <option value="Disponível">Disponível</option>
-                  <option value="Em Rota">Em Rota</option>
-                  <option value="Em Intervalo">Em Intervalo</option>
-                </select>
+                  onChange={(val) => setStatusFilter(val)}
+                  className="min-w-[140px]"
+                  size="sm"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-on-surface-variant text-[12px] font-semibold">Unidade:</span>
-                <select 
+                <SearchableSelect 
+                  placeholder="Todas as Regiões"
+                  options={[
+                    { value: '', label: 'Todas as Regiões' },
+                    ...works.map(work => ({ value: work.name, label: work.name }))
+                  ]}
                   value={workFilter}
-                  onChange={(e) => setWorkFilter(e.target.value)}
-                  className="bg-surface-container-low border border-outline-variant rounded px-3 py-1 text-[13px] focus:ring-0"
-                >
-                  <option value="">Todas as Regiões</option>
-                  {works.map((work) => (
-                    <option key={work.id} value={work.name}>{work.name}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setWorkFilter(val)}
+                  className="min-w-[180px]"
+                  size="sm"
+                />
               </div>
             </div>
           </div>

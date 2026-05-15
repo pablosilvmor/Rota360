@@ -2,6 +2,7 @@ import { useState, ChangeEvent, DragEvent, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, updateDoc, doc, setDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { SearchableSelect } from '../components/SearchableSelect';
 
 export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () => void, onSave: () => void, vehicleToEdit?: any }) {
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'uploading' | 'processing' | 'done'>('idle');
@@ -426,24 +427,22 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                 </h4>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="col-span-2 md:col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                      Tipo de Combustível {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container font-bold">auto_awesome</span>}
-                    </label>
-                    <select 
-                      className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-base text-on-surface focus:outline-none focus:border-primary font-medium"
+                    <SearchableSelect 
+                      label="Tipo de Combustível"
+                      placeholder="Selecione..."
+                      options={[
+                        { value: 'DIESEL S10', label: 'DIESEL S10' },
+                        { value: 'DIESEL', label: 'DIESEL' },
+                        { value: 'GASOLINA', label: 'GASOLINA' },
+                        { value: 'ALCOOL/GASOLINA', label: 'ALCOOL/GASOLINA' },
+                        { value: 'ETANOL', label: 'ETANOL' },
+                        { value: 'FLEX', label: 'FLEX (ALCOOL/GASOL)' },
+                        { value: 'ELÉTRICO', label: 'ELÉTRICO' },
+                        { value: 'HÍBRIDO', label: 'HÍBRIDO' },
+                      ]}
                       value={vehicleData.fuelType}
-                      onChange={(e) => setVehicleData({ ...vehicleData, fuelType: e.target.value })}
-                    >
-                      <option value="">Selecione...</option>
-                      <option value="DIESEL S10">DIESEL S10</option>
-                      <option value="DIESEL">DIESEL</option>
-                      <option value="GASOLINA">GASOLINA</option>
-                      <option value="ALCOOL/GASOLINA">ALCOOL/GASOLINA</option>
-                      <option value="ETANOL">ETANOL</option>
-                      <option value="FLEX">FLEX (ALCOOL/GASOL)</option>
-                      <option value="ELÉTRICO">ELÉTRICO</option>
-                      <option value="HÍBRIDO">HÍBRIDO</option>
-                    </select>
+                      onChange={(val) => setVehicleData({ ...vehicleData, fuelType: val })}
+                    />
                   </div>
                   <div className="col-span-2 md:col-span-1">
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
@@ -461,18 +460,16 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     </div>
                   </div>
                   <div className="col-span-2 md:col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Obra / Centro de Custo</label>
-                    <select 
-                      className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-base text-on-surface focus:outline-none focus:border-primary"
+                    <SearchableSelect 
+                      label="Obra / Centro de Custo"
+                      placeholder="Selecione..."
+                      options={[
+                        ...works.map(w => ({ value: w.name, label: w.name })),
+                        { value: 'Sede Administrativa', label: 'Sede Administrativa' }
+                      ]}
                       value={vehicleData.costCenter}
-                      onChange={(e) => setVehicleData({ ...vehicleData, costCenter: e.target.value })}
-                    >
-                      <option value="">Selecione...</option>
-                      {works.map((work) => (
-                        <option key={work.id} value={work.name}>{work.name}</option>
-                      ))}
-                      <option value="Sede Administrativa">Sede Administrativa</option>
-                    </select>
+                      onChange={(val) => setVehicleData({ ...vehicleData, costCenter: val })}
+                    />
                   </div>
                   <div className="col-span-2 md:col-span-1">
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Link da Imagem (URL)</label>
