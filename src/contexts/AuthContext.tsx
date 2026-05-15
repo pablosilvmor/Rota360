@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { Preloader } from '../components/Preloader';
 
 export interface UserData {
   uid: string;
@@ -97,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, userData, loading, loginWithGoogle, logout }}>
-      {!loading && children}
+      {loading ? <Preloader /> : children}
     </AuthContext.Provider>
   );
 }

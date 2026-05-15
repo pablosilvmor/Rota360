@@ -284,8 +284,8 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
         </div>
 
         <div className="col-span-12 lg:col-span-7">
-          <form className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden" onSubmit={(e) => e.preventDefault()}>
-            <div className="px-8 py-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low/30">
+          <form className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm" onSubmit={(e) => e.preventDefault()}>
+            <div className="px-8 py-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low/30 rounded-t-2xl">
               <h3 className="text-[24px] font-semibold text-on-surface">Detalhes do Veículo</h3>
               <span className="text-xs text-on-surface-variant italic">Campos com <span className="material-symbols-outlined text-[12px] text-on-tertiary-container">auto_awesome</span> foram preenchidos automaticamente</span>
             </div>

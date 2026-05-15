@@ -218,9 +218,9 @@ export function Drivers() {
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col"
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-md flex flex-col"
             >
-              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low rounded-t-2xl">
                 <h3 className="text-xl font-semibold text-on-surface">Atribuir Veículo</h3>
                 <button onClick={() => setSearchParams({})} className="text-on-surface-variant hover:text-error transition-colors">
                   <span className="material-symbols-outlined">close</span>
@@ -279,9 +279,9 @@ export function Drivers() {
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col"
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-lg flex flex-col"
             >
-              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low rounded-t-2xl">
                 <h3 className="text-xl font-semibold text-on-surface">{editingDriverId ? 'Editar Motorista' : 'Adicionar Novo Motorista'}</h3>
                 <button onClick={() => setSearchParams({})} className="text-on-surface-variant hover:text-error transition-colors">
                   <span className="material-symbols-outlined">close</span>

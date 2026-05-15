@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { ConfirmModal } from './components/ConfirmModal';
+import { Preloader } from './components/Preloader';
 
 // Otimização: Code Splitting
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
@@ -73,7 +74,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Suspense fallback={<div className="flex h-screen items-center justify-center">Carregando...</div>}>
+        <Suspense fallback={<Preloader />}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute path="/"><Dashboard /></ProtectedRoute>} />

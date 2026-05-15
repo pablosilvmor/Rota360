@@ -29,6 +29,7 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [filterTerm, setFilterTerm] = useState('');
+  const [direction, setDirection] = useState<'down' | 'up'>('down');
   const containerRef = useRef<HTMLDivElement>(null);
   
   const selectedOption = options.find(o => o.value === value);
@@ -36,6 +37,20 @@ export function SearchableSelect({
     o.label.toLowerCase().includes(filterTerm.toLowerCase()) ||
     o.value.toLowerCase().includes(filterTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      if (spaceBelow < 300 && spaceAbove > spaceBelow) {
+        setDirection('up');
+      } else {
+        setDirection('down');
+      }
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -65,11 +80,11 @@ export function SearchableSelect({
       <AnimatePresence>
         {isOpen && (
           <motion.div 
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            initial={{ opacity: 0, y: direction === 'down' ? -10 : 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            exit={{ opacity: 0, y: direction === 'down' ? -10 : 10, scale: 0.95 }}
             transition={{ duration: 0.1 }}
-            className="absolute left-0 right-0 top-[calc(100%+4px)] bg-white border border-outline-variant rounded-xl shadow-2xl z-[100] overflow-hidden flex flex-col max-h-72 ring-1 ring-black/5"
+            className={`absolute left-0 right-0 ${direction === 'down' ? 'top-[calc(100%+4px)]' : 'bottom-[calc(100%+4px)]'} bg-white border border-outline-variant rounded-xl shadow-2xl z-[100] overflow-hidden flex flex-col max-h-72 ring-1 ring-black/5`}
           >
             <div className="p-3 border-b border-outline-variant bg-surface-container-lowest sticky top-0">
               <div className="relative">
