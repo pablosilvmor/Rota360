@@ -88,9 +88,9 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
       setOcrStatus('processing');
 
       // Chamada direta à API Gemini no frontend seguindo as diretrizes
-      const apiKey = (process.env as any).GEMINI_API_KEY;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error('Chave de API Gemini não encontrada no ambiente.');
+        throw new Error('Chave de API Gemini (VITE_GEMINI_API_KEY) não encontrada nas variáveis de ambiente. Adicione a chave no painel da Vercel (https://vercel.com).');
       }
 
       const ai = new GoogleGenAI({ apiKey });

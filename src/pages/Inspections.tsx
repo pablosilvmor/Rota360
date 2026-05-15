@@ -113,10 +113,8 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
           // Pre-load vehicle image to handle CORS for PDF export
           const imgUrl = vehicleData.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800";
           
-          let proxyImgUrl = imgUrl;
-          if (imgUrl.includes('images.unsplash.com') || imgUrl.includes('firebasestorage.googleapis.com')) {
-             proxyImgUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}`;
-          }
+          // Sempre usar wsrv.nl no proxy para evitar problemas CORS com imagens de qualquer domínio
+          const proxyImgUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}`;
 
           const img = new Image();
           img.crossOrigin = "anonymous";
@@ -388,6 +386,8 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
           if (data.section === 'body' && data.column.index === 4) {
             const rowIndex = data.row.index;
             const item = sortedItems[rowIndex];
+            if (!item) return;
+
             const record = records[item.id] || { lastMaintenanceKM: 0 };
             const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
             
@@ -399,22 +399,24 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
             
             const cell = data.cell;
             const barWidth = cell.width - 8;
-            const barHeight = 2;
+            const barHeight = 4; // Barra mais grossa
             const x = cell.x + 4;
-            const y = cell.y + cell.height - 4; // Fica a 4px do fundo da célula
+            const y = cell.y + cell.height - 6; // Posicionamento mais visível
             
             // Fundo da barra
             pdf.setFillColor(226, 232, 240); // bg-slate-200
             pdf.rect(x, y, barWidth, barHeight, 'F');
             
             // Preenchimento da barra
-            if (progressPercent >= 100) {
-               pdf.setFillColor(239, 68, 68); // vermelho error
-            } else {
-               pdf.setFillColor(14, 165, 233); // azul primário
+            if (progressPercent > 0) {
+              if (progressPercent >= 100) {
+                 pdf.setFillColor(239, 68, 68); // vermelho error
+              } else {
+                 pdf.setFillColor(14, 165, 233); // azul primário
+              }
+              const filledWidth = (progressPercent / 100) * barWidth;
+              pdf.rect(x, y, filledWidth, barHeight, 'F');
             }
-            const filledWidth = (progressPercent / 100) * barWidth;
-            pdf.rect(x, y, filledWidth, barHeight, 'F');
             
             // Reset de cores
             pdf.setTextColor(0, 0, 0);
