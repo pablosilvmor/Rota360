@@ -292,9 +292,9 @@ export function Fleet() {
                 onClick={() => setSelectedVehicle(vehicle)}
                 className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer"
               >
-                <div className="relative h-56 overflow-hidden">
+                <div className="relative h-56 overflow-hidden bg-white border-b border-outline-variant/30 flex items-center justify-center p-4">
                   <img 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                    className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-sm" 
                     src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} 
                     alt={vehicle.model} 
                   />
