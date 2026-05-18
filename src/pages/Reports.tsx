@@ -228,14 +228,16 @@ export function Reports() {
       })
     );
 
+    const isFleetReport = selectedModule.id === 'vehicles';
+
     autoTable(doc, {
       head: [tableCols],
       body: tableData,
-      startY: 40,
-      margin: { top: 45, bottom: 30 },
+      startY: isFleetReport ? 45 : 40,
+      margin: { top: 45, bottom: 30, left: 8, right: 8 },
       styles: {
-        fontSize: 9,
-        cellPadding: 4,
+        fontSize: isFleetReport ? 7.5 : 9,
+        cellPadding: 3,
       },
       headStyles: {
         fillColor: [20, 24, 27],
@@ -245,18 +247,44 @@ export function Reports() {
       alternateRowStyles: {
         fillColor: [245, 245, 245]
       },
+      didParseCell: function(data) {
+        if (isFleetReport && data.section === 'body') {
+          const colKey = activeColumns[data.column.index].key;
+          if (colKey === 'status') {
+            const status = String(data.cell.raw).toUpperCase();
+            if (status.includes('MANUTENÇÃO')) {
+              data.cell.styles.textColor = [0, 102, 204]; // Blue
+              data.cell.styles.fontStyle = 'bold';
+            } else if (status.includes('INATIVO')) {
+              data.cell.styles.textColor = [220, 38, 38]; // Red
+              data.cell.styles.fontStyle = 'bold';
+            } else if (status.includes('ATIVO')) {
+              data.cell.styles.textColor = [22, 163, 74]; // Green
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        }
+      },
       didDrawPage: function (hookData) {
         // Headers
+        const marginX = hookData.settings.margin.left;
         if (headerLogo) {
           const h = 12;
           const w = h * headerLogo.ratio;
-          doc.addImage(headerLogo.src, 'PNG', 14, 10, w, h, '', 'FAST');
+          doc.addImage(headerLogo.src, 'PNG', marginX, 10, w, h, '', 'FAST');
         }
         
         if (hookData.pageNumber === 1) {
           doc.setFontSize(16);
           doc.setTextColor(40);
-          doc.text(title, 14, 32);
+          doc.text(title, marginX, 32);
+          
+          if (isFleetReport) {
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Total de Veículos na Frota: ${filteredData.length}`, marginX, 39);
+          }
         }
 
         // Footer
@@ -265,7 +293,7 @@ export function Reports() {
         
         const pageNumber = (doc.internal as any).getNumberOfPages();
         const totalPagesExp = "{total_pages_count_string}";
-        doc.text(`Pág. ${pageNumber} de ${totalPagesExp}`, 14, pageHeight - 10);
+        doc.text(`Pág. ${pageNumber} de ${totalPagesExp}`, marginX, pageHeight - 10);
         
         if (footerLogo) {
           const h = 8;
@@ -275,7 +303,7 @@ export function Reports() {
         
         const byText = "By Pablo Moreira";
         const byWidth = doc.getTextWidth(byText);
-        doc.text(byText, pageWidth - 14 - byWidth, pageHeight - 10);
+        doc.text(byText, pageWidth - marginX - byWidth, pageHeight - 10);
       }
     });
 
