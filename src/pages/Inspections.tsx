@@ -1288,6 +1288,11 @@ export function Inspections() {
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       
+      // Cálculos de resumo
+      const totalItems = checklist.items.length;
+      const compliantItems = checklist.items.filter((i: any) => i.conformidade === 'Em conformidade').length;
+      const nonCompliantItems = totalItems - compliantItems;
+
       const tableData = checklist.items.map((item: any) => [
         item.item,
         item.category || 'Geral',
@@ -1296,8 +1301,8 @@ export function Inspections() {
       ]);
 
       autoTable(pdf, {
-        startY: 40,
-        margin: { top: 40, bottom: 20, left: 14, right: 14 },
+        startY: 55,
+        margin: { top: 55, bottom: 20, left: 14, right: 14 },
         head: [['ITEM', 'CATEGORIA', 'STATUS', 'OBSERVAÇÕES / SERVIÇOS']],
         body: tableData,
         theme: 'grid',
@@ -1320,6 +1325,16 @@ export function Inspections() {
            lineColor: [226, 232, 240],
            lineWidth: 0.1
         },
+        didParseCell: function(data) {
+          // Status não conforme em vermelho
+          if (data.section === 'body' && data.column.index === 2) {
+            const status = data.cell.raw;
+            if (status !== 'Em conformidade') {
+              data.cell.styles.textColor = [220, 38, 38]; // Red-600
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        },
         didDrawPage: function (data) {
             // Cabeçalho (renderizado em todas as páginas)
             let startY = 15;
@@ -1333,6 +1348,16 @@ export function Inspections() {
             pdf.setFont('helvetica', 'normal');
             pdf.setTextColor(100, 100, 100);
             pdf.text(`${checklist.vehicleModel}`, 14, startY + 14);
+
+            // Resumo no cabeçalho
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(30, 41, 59);
+            pdf.text(`TOTAL: ${totalItems}`, 14, startY + 22);
+            pdf.setTextColor(22, 163, 74); // Verde
+            pdf.text(`EM CONFORMIDADE: ${compliantItems}`, 40, startY + 22);
+            pdf.setTextColor(220, 38, 38); // Vermelho
+            pdf.text(`NÃO CONFORME: ${nonCompliantItems}`, 85, startY + 22);
 
             // Box informativos (Data e Motorista)
             pdf.setFillColor(241, 245, 249);
@@ -1348,17 +1373,21 @@ export function Inspections() {
             pdf.setTextColor(30, 41, 59);
             pdf.text(`${checklist.date}`, pageWidth - 90, startY + 11);
             pdf.text(`${checklist.driverName}`, pageWidth - 90, startY + 16);
-
-            // Rodapé
-            const pageCount = (pdf as any).internal.getNumberOfPages();
-            pdf.setFontSize(8);
-            pdf.setTextColor(150);
-            pdf.text('By Pablo Moreira', 14, pageHeight - 10);
-            const pageCountStr = `Página ${pageCount}`;
-            pdf.text(pageCountStr, pageWidth - 14 - pdf.getTextWidth(pageCountStr), pageHeight - 10);
         }
       });
       
+      // Adicionar paginação inteligente ao final de todas as páginas
+      const totalPages = (pdf as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(150);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('By Pablo Moreira', 14, pageHeight - 10);
+        const pageStr = `Página ${i}/${totalPages}`;
+        pdf.text(pageStr, pageWidth - 14 - pdf.getTextWidth(pageStr), pageHeight - 10);
+      }
+
       pdf.save(`Checklist_${checklist.vehiclePlate}_${checklist.date}.pdf`);
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
