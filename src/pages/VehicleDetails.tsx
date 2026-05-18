@@ -145,7 +145,12 @@ export function VehicleDetails({ vehicle, assignedDriver, onBack, onEdit, onDele
             </div>
             <div className="py-3.5 flex justify-between items-center">
               <span className="text-on-surface-variant text-sm font-medium">Centro de Custo</span>
-              <span className="font-bold text-sm">{vehicle.costCenter}</span>
+              <span className="font-bold text-sm">
+                {(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
+                  .map(v => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim())
+                  .filter(Boolean)
+                  .join(', ') || '-'}
+              </span>
             </div>
             <div className="py-3.5 flex justify-between items-center">
               <span className="text-on-surface-variant text-sm font-medium">Lotação</span>

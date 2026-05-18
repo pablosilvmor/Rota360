@@ -44,7 +44,7 @@ const MODULES: ModuleData[] = [
         key: 'costCenter', 
         label: 'Centro de Custo',
         renderer: (val: any) => {
-          const clean = (v: any) => String(v || '').replace(/Logístic a - Região Sul,?/g, '').trim();
+          const clean = (v: any) => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim();
           if (Array.isArray(val)) {
             return val.map(clean).filter(Boolean).join(', ') || '-';
           }

@@ -348,7 +348,10 @@ export function Fleet() {
                           <span className="font-bold whitespace-nowrap">{vehicle.plate}</span>
                         </td>
                         <td className="px-6 py-4 text-sm font-bold text-on-surface-variant uppercase">
-                          {vehicle.costCenter || 'N/D'}
+                          {(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
+                            .map(v => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim())
+                            .filter(Boolean)
+                            .join(', ') || 'N/D'}
                         </td>
                         <td className="px-6 py-4">
                           <span className="font-mono text-primary font-bold">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()}</span>
@@ -398,7 +401,10 @@ export function Fleet() {
                       {vehicle.bodywork && <p className="text-xs text-on-surface-variant/80 uppercase font-bold tracking-wide mt-1">{vehicle.bodywork}</p>}
                       <div className="flex items-center gap-1 mt-2 text-on-surface-variant bg-surface-container w-fit px-2 py-0.5 rounded">
                          <span className="material-symbols-outlined text-[14px]">domain</span>
-                         <span className="text-xs font-semibold">{Array.isArray(vehicle.costCenter) ? vehicle.costCenter.join(', ') : (vehicle.costCenter || 'Não atribuída')}</span>
+                         <span className="text-xs font-semibold">{(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
+                            .map(v => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim())
+                            .filter(Boolean)
+                            .join(', ') || 'Não atribuída'}</span>
                       </div>
                     </div>
                     <div className="relative group/menu">
@@ -467,7 +473,10 @@ export function Fleet() {
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-1 text-on-surface-variant bg-surface-container w-fit px-2 py-0.5 rounded">
                         <span className="material-symbols-outlined text-[14px]">domain</span>
-                        <span className="text-xs font-semibold">{vehicle.costCenter || 'Não atribuída'}</span>
+                        <span className="text-xs font-semibold">{(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
+                            .map(v => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim())
+                            .filter(Boolean)
+                            .join(', ') || 'Não atribuída'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
