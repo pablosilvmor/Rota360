@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, collectionGroup, getDocs } from 'firebase/firestore';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -24,6 +24,7 @@ const itemVariants = {
 };
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const [isAlertCenterOpen, setIsAlertCenterOpen] = useState(false);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [vehicleStats, setVehicleStats] = useState({
@@ -32,36 +33,108 @@ export function Dashboard() {
     maintenance: 0
   });
 
+  const [expiredInspections, setExpiredInspections] = useState<any[]>([]);
+  const [loadingAlerts, setLoadingAlerts] = useState(true);
+
   const [nextServices, setNextServices] = useState<any[]>([]);
 
   useEffect(() => {
-    const unsubscribeVehicles = onSnapshot(collection(db, 'vehicles'), (snapshot) => {
-      const stats = {
-        total: snapshot.docs.length,
-        active: snapshot.docs.filter(d => d.data().status === 'Ativo').length,
-        maintenance: snapshot.docs.filter(d => d.data().status === 'Em Manutenção').length
+    const fetchData = async () => {
+      // Create listeners
+      const unsubscribeVehicles = onSnapshot(collection(db, 'vehicles'), async (snapshot) => {
+        const vehicles = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as any[];
+        
+        const stats = {
+          total: vehicles.length,
+          active: vehicles.filter(v => v.status === 'Ativo').length,
+          maintenance: vehicles.filter(v => v.status === 'Em Manutenção').length
+        };
+        setVehicleStats(stats);
+
+        // Fetch expired inspections based on current vehicles
+        try {
+          const recordsSnap = await getDocs(collectionGroup(db, 'records'));
+          const itemsSnap = await getDocs(collectionGroup(db, 'items'));
+          
+          const itemsMap = new Map();
+          itemsSnap.forEach(doc => {
+            itemsMap.set(doc.id, { ...doc.data(), id: doc.id });
+          });
+
+          const expired: any[] = [];
+          
+          recordsSnap.forEach(recordDoc => {
+            const record = recordDoc.data();
+            const vehicleId = recordDoc.ref.parent.parent?.id;
+            const item = itemsMap.get(record.itemId);
+            
+            if (vehicleId && item) {
+              const vehicle = vehicles.find(v => v.id === vehicleId);
+              if (vehicle) {
+                const currentKM = vehicle.currentKM || vehicle.odometer || 0;
+                const nextKM = record.nextMaintenanceKM || 0;
+                const remaining = nextKM - currentKM;
+                
+                // If it's expired or within 500km of expiring
+                if (remaining <= 0) {
+                  expired.push({
+                    vehicleId: vehicleId,
+                    vehiclePlate: vehicle.plate,
+                    vehicleModel: vehicle.model,
+                    vehicleBrand: vehicle.brand,
+                    vehicleImage: vehicle.imageUrl,
+                    itemName: item.name,
+                    remainingKM: remaining,
+                    type: 'expired'
+                  });
+                } else if (remaining <= 1000) {
+                  expired.push({
+                    vehicleId: vehicleId,
+                    vehiclePlate: vehicle.plate,
+                    vehicleModel: vehicle.model,
+                    vehicleBrand: vehicle.brand,
+                    vehicleImage: vehicle.imageUrl,
+                    itemName: item.name,
+                    remainingKM: remaining,
+                    type: 'warning'
+                  });
+                }
+              }
+            }
+          });
+          
+          // Sort so expired is first, then warnings by lowest remaining KM
+          expired.sort((a, b) => a.remainingKM - b.remainingKM);
+          
+          setExpiredInspections(expired);
+        } catch (error) {
+          console.error("Error fetching inspections:", error);
+        } finally {
+          setLoadingAlerts(false);
+        }
+      });
+
+      const unsubscribeAlerts = onSnapshot(collection(db, 'alerts'), (snapshot) => {
+        const alertsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        setAlerts(alertsData);
+      });
+
+      const unsubscribeMaintenance = onSnapshot(collection(db, 'maintenance'), (snapshot) => {
+        const maintenanceData = snapshot.docs
+          .map(doc => ({ ...doc.data(), id: doc.id }))
+          .filter((os: any) => os.status !== 'Concluído')
+          .slice(0, 5);
+        setNextServices(maintenanceData);
+      });
+
+      return () => {
+        unsubscribeVehicles();
+        unsubscribeAlerts();
+        unsubscribeMaintenance();
       };
-      setVehicleStats(stats);
-    });
-
-    const unsubscribeAlerts = onSnapshot(collection(db, 'alerts'), (snapshot) => {
-      const alertsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      setAlerts(alertsData);
-    });
-
-    const unsubscribeMaintenance = onSnapshot(collection(db, 'maintenance'), (snapshot) => {
-      const maintenanceData = snapshot.docs
-        .map(doc => ({ ...doc.data(), id: doc.id }))
-        .filter((os: any) => os.status !== 'Concluído')
-        .slice(0, 5);
-      setNextServices(maintenanceData);
-    });
-
-    return () => {
-      unsubscribeVehicles();
-      unsubscribeAlerts();
-      unsubscribeMaintenance();
     };
+    
+    fetchData();
   }, []);
 
   return (
@@ -97,22 +170,60 @@ export function Dashboard() {
                 </button>
               </div>
               <div className="p-6 overflow-y-auto space-y-4">
-                {alerts.length === 0 ? (
+                {loadingAlerts ? (
+                  <div className="py-12 text-center text-on-surface-variant flex flex-col items-center">
+                    <span className="material-symbols-outlined animate-spin mb-2">progress_activity</span>
+                    Carregando alertas...
+                  </div>
+                ) : Number([...alerts, ...(expiredInspections.filter(i => i.type === 'expired'))].length) === 0 ? (
                   <div className="py-12 text-center text-on-surface-variant italic">
                     Nenhum alerta pendente no momento.
                   </div>
                 ) : (
-                  alerts.map(alert => (
-                    <div key={alert.id} className={`flex gap-4 p-4 bg-surface-container-low rounded-lg border ${alert.severity === 'critical' ? 'border-error/50' : 'border-outline-variant'}`}>
-                      <span className={`material-symbols-outlined mt-1 ${alert.severity === 'critical' ? 'text-error' : 'text-on-surface-variant'}`} style={{ fontVariationSettings: alert.severity === 'critical' ? "'FILL' 1" : "" }}>
-                        {alert.severity === 'critical' ? 'warning' : 'info'}
-                      </span>
-                      <div>
-                        <p className="text-sm font-bold text-on-surface">{alert.title}</p>
-                        <p className="text-xs text-on-surface-variant mt-1">{alert.description}</p>
+                  <>
+                    {expiredInspections.filter(i => i.type === 'expired' || i.type === 'warning').map((insp, idx) => (
+                      <div 
+                        key={`insp-${idx}`}
+                        onClick={() => {
+                          setIsAlertCenterOpen(false);
+                          navigate(`/inspections/${insp.vehicleId}`);
+                        }}
+                        className={`flex items-start gap-4 p-4 bg-surface-container-low rounded-xl border ${insp.type === 'expired' ? 'border-error/50 shadow-[0_0_10px_rgba(255,0,0,0.05)] hover:bg-error-container/20' : 'border-warning/50 hover:bg-warning-container/20'} transition-all cursor-pointer`}
+                      >
+                        <div className="w-12 h-12 rounded-lg border border-outline-variant bg-white overflow-hidden flex-shrink-0">
+                          <img src={insp.vehicleImage || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} className="w-full h-full object-contain" alt={insp.vehicleModel} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-on-surface flex items-center gap-2">
+                            {insp.itemName}
+                            <span className={`text-[10px] px-2 py-0.5 rounded uppercase tracking-wider font-bold ${insp.type === 'expired' ? 'bg-error-container text-on-error-container' : 'bg-warning-container text-warning-dark'}`}>
+                              {insp.type === 'expired' ? 'Vencido' : 'Próximo do Vencimento'}
+                            </span>
+                          </p>
+                          <p className="text-xs font-semibold text-on-surface-variant mt-1.5 uppercase tracking-wide">
+                            {insp.vehiclePlate} • {insp.vehicleBrand} {insp.vehicleModel}
+                          </p>
+                          <p className={`text-[11px] mt-2 font-bold ${insp.type === 'expired' ? 'text-error' : 'text-warning-dark'}`}>
+                            {insp.type === 'expired' 
+                              ? `Vencido há ${(Math.abs(insp.remainingKM)).toLocaleString()} KM` 
+                              : `Faltam ${insp.remainingKM.toLocaleString()} KM`
+                            }
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))}
+                    {alerts.map(alert => (
+                      <div key={alert.id} className={`flex gap-4 p-4 bg-surface-container-low rounded-xl border ${alert.severity === 'critical' ? 'border-error/50' : 'border-outline-variant'}`}>
+                        <span className={`material-symbols-outlined mt-1 ${alert.severity === 'critical' ? 'text-error' : 'text-on-surface-variant'}`} style={{ fontVariationSettings: alert.severity === 'critical' ? "'FILL' 1" : "" }}>
+                          {alert.severity === 'critical' ? 'warning' : 'info'}
+                        </span>
+                        <div>
+                          <p className="text-sm font-bold text-on-surface">{alert.title}</p>
+                          <p className="text-xs text-on-surface-variant mt-1">{alert.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </>
                 )}
               </div>
             </motion.div>
@@ -266,27 +377,54 @@ export function Dashboard() {
             <h3 className="text-[24px] font-semibold">Próximos Serviços</h3>
           </div>
           <div className="divide-y divide-outline-variant flex-1 overflow-y-auto">
-            {nextServices.length === 0 ? (
+            {loadingAlerts ? (
+              <div className="py-12 text-center text-on-surface-variant flex flex-col items-center">
+                <span className="material-symbols-outlined animate-spin mb-2">progress_activity</span>
+                Carregando...
+              </div>
+            ) : [...(expiredInspections.filter(i => i.type === 'expired' || i.type === 'warning')), ...nextServices].length === 0 ? (
               <div className="p-12 text-center text-on-surface-variant italic text-sm">
-                Nenhuma manutenção agendada no momento.
+                Nenhuma manutenção ou serviço pendente no momento.
               </div>
             ) : (
-              nextServices.map((service: any) => (
-                <div key={service.id} className="p-4 hover:bg-surface-container transition-colors flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full bg-${service.color || 'primary'}-container flex items-center justify-center`}>
-                      <span className="material-symbols-outlined text-[18px]">{service.icon || 'build'}</span>
+              <>
+                {expiredInspections.filter(i => i.type === 'expired' || i.type === 'warning').slice(0, 5).map((insp, idx) => (
+                  <div 
+                    key={`srv-insp-${idx}`} 
+                    onClick={() => navigate(`/inspections/${insp.vehicleId}`)}
+                    className="p-4 hover:bg-surface-container transition-colors flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg border border-outline-variant bg-white overflow-hidden flex-shrink-0">
+                        <img src={insp.vehicleImage || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} className="w-full h-full object-contain" alt={insp.vehicleModel} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-on-surface">{insp.vehiclePlate}</p>
+                        <p className="text-xs text-on-surface-variant line-clamp-1">{insp.itemName}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-on-surface">{service.plate}</p>
-                      <p className="text-xs text-on-surface-variant">{service.title}</p>
-                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase flex-shrink-0 ${insp.type === 'expired' ? 'bg-error-container text-on-error-container' : 'bg-warning-container text-warning-dark'}`}>
+                      {insp.type === 'expired' ? 'Vencido' : 'Próximo'}
+                    </span>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${service.priority === 'Crítica' ? 'bg-error-container text-on-error-container' : 'bg-primary-container text-on-primary'}`}>
-                    {service.priority}
-                  </span>
-                </div>
-              ))
+                ))}
+                {nextServices.map((service: any) => (
+                  <div key={service.id} className="p-4 hover:bg-surface-container transition-colors flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-lg bg-${service.color || 'primary'}-container flex items-center justify-center`}>
+                        <span className="material-symbols-outlined text-[20px] text-on-surface">{service.icon || 'build'}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-on-surface">{service.plate}</p>
+                        <p className="text-xs text-on-surface-variant line-clamp-1">{service.title}</p>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase flex-shrink-0 ${service.priority === 'Crítica' ? 'bg-error-container text-on-error-container' : 'bg-primary-container text-on-primary'}`}>
+                      {service.priority}
+                    </span>
+                  </div>
+                ))}
+              </>
             )}
           </div>
           <div className="p-4 bg-surface-container-low text-center mt-auto border-t border-outline-variant">

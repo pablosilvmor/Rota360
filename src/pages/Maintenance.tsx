@@ -38,7 +38,13 @@ export function Maintenance() {
   const stats = {
     pending: osData.filter(os => os.status !== 'Concluído').length,
     delayed: osData.filter(os => os.priority === 'Crítica' && os.status !== 'Concluído').length,
-    monthlyCost: osData.reduce((acc, os) => acc + (parseFloat(os.cost) || 0), 0)
+    monthlyCost: osData
+      .filter(os => {
+        const osDate = new Date(os.createdAt);
+        const now = new Date();
+        return osDate.getMonth() === now.getMonth() && osDate.getFullYear() === now.getFullYear();
+      })
+      .reduce((acc, os) => acc + (parseFloat(os.cost) || 0), 0)
   };
 
   useEffect(() => {
@@ -72,11 +78,36 @@ export function Maintenance() {
         status: 'Em Andamento',
         icon: 'build',
         color: 'primary',
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        updatedAt: Date.now()
       });
       setIsGenerateOSOpen(false);
-      setNewOS({ plate: '', priority: 'Média', description: '', provider: '', title: '' });
+      setNewOS({ plate: '', priority: 'Média', description: '', provider: '', title: '', cost: '', obra: '' });
     } catch(e) {
+      handleFirestoreError(e, OperationType.CREATE, 'maintenance');
+    }
+  };
+
+  const [scheduleData, setScheduleData] = useState({ date: '', time: '', vehicle: '', type: 'Troca de Óleo e Filtros' });
+  
+  const handleScheduleMaintenance = async () => {
+    if (!scheduleData.date || !scheduleData.vehicle) return;
+    try {
+      await addDoc(collection(db, 'maintenance'), {
+        plate: scheduleData.vehicle.split(' ')[0],
+        title: scheduleData.type,
+        status: 'Agendado',
+        priority: 'Média',
+        provider: 'Agendamento Prévio',
+        description: `Agendado para ${scheduleData.date} às ${scheduleData.time || 'não informado'}`,
+        icon: 'calendar_today',
+        color: 'secondary',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      setIsScheduleMaintenanceOpen(false);
+      setScheduleData({ date: '', time: '', vehicle: '', type: 'Troca de Óleo e Filtros' });
+    } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'maintenance');
     }
   };
@@ -184,23 +215,42 @@ export function Maintenance() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2 md:col-span-1">
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Data do Agendamento</label>
-                    <input type="date" className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" />
+                    <input 
+                      type="date" 
+                      value={scheduleData.date}
+                      onChange={e => setScheduleData({...scheduleData, date: e.target.value})}
+                      className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" 
+                    />
                   </div>
                   <div className="col-span-2 md:col-span-1">
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Horário (Opcional)</label>
-                    <input type="time" className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" />
+                    <input 
+                      type="time" 
+                      value={scheduleData.time}
+                      onChange={e => setScheduleData({...scheduleData, time: e.target.value})}
+                      className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" 
+                    />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Veículo</label>
-                    <select className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
-                      <option>Selecione...</option>
+                    <select 
+                      value={scheduleData.vehicle}
+                      onChange={e => setScheduleData({...scheduleData, vehicle: e.target.value})}
+                      className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
+                    >
+                      <option value="">Selecione...</option>
+                      {/* Using unique plates from fleet if possible, but let's just use what we have or suggested ones */}
                       <option>ABC-1234 (Volvo FH)</option>
                       <option>XYZ-9876 (Scania R450)</option>
                     </select>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Tipo de Intervenção Preventiva</label>
-                    <select className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
+                    <select 
+                      value={scheduleData.type}
+                      onChange={e => setScheduleData({...scheduleData, type: e.target.value})}
+                      className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
+                    >
                       <option>Revisão de Motor</option>
                       <option>Troca de Óleo e Filtros</option>
                       <option>Inspeção Pneus/Freio</option>
@@ -210,7 +260,13 @@ export function Maintenance() {
                 </div>
                 <div className="pt-4 flex gap-4">
                    <button onClick={() => setIsScheduleMaintenanceOpen(false)} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
-                   <button onClick={() => setIsScheduleMaintenanceOpen(false)} className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors">Agendar</button>
+                   <button 
+                     onClick={handleScheduleMaintenance}
+                     disabled={!scheduleData.date || !scheduleData.vehicle}
+                     className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                   >
+                     Agendar
+                   </button>
                 </div>
               </div>
             </motion.div>
@@ -371,14 +427,15 @@ export function Maintenance() {
 
                 <div className="col-span-7 pt-4 mt-4 border-t border-outline-variant">
                   <p className="text-sm font-semibold mb-3">Foco de Hoje</p>
-                  <div className="bg-surface-container-low p-3 rounded-lg mb-2 border-l-4 border-secondary">
-                    <p className="font-semibold text-sm">Troca de Óleo: TRK-9204</p>
-                    <p className="text-xs text-on-surface-variant">09:00 AM • Precision Auto</p>
-                  </div>
-                  <div className="bg-surface-container-low p-3 rounded-lg border-l-4 border-primary mt-2">
-                    <p className="font-semibold text-sm">Freios: VAN-3312</p>
-                    <p className="text-xs text-on-surface-variant">02:30 PM • Fleet Master Garage</p>
-                  </div>
+                  {osData.filter(os => os.status !== 'Concluído').slice(0, 2).map((os, index) => (
+                    <div key={os.id} className={`bg-surface-container-low p-3 rounded-lg mb-2 border-l-4 ${index === 0 ? 'border-secondary' : 'border-primary'}`}>
+                      <p className="font-semibold text-sm truncate">{os.title}: {os.plate}</p>
+                      <p className="text-xs text-on-surface-variant truncate">{os.provider}</p>
+                    </div>
+                  ))}
+                  {osData.filter(os => os.status !== 'Concluído').length === 0 && (
+                    <div className="text-xs text-on-surface-variant py-2">Nenhum serviço pendente.</div>
+                  )}
                 </div>
               </div>
             </div>

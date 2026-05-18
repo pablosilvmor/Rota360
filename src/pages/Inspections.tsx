@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, onSnapshot, doc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp, updateDoc, getDocs, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp, updateDoc, getDocs, where, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useParams, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface InspectionItem {
   id: string;
@@ -390,7 +391,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
             pdf.text(formatKM(currentKM), pageWidth - 50, startY + 14);
 
             // Rodapé
-            const pageCount = pdf.internal.getNumberOfPages();
+            const pageCount = (pdf as any).internal.getNumberOfPages();
             pdf.setFontSize(8);
             pdf.setTextColor(150);
             pdf.text('By Pablo Moreira', 14, pageHeight - 10);
@@ -1244,13 +1245,16 @@ export function Inspections() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [vehicles, setVehicles] = useState<any[]>([]);
+  const [checklistHistory, setChecklistHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'vehicles' | 'history'>('vehicles');
+  const [isExportingChecklist, setIsExportingChecklist] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     // We fetch the vehicles list to show cards or if an ID is present, we just pass to the Form
-    const unsubscribe = onSnapshot(collection(db, 'vehicles'), (snapshot) => {
+    const unsubscribeVehicles = onSnapshot(collection(db, 'vehicles'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -1258,16 +1262,122 @@ export function Inspections() {
       setVehicles(data.sort((a: any, b: any) => 
         (a.plate || "").localeCompare((b.plate || ""), undefined, { numeric: true, sensitivity: 'base' })
       ));
-      setLoading(false);
+      if (activeTab === 'vehicles') setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'vehicles'));
 
-    return () => unsubscribe();
-  }, []);
+    const qChecklist = query(collection(db, 'checklist_history'), orderBy('createdAt', 'desc'));
+    const unsubscribeHistory = onSnapshot(qChecklist, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setChecklistHistory(data);
+      if (activeTab === 'history') setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'checklist_history'));
+
+    return () => {
+      unsubscribeVehicles();
+      unsubscribeHistory();
+    };
+  }, [activeTab]);
+
+  const handleExportChecklistPDF = (checklist: any) => {
+    setIsExportingChecklist(checklist.id);
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      const tableData = checklist.items.map((item: any) => [
+        item.item,
+        item.category || 'Geral',
+        item.conformidade,
+        item.service || 'NENHUMA'
+      ]);
+
+      autoTable(pdf, {
+        startY: 40,
+        margin: { top: 40, bottom: 20, left: 14, right: 14 },
+        head: [['ITEM', 'CATEGORIA', 'STATUS', 'OBSERVAÇÕES / SERVIÇOS']],
+        body: tableData,
+        theme: 'grid',
+        styles: {
+           font: 'helvetica',
+           fontSize: 8,
+           cellPadding: { top: 4, right: 4, bottom: 4, left: 4 },
+           valign: 'middle'
+        },
+        headStyles: {
+           fillColor: [248, 250, 252],
+           textColor: [100, 116, 139],
+           fontStyle: 'bold',
+           fontSize: 7,
+           halign: 'left',
+           lineColor: [226, 232, 240],   
+           lineWidth: 0.1
+        },
+        bodyStyles: {
+           lineColor: [226, 232, 240],
+           lineWidth: 0.1
+        },
+        didDrawPage: function (data) {
+            // Cabeçalho (renderizado em todas as páginas)
+            let startY = 15;
+
+            pdf.setFontSize(16);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(0, 0, 0);
+            pdf.text(`Checklist: ${checklist.vehiclePlate}`, 14, startY + 8);
+            
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(100, 100, 100);
+            pdf.text(`${checklist.vehicleModel}`, 14, startY + 14);
+
+            // Box informativos (Data e Motorista)
+            pdf.setFillColor(241, 245, 249);
+            pdf.roundedRect(pageWidth - 94, startY, 80, 20, 2, 2, 'F');
+            
+            pdf.setFontSize(7);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(100, 116, 139);
+            pdf.text('DATA E MOTORISTA', pageWidth - 90, startY + 6);
+            
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(30, 41, 59);
+            pdf.text(`${checklist.date}`, pageWidth - 90, startY + 11);
+            pdf.text(`${checklist.driverName}`, pageWidth - 90, startY + 16);
+
+            // Rodapé
+            const pageCount = (pdf as any).internal.getNumberOfPages();
+            pdf.setFontSize(8);
+            pdf.setTextColor(150);
+            pdf.text('By Pablo Moreira', 14, pageHeight - 10);
+            const pageCountStr = `Página ${pageCount}`;
+            pdf.text(pageCountStr, pageWidth - 14 - pdf.getTextWidth(pageCountStr), pageHeight - 10);
+        }
+      });
+      
+      pdf.save(`Checklist_${checklist.vehiclePlate}_${checklist.date}.pdf`);
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      alert('Houve um problema ao gerar o PDF.');
+    } finally {
+      setIsExportingChecklist(null);
+    }
+  };
 
   const filteredVehicles = vehicles.filter(v => 
     (v.plate || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (v.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (v.brand || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredHistory = checklistHistory.filter(h => 
+    (h.vehiclePlate || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (h.driverName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (h.vehicleModel || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (id) {
@@ -1279,32 +1389,36 @@ export function Inspections() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">Inspeções da Frota</h2>
-          <p className="text-on-surface-variant font-medium">Controle e manutenção preventiva dos veículos.</p>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => setActiveTab('vehicles')}
+              className={`pb-2 border-b-2 transition-all font-bold text-sm ${activeTab === 'vehicles' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            >
+              VEÍCULOS
+            </button>
+            <button 
+              onClick={() => setActiveTab('history')}
+              className={`pb-2 border-b-2 transition-all font-bold text-sm ${activeTab === 'history' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
+            >
+              HISTÓRICO DE CHECKLISTS
+            </button>
+          </div>
         </div>
         <div className="relative w-full md:w-72">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
           <input
             type="text"
-            placeholder="Pesquisar placa ou modelo..."
+            placeholder="Pesquisar..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm"
           />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-full transition-colors"
-              title="Limpar pesquisa"
-            >
-              <span className="material-symbols-outlined text-[18px]">close</span>
-            </button>
-          )}
         </div>
       </div>
 
       {loading ? (
-        <div className="p-8 text-center text-on-surface-variant">Carregando veículos...</div>
-      ) : (
+        <div className="p-8 text-center text-on-surface-variant">Carregando dados...</div>
+      ) : activeTab === 'vehicles' ? (
         <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           <AnimatePresence>
             {filteredVehicles.length === 0 ? (
@@ -1314,16 +1428,12 @@ export function Inspections() {
                 exit={{ opacity: 0 }}
                 className="col-span-full p-12 text-center bg-surface-container-low text-on-surface-variant border border-outline-variant rounded-2xl border-dashed"
               >
-                Nenhum veículo encontrado para os filtros atuais.
+                Nenhum veículo encontrado.
               </motion.div>
             ) : (
               filteredVehicles.map(vehicle => (
                 <motion.div 
                   layout
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
                   key={vehicle.id} 
                   onClick={() => navigate(`/inspections/${vehicle.id}`)}
                   className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:bg-surface-container-low hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col"
@@ -1334,17 +1444,7 @@ export function Inspections() {
                       src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} 
                       alt={vehicle.model} 
                     />
-                    <div className="absolute top-3 right-3 z-10">
-                      <span className={`bg-white/90 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm ${
-                        vehicle.status === 'Ativo' ? 'text-success' : 
-                        vehicle.status === 'Em Manutenção' ? 'text-warning' : 
-                        'text-error'
-                      }`}>
-                        {vehicle.status || 'Ativo'}
-                      </span>
-                    </div>
                   </div>
-                  
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="flex items-center gap-3 mb-2 flex-1">
                       <div className="bg-primary/10 text-primary p-2.5 rounded-xl">
@@ -1352,23 +1452,73 @@ export function Inspections() {
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-on-surface leading-none mb-1">{vehicle.plate}</h3>
-                        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{vehicle.brand} {vehicle.model}</p>
-                        <div className="flex items-center gap-1 mt-2 text-on-surface-variant bg-surface-container-high w-fit px-2 py-0.5 rounded">
-                          <span className="material-symbols-outlined text-[12px]">domain</span>
-                          <span className="text-[10px] font-bold uppercase">{vehicle.work || 'Não atribuída'}</span>
-                        </div>
+                        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{vehicle.model}</p>
                       </div>
-                    </div>
-                    
-                    <div className="mt-4 pt-3 border-t border-outline-variant/50 flex justify-between items-center text-sm">
-                      <span className="text-on-surface-variant text-[11px] uppercase tracking-wider font-bold">KM Atual</span>
-                      <span className="font-mono font-bold text-primary text-base">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 </motion.div>
               ))
             )}
           </AnimatePresence>
+        </motion.div>
+      ) : (
+        <motion.div layout className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-surface-container-low border-b border-outline-variant text-[12px] font-bold text-on-surface-variant uppercase tracking-wider">
+                  <th className="px-6 py-4">Data</th>
+                  <th className="px-6 py-4">Veículo</th>
+                  <th className="px-6 py-4">Motorista</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant">
+                {filteredHistory.map(item => (
+                  <tr key={item.id} className="hover:bg-surface-container-low transition-colors group">
+                    <td className="px-6 py-4 text-sm font-medium">{item.date}</td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-bold">{item.vehiclePlate}</div>
+                      <div className="text-[10px] text-on-surface-variant uppercase">{item.vehicleModel}</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm">{item.driverName}</td>
+                    <td className="px-6 py-4">
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => navigate(`/checklist?edit=${item.id}`)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all"
+                          title="Editar Checklist"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button 
+                          onClick={() => handleExportChecklistPDF(item)}
+                          disabled={isExportingChecklist === item.id}
+                          className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all"
+                          title="Exportar PDF"
+                        >
+                          {isExportingChecklist === item.id ? (
+                            <span className="animate-spin text-[18px] material-symbols-outlined">refresh</span>
+                          ) : (
+                            <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filteredHistory.length === 0 && (
+            <div className="p-12 text-center text-on-surface-variant">Nenhum histórico encontrado.</div>
+          )}
         </motion.div>
       )}
     </div>

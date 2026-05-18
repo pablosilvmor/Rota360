@@ -89,7 +89,7 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
       setOcrStatus('processing');
 
       // Chamada direta à API Gemini no frontend seguindo as diretrizes
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY;
+      const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY;
       if (!apiKey) {
         throw new Error('Chave de API Gemini (VITE_GEMINI_API_KEY) não encontrada nas variáveis de ambiente. Adicione a chave no painel da Vercel (https://vercel.com).');
       }
@@ -463,11 +463,12 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     <SearchableSelect 
                       label="Obra / Centro de Custo"
                       placeholder="Selecione..."
+                      multiple={true}
                       options={[
                         ...works.map(w => ({ value: w.name, label: w.name })),
                         { value: 'Sede Administrativa', label: 'Sede Administrativa' }
                       ]}
-                      value={vehicleData.costCenter}
+                      value={Array.isArray(vehicleData.costCenter) ? vehicleData.costCenter : (vehicleData.costCenter ? [vehicleData.costCenter] : [])}
                       onChange={(val) => setVehicleData({ ...vehicleData, costCenter: val })}
                     />
                   </div>
@@ -490,18 +491,25 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Status Operacional</label>
                     <div className="flex items-center gap-2 p-1 bg-surface-container rounded-lg">
                       <button 
-                        className={`flex-1 py-2 text-center rounded-md text-sm font-semibold transition-colors ${vehicleData.status === 'Ativo' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        className={`flex-1 py-2 text-center rounded-md text-[11px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Ativo' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant hover:text-on-surface'}`} 
                         type="button"
                         onClick={() => setVehicleData({ ...vehicleData, status: 'Ativo' })}
                       >
                         Ativo
                       </button>
                       <button 
-                        className={`flex-1 py-2 text-center rounded-md text-sm font-semibold transition-colors ${vehicleData.status === 'Em Manutenção' ? 'bg-white shadow-sm text-error' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        className={`flex-1 py-2 text-center rounded-md text-[11px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Em Manutenção' ? 'bg-white shadow-sm text-warning-dark' : 'text-on-surface-variant hover:text-on-surface'}`} 
                         type="button"
                         onClick={() => setVehicleData({ ...vehicleData, status: 'Em Manutenção' })}
                       >
-                        Em Manutenção
+                        Manutenção
+                      </button>
+                      <button 
+                        className={`flex-1 py-2 text-center rounded-md text-[11px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Inativo' ? 'bg-white shadow-sm text-error' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        type="button"
+                        onClick={() => setVehicleData({ ...vehicleData, status: 'Inativo' })}
+                      >
+                        Inativo
                       </button>
                     </div>
                   </div>

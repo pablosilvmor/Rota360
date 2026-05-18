@@ -89,6 +89,11 @@ service cloud.firestore {
     }
 
     // --- Rules ---
+    match /occurrences/{occurrenceId} {
+       allow read: if isSignedIn();
+       allow write: if isSignedIn();
+    }
+    
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == userId;
@@ -125,6 +130,12 @@ service cloud.firestore {
     }
 
     match /inspections/{allInspections=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+    match /{path=**}/records/{record} {
+      allow read, write, delete: if isSignedIn();
+    }
+    match /{path=**}/items/{item} {
       allow read, write, delete: if isSignedIn();
     }
   }

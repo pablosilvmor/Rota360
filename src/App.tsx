@@ -17,6 +17,7 @@ const Tracking = lazy(() => import('./pages/Tracking').then(m => ({ default: m.T
 const Works = lazy(() => import('./pages/Works').then(m => ({ default: m.Works })));
 const Inspections = lazy(() => import('./pages/Inspections').then(m => ({ default: m.Inspections })));
 const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
+const Checklist = lazy(() => import('./pages/Checklist').then(m => ({ default: m.Checklist })));
 
 function ProtectedRoute({ children, path }: { children: ReactNode, path: string }) {
   const { user, userData, loading, logout } = useAuth();
@@ -27,9 +28,9 @@ function ProtectedRoute({ children, path }: { children: ReactNode, path: string 
   if (userData && !userData.isActive) {
     return (
       <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-6 text-center">
-        <span className="material-symbols-outlined text-[64px] text-error mb-4">block</span>
-        <h1 className="text-2xl font-bold text-on-surface mb-2">Acesso Bloqueado</h1>
-        <p className="text-on-surface-variant font-medium mb-6">Sua conta foi desativada pelo administrador.</p>
+        <span className="material-symbols-outlined text-[64px] text-error mb-4">analytics</span>
+        <h1 className="text-2xl font-bold text-on-surface mb-2">Conta em Análise</h1>
+        <p className="text-on-surface-variant font-medium mb-6">Sua conta encontra-se em análise ou bloqueada pelo administrador.<br/>Aguarde a liberação do acesso.</p>
         <button 
           onClick={() => setShowLogoutConfirm(true)} 
           className="px-6 py-2 bg-primary text-on-primary rounded-lg font-bold shadow-sm"
@@ -76,6 +77,7 @@ export default function App() {
       <BrowserRouter>
         <Suspense fallback={<Preloader />}>
           <Routes>
+            <Route path="/checklist" element={<Checklist />} />
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute path="/"><Dashboard /></ProtectedRoute>} />
             <Route path="/fleet" element={<ProtectedRoute path="/fleet"><Fleet /></ProtectedRoute>} />

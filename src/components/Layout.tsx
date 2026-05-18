@@ -21,8 +21,10 @@ export function Layout({ children }: LayoutProps) {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -36,6 +38,9 @@ export function Layout({ children }: LayoutProps) {
       }
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
         setIsNotificationsOpen(false);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setIsMoreMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -91,6 +96,7 @@ export function Layout({ children }: LayoutProps) {
     { name: 'Inspeções', path: '/inspections', icon: 'fact_check' },
     { name: 'Motoristas', path: '/drivers', icon: 'group' },
     { name: 'Relatórios', path: '/reports', icon: 'analytics' },
+    { name: 'Checklist', path: '/checklist', icon: 'checklist' },
   ];
 
   const allowedNavItems = navItems.filter(item => 
@@ -243,29 +249,51 @@ export function Layout({ children }: LayoutProps) {
           })}
           
           <div className="px-2 pt-2">
-            <div className="relative group/more">
-              <button className="w-full px-4 py-3 rounded-lg flex items-center justify-between text-on-primary-container hover:bg-white/5 font-medium transition-colors group">
+            <div className="relative" ref={moreMenuRef}>
+              <button 
+                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                className={`w-full px-4 py-3 rounded-lg flex items-center justify-between transition-colors group ${isMoreMenuOpen ? 'bg-white/10 text-white' : 'text-on-primary-container hover:bg-white/5'}`}
+              >
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined">more_horiz</span>
                   <span className="text-base font-medium">Mais Opções</span>
                 </div>
-                <span className="material-symbols-outlined text-[18px] group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+                <span className={`material-symbols-outlined text-[18px] transition-transform ${isMoreMenuOpen ? 'rotate-90' : ''}`}>chevron_right</span>
               </button>
               
-              <div className="absolute left-full top-0 ml-2 w-56 bg-primary-container rounded-2xl p-2 opacity-0 group-hover/more:opacity-100 transition-all duration-200 pointer-events-none group-hover/more:pointer-events-auto shadow-2xl border border-white/10 z-[100] translate-y-[-10px] group-hover/more:translate-y-0">
-                <NavLink to="/maintenance" className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base" title="Manutenção">
-                  <span className="material-symbols-outlined text-[20px]">build</span>
-                  Manutenção
-                </NavLink>
-                <NavLink to="/fuel" className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base" title="Combustível">
-                  <span className="material-symbols-outlined text-[20px]">local_gas_station</span>
-                  Combustível
-                </NavLink>
-                <NavLink to="/tracking" className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base" title="Rastreamento">
-                  <span className="material-symbols-outlined text-[20px]">map</span>
-                  Rastreamento
-                </NavLink>
-              </div>
+              {isMoreMenuOpen && (
+                <div className="absolute left-full top-0 pl-2 w-56 z-[100] animate-in fade-in slide-in-from-left-2 duration-200">
+                  <div className="bg-primary-container rounded-2xl p-2 shadow-2xl border border-white/10">
+                    <NavLink 
+                      to="/maintenance" 
+                      onClick={() => setIsMoreMenuOpen(false)}
+                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base" 
+                      title="Manutenção"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">build</span>
+                      Manutenção
+                    </NavLink>
+                    <NavLink 
+                      to="/fuel" 
+                      onClick={() => setIsMoreMenuOpen(false)}
+                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base" 
+                      title="Combustível"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">local_gas_station</span>
+                      Combustível
+                    </NavLink>
+                    <NavLink 
+                      to="/tracking" 
+                      onClick={() => setIsMoreMenuOpen(false)}
+                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base" 
+                      title="Rastreamento"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">map</span>
+                      Rastreamento
+                    </NavLink>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </nav>

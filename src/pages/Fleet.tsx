@@ -51,10 +51,19 @@ export function Fleet() {
     // Listen to vehicles
     const qVehicles = query(collection(db, 'vehicles'), orderBy('createdAt', 'desc'));
     const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
-      const vehiclesData = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      }));
+      const seenPlates = new Set();
+      const vehiclesData = snapshot.docs
+        .map(doc => ({
+          ...doc.data(),
+          id: doc.id
+        } as any))
+        .filter(v => {
+          const plate = (v.plate || '').toUpperCase().trim();
+          if (!plate) return true;
+          if (seenPlates.has(plate)) return false;
+          seenPlates.add(plate);
+          return true;
+        });
       setVehicles(vehiclesData);
       setLoading(false);
     }, (error) => {
@@ -135,7 +144,7 @@ export function Fleet() {
       (v.bodywork || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (v.observations || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesWork = filterWork === '' || filterWork === 'Todas as Obras' || v.work === filterWork;
+    const matchesWork = filterWork === '' || filterWork === 'Todas as Obras' || (Array.isArray(v.costCenter) ? v.costCenter.includes(filterWork) : v.costCenter === filterWork);
     const matchesStatus = filterStatus === '' || filterStatus === 'Todos os Status' || v.status === filterStatus;
 
     return matchesSearch && matchesWork && matchesStatus;
@@ -229,6 +238,9 @@ export function Fleet() {
             placeholder="Todos os Status"
             options={[
               { value: '', label: 'Todos os Status' },
+              { value: 'Ativo', label: 'Ativo' },
+              { value: 'Inativo', label: 'Inativo' },
+              { value: 'Em Manutenção', label: 'Em Manutenção' },
               ...statuses.map(s => ({ value: s.name, label: s.name }))
             ]}
             value={filterStatus}
@@ -328,7 +340,7 @@ export function Fleet() {
                       {vehicle.bodywork && <p className="text-xs text-on-surface-variant/80 uppercase font-bold tracking-wide mt-1">{vehicle.bodywork}</p>}
                       <div className="flex items-center gap-1 mt-2 text-on-surface-variant bg-surface-container w-fit px-2 py-0.5 rounded">
                          <span className="material-symbols-outlined text-[14px]">domain</span>
-                         <span className="text-xs font-semibold">{vehicle.work || 'Não atribuída'}</span>
+                         <span className="text-xs font-semibold">{Array.isArray(vehicle.costCenter) ? vehicle.costCenter.join(', ') : (vehicle.costCenter || 'Não atribuída')}</span>
                       </div>
                     </div>
                     <div className="relative group/menu">
@@ -397,7 +409,7 @@ export function Fleet() {
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-1 text-on-surface-variant bg-surface-container w-fit px-2 py-0.5 rounded">
                         <span className="material-symbols-outlined text-[14px]">domain</span>
-                        <span className="text-xs font-semibold">{vehicle.work || 'Não atribuída'}</span>
+                        <span className="text-xs font-semibold">{vehicle.costCenter || 'Não atribuída'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">

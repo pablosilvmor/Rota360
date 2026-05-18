@@ -307,6 +307,7 @@ export function Admin() {
     { path: '/drivers', label: 'Motoristas' },
     { path: '/settings', label: 'Configurações' },
     { path: '/reports', label: 'Relatórios' },
+    { path: '/checklist', label: 'Checklist' },
   ];
 
   const tabs = [

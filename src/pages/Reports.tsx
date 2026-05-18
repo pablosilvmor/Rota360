@@ -39,7 +39,12 @@ const MODULES: ModuleData[] = [
         label: 'KM Atual', 
         renderer: (val: any, item: any) => (item?.currentKM || item?.odometer || 0).toLocaleString() 
       },
-      { key: 'work', label: 'Obra' },
+      { 
+        key: 'costCenter', 
+        label: 'Centro de Custo',
+        renderer: (val: any) => Array.isArray(val) ? val.join(', ') : val
+      },
+      { key: 'assignedDriver', label: 'Motorista Atribuído' },
       { key: 'status', label: 'Status' },
       { key: 'observations', label: 'Observações' },
     ]
@@ -52,9 +57,10 @@ const MODULES: ModuleData[] = [
     columns: [
       { key: 'name', label: 'Nome' },
       { key: 'cnh', label: 'CNH' },
-      { key: 'category', label: 'Categoria CNH' },
-      { key: 'expiration', label: 'Validade CNH', renderer: formatDate },
+      { key: 'cnhCategory', label: 'Categoria CNH' },
+      { key: 'validUntil', label: 'Validade CNH', renderer: formatDate },
       { key: 'phone', label: 'Telefone' },
+      { key: 'vehicleAssigned', label: 'Veículo Atribuído' },
       { key: 'status', label: 'Status' },
     ]
   },
@@ -111,10 +117,27 @@ export function Reports() {
     setSelectedModule(mod);
     setSelectedColumns(mod.columns.map(c => c.key));
     setLoadingData(true);
+    setData([]);
+    
+    if (mod.id === 'inspections') {
+      setLoadingData(false);
+      return; // Will be handled by empty state component logic to show warning
+    }
+
     try {
       const q = query(collection(db, mod.collectionId));
       const snap = await getDocs(q);
-      const docs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      let docs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+
+      if (mod.id === 'vehicles') {
+        const driversSnap = await getDocs(query(collection(db, 'drivers')));
+        const driversData = driversSnap.docs.map(d => d.data());
+        docs = docs.map((v: any) => {
+          const assignedD = driversData.find(d => d.vehicleAssigned === v.plate);
+          return { ...v, assignedDriver: assignedD ? assignedD.name : 'Não Atribuída' };
+        });
+      }
+
       setData(docs);
     } catch (e) {
       handleFirestoreError(e, OperationType.LIST, mod.collectionId);
@@ -157,6 +180,7 @@ export function Reports() {
       head: [tableCols],
       body: tableData,
       startY: 40,
+      margin: { top: 45, bottom: 30 },
       styles: {
         fontSize: 9,
         cellPadding: 4,
@@ -177,9 +201,11 @@ export function Reports() {
           doc.addImage(headerLogo.src, 'PNG', 14, 10, w, h, '', 'FAST');
         }
         
-        doc.setFontSize(16);
-        doc.setTextColor(40);
-        doc.text(title, 14, 32);
+        if (hookData.pageNumber === 1) {
+          doc.setFontSize(16);
+          doc.setTextColor(40);
+          doc.text(title, 14, 32);
+        }
 
         // Footer
         doc.setFontSize(8);
@@ -216,9 +242,19 @@ export function Reports() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">Central de Relatórios</h2>
-        <p className="text-on-surface-variant font-medium">Extraia informações e gere arquivos profissionais em PDF da base de dados.</p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">Central de Relatórios</h2>
+          <p className="text-on-surface-variant font-medium">Extraia informações e gere arquivos profissionais em PDF da base de dados.</p>
+        </div>
+        <button
+          onClick={handleExportPDF}
+          disabled={!selectedModule || selectedColumns.length === 0 || loadingData}
+          className="px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:hover:shadow-lg flex items-center gap-2 justify-center"
+        >
+          <span className="material-symbols-outlined">picture_as_pdf</span>
+          Exportar PDF Selecionado
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8">
@@ -305,15 +341,6 @@ export function Reports() {
                     O relatório no PDF será ajustado automaticamente para {activeColumns.length > 5 ? 'paisagem' : 'retrato'}.
                   </p>
                 </div>
-                
-                <button
-                  onClick={handleExportPDF}
-                  disabled={selectedColumns.length === 0 || loadingData}
-                  className="px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:hover:shadow-lg flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined">picture_as_pdf</span>
-                  Exportar PDF
-                </button>
               </div>
 
               <div className="overflow-x-auto min-h-[400px]">
@@ -328,6 +355,12 @@ export function Reports() {
                      <p className="font-bold text-on-surface">Nenhuma coluna selecionada</p>
                      <p className="text-sm text-on-surface-variant">Selecione pelo menos uma coluna para visualizar os dados.</p>
                   </div>
+                ) : selectedModule && selectedModule.id === 'inspections' ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+                     <span className="material-symbols-outlined text-5xl text-on-surface-variant/50 mb-2">info</span>
+                     <p className="font-bold text-on-surface">Base de Inspeções Indisponível</p>
+                     <p className="text-sm text-on-surface-variant mt-2 max-w-md">O sistema atual de inspeções funciona através de relatórios e checklists digitais para PDF. Não há dados tabulares diários de checklists individuais estruturados para compor uma tabela no momento.</p>
+                  </div>
                 ) : data.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-64 text-center p-6">
                      <span className="material-symbols-outlined text-5xl text-on-surface-variant/50 mb-2">search_off</span>
@@ -335,11 +368,11 @@ export function Reports() {
                      <p className="text-sm text-on-surface-variant">A base de dados selecionada está vazia.</p>
                   </div>
                 ) : (
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse table-auto min-w-max">
                     <thead>
                       <tr className="bg-surface-container-low/50">
                         {activeColumns.map(c => (
-                          <th key={c.key} className="px-5 py-3 text-sm font-semibold text-on-surface-variant border-b border-outline-variant/30 uppercase tracking-wider">{c.label}</th>
+                          <th key={c.key} className="px-5 py-3 text-sm font-semibold text-on-surface-variant border-b border-outline-variant/30 uppercase tracking-wider whitespace-nowrap">{c.label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -348,9 +381,9 @@ export function Reports() {
                         <tr key={item.id || idx} className="hover:bg-surface-container transition-colors">
                           {activeColumns.map(c => {
                             const val = item[c.key];
-                            const displayVal = c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '-');
+                            const displayVal = c.renderer ? c.renderer(val, item) : (val != null && val !== "" ? String(val) : '-');
                             return (
-                              <td key={c.key} className="px-5 py-3 text-sm text-on-surface truncate max-w-[200px]" title={displayVal}>
+                              <td key={c.key} className="px-5 py-3 text-sm text-on-surface whitespace-normal break-words align-top max-w-[250px] min-w-[120px]">
                                 {displayVal}
                               </td>
                             );

@@ -30,7 +30,7 @@ export function Login() {
         </button>
 
         <div className="flex flex-col items-center justify-center gap-2 mt-6">
-          <span className="text-xs text-white/50">DESENVOLVIDO POR PABLO MOREIRA</span>
+          <a href="https://pablosilvmor.github.io/site/1" target="_blank" rel="noopener noreferrer" className="text-xs text-white/50 hover:text-primary transition-colors">DESENVOLVIDO POR PABLO MOREIRA</a>
           <img src="https://i.imgur.com/iG8dI7r.png" alt="Company Logo" className="h-16 object-contain rounded" />
         </div>
       </div>

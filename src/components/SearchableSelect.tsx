@@ -10,11 +10,12 @@ interface SearchableSelectProps {
   label?: string;
   placeholder: string;
   options: Option[];
-  value: string;
-  onChange: (val: string) => void;
+  value: string | string[];
+  onChange: (val: any) => void;
   error?: string;
   className?: string;
   size?: 'sm' | 'md';
+  multiple?: boolean;
 }
 
 export function SearchableSelect({ 
@@ -25,14 +26,17 @@ export function SearchableSelect({
   onChange,
   error,
   className = "",
-  size = 'md'
+  size = 'md',
+  multiple = false
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [filterTerm, setFilterTerm] = useState('');
   const [direction, setDirection] = useState<'down' | 'up'>('down');
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const selectedOption = options.find(o => o.value === value);
+  const selectedOption = multiple ? undefined : options.find(o => o.value === value);
+  const selectedOptions = multiple ? options.filter(o => (value as string[]).includes(o.value)) : [];
+  
   const filteredOptions = options.filter(o => 
     o.label.toLowerCase().includes(filterTerm.toLowerCase()) ||
     o.value.toLowerCase().includes(filterTerm.toLowerCase())
@@ -71,8 +75,8 @@ export function SearchableSelect({
         className={`w-full bg-white border ${error ? 'border-error' : 'border-outline-variant'} rounded-lg ${heightClass} cursor-pointer flex items-center justify-between hover:border-primary transition-colors shadow-sm`}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className={`truncate ${selectedOption ? 'text-on-surface font-medium' : 'text-on-surface-variant/50'}`}>
-          {selectedOption ? selectedOption.label : placeholder}
+        <span className={`truncate ${(!multiple && selectedOption) || (multiple && selectedOptions.length > 0) ? 'text-on-surface font-medium' : 'text-on-surface-variant/50'}`}>
+          {!multiple && selectedOption ? selectedOption.label : (multiple && selectedOptions.length > 0 ? selectedOptions.map(o => o.label).join(', ') : placeholder)}
         </span>
         <span className={`material-symbols-outlined ${size === 'sm' ? 'text-[18px]' : 'text-[20px]'} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
       </div>
@@ -105,15 +109,24 @@ export function SearchableSelect({
                 filteredOptions.map((opt) => (
                   <div 
                     key={opt.value}
-                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-primary/10 transition-colors flex items-center justify-between group ${value === opt.value ? 'bg-primary/5 font-bold text-primary' : 'text-on-surface'}`}
+                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-primary/10 transition-colors flex items-center justify-between group ${(!multiple && value === opt.value) || (multiple && (value as string[]).includes(opt.value)) ? 'bg-primary/5 font-bold text-primary' : 'text-on-surface'}`}
                     onClick={() => {
-                      onChange(opt.value);
-                      setIsOpen(false);
+                      if (multiple) {
+                        const arr = (value as string[]) || [];
+                        if (arr.includes(opt.value)) {
+                          onChange(arr.filter(v => v !== opt.value));
+                        } else {
+                          onChange([...arr, opt.value]);
+                        }
+                      } else {
+                        onChange(opt.value);
+                        setIsOpen(false);
+                      }
                       setFilterTerm('');
                     }}
                   >
                     <span className="flex-1">{opt.label}</span>
-                    {value === opt.value && (
+                    {((!multiple && value === opt.value) || (multiple && (value as string[]).includes(opt.value))) && (
                       <span className="material-symbols-outlined text-primary text-[18px]">check</span>
                     )}
                   </div>

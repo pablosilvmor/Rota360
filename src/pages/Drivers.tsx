@@ -35,7 +35,8 @@ export function Drivers() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [assignment, setAssignment] = useState({ driverId: '', vehiclePlate: '', workId: '', workName: '' });
-  const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
+  const [newOccurrence, setNewOccurrence] = useState({ driverId: '', type: 'Multa Leve', description: '', points: 1 });
+  const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '' });
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -50,10 +51,11 @@ export function Drivers() {
         cpf: editingDriver.cpf || '',
         cnh: editingDriver.cnh || '',
         cnhCategory: editingDriver.cnhCategory || 'A',
-        validUntil: editingDriver.validUntil || ''
+        validUntil: editingDriver.validUntil || '',
+        phone: editingDriver.phone || ''
       });
     } else {
-      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
+      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '' });
     }
   }, [editingDriver]);
 
@@ -142,9 +144,30 @@ export function Drivers() {
         });
       }
       setSearchParams({});
-      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '' });
+      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '' });
     } catch(e) {
       handleFirestoreError(e, editingDriverId ? OperationType.UPDATE : OperationType.CREATE, 'drivers');
+    }
+  };
+
+  const handleAddOccurrence = async () => {
+    if (!newOccurrence.driverId || newOccurrence.points <= 0) return;
+    try {
+      const driver = drivers.find(d => d.id === newOccurrence.driverId);
+      if (!driver) return;
+      const currentRating = parseFloat(driver.rating) || 5.0;
+      const newRating = Math.max(0, currentRating - (newOccurrence.points * 0.5));
+      await updateDoc(doc(db, 'drivers', driver.id), { rating: newRating.toFixed(1) });
+      await addDoc(collection(db, 'occurrences'), {
+        driverId: driver.id,
+        type: newOccurrence.type,
+        description: newOccurrence.description,
+        points: newOccurrence.points,
+        date: Date.now()
+      });
+      setNewOccurrence({ driverId: '', type: 'Multa Leve', description: '', points: 1 });
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -185,7 +208,7 @@ export function Drivers() {
     setStatusFilter('');
     setWorkFilter('');
   };
-  const availableVehicles = vehicles.filter(v => !drivers.some(d => d.vehicleAssigned === v.plate));
+  const availableVehicles = vehicles.filter(v => !drivers.some(d => d.vehicleAssigned === v.plate && d.id !== assignment.driverId));
 
   const SortButton = ({ column, label }: { column: string, label: string }) => (
     <th 
@@ -232,7 +255,16 @@ export function Drivers() {
                   placeholder="Selecione um motorista..."
                   options={drivers.map(d => ({ value: d.id, label: `${d.name} (${d.cpf})` }))}
                   value={assignment.driverId}
-                  onChange={(val) => setAssignment({ ...assignment, driverId: val })}
+                  onChange={(val) => {
+                    const driver = drivers.find(d => d.id === val);
+                    setAssignment({ 
+                      ...assignment, 
+                      driverId: val,
+                      vehiclePlate: driver?.vehicleAssigned || '',
+                      workId: driver?.workId || '',
+                      workName: driver?.workName || ''
+                    });
+                  }}
                 />
                 <SearchableSelect 
                   label="Veículo Disponível"
@@ -270,6 +302,69 @@ export function Drivers() {
           </motion.div>
         )}
 
+        {newOccurrence.driverId && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setNewOccurrence({...newOccurrence, driverId: ''})}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-md flex flex-col"
+            >
+              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low rounded-t-2xl">
+                <h3 className="text-xl font-semibold text-on-surface">Registrar Ocorrência</h3>
+                <button onClick={() => setNewOccurrence({...newOccurrence, driverId: ''})} className="text-on-surface-variant hover:text-error transition-colors">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Tipo de Ocorrência</label>
+                  <select 
+                    className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary"
+                    value={newOccurrence.type}
+                    onChange={e => setNewOccurrence({...newOccurrence, type: e.target.value})}
+                  >
+                    <option value="Multa Leve">Multa Leve (-0.5 pts)</option>
+                    <option value="Multa Grave">Multa Grave (-1.0 pts)</option>
+                    <option value="Quebra de Veículo">Falta de Zelo / Quebra (-1.5 pts)</option>
+                    <option value="Acidente">Acidente com Culpa (-2.0 pts)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Descrição (Opcional)</label>
+                  <textarea 
+                    value={newOccurrence.description} 
+                    onChange={e => setNewOccurrence({...newOccurrence, description: e.target.value})} 
+                    className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary resize-y" 
+                    placeholder="Detalhes..." 
+                  />
+                </div>
+                <div className="pt-4 flex gap-4">
+                   <button onClick={() => setNewOccurrence({...newOccurrence, driverId: ''})} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
+                   <button 
+                     onClick={() => {
+                        let pts = 1;
+                        if(newOccurrence.type === 'Multa Leve') pts = 1;
+                        if(newOccurrence.type === 'Multa Grave') pts = 2;
+                        if(newOccurrence.type === 'Quebra de Veículo') pts = 3;
+                        if(newOccurrence.type === 'Acidente') pts = 4;
+                        setNewOccurrence({...newOccurrence, points: pts});
+                        // wait for state
+                        setTimeout(() => handleAddOccurrence(), 100);
+                     }} 
+                     className="flex-1 px-4 py-2 bg-error text-on-error rounded-lg font-semibold hover:bg-error/90 transition-colors"
+                   >
+                     Registrar
+                   </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {(isAddDriverOpen || editingDriverId) && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -300,6 +395,10 @@ export function Drivers() {
                    <div className="col-span-1">
                      <label className="block text-sm font-semibold text-on-surface-variant mb-2">Nº CNH</label>
                      <input type="text" value={newDriver.cnh} onChange={e => setNewDriver({...newDriver, cnh: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="Número do registro" />
+                   </div>
+                   <div className="col-span-1">
+                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Telefone</label>
+                     <input type="text" value={newDriver.phone} onChange={e => setNewDriver({...newDriver, phone: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="(00) 00000-0000" />
                    </div>
                    <div className="col-span-1">
                      <SearchableSelect 
@@ -448,6 +547,14 @@ export function Drivers() {
                   size="sm"
                 />
               </div>
+              {(searchTerm || statusFilter || workFilter) && (
+                <button 
+                  onClick={clearFilters}
+                  className="text-xs font-bold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors border border-primary/20 bg-primary/5"
+                >
+                  Limpar Filtros
+                </button>
+              )}
             </div>
           </div>
           {(searchTerm || statusFilter || workFilter) && (
@@ -482,7 +589,7 @@ export function Drivers() {
                       </div>
                       <div>
                         <p className="text-base text-on-surface font-semibold">{driver.name}</p>
-                        <p className="text-[12px] text-on-surface-variant">CPF: {driver.cpf}</p>
+                        <p className="text-[12px] text-on-surface-variant flex gap-2"><span>CPF: {driver.cpf}</span> {driver.phone && <span>• Tel: {driver.phone}</span>}</p>
                       </div>
                     </div>
                   </td>
@@ -511,6 +618,63 @@ export function Drivers() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
+                      {!driver.vehicleAssigned && (
+                         <button 
+                         onClick={() => {
+                           setAssignment({...assignment, driverId: driver.id});
+                           setSearchParams({ assign: 'true' });
+                         }}
+                         className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
+                         title="Atribuir Veículo"
+                       >
+                         <span className="material-symbols-outlined text-[20px]">link</span>
+                       </button>
+                      )}
+                      {driver.vehicleAssigned && (
+                        <button 
+                         onClick={() => {
+                           setAssignment({
+                             driverId: driver.id, 
+                             vehiclePlate: driver.vehicleAssigned, 
+                             workId: driver.workId || '', 
+                             workName: driver.workName || ''
+                           });
+                           setSearchParams({ assign: 'true' });
+                         }}
+                         className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
+                         title="Editar Atribuição"
+                       >
+                         <span className="material-symbols-outlined text-[20px]">edit_document</span>
+                       </button>
+                      )}
+                      {driver.vehicleAssigned && (
+                        <button 
+                          onClick={async () => {
+                            if(window.confirm('Deseja desvincular este veículo do motorista?')) {
+                              try {
+                                await updateDoc(doc(db, 'drivers', driver.id), { 
+                                  vehicleAssigned: '',
+                                  status: 'Disponível',
+                                  updatedAt: Date.now()
+                                });
+                              } catch(e) {
+                                handleFirestoreError(e, OperationType.UPDATE, 'drivers');
+                              }
+                            }
+                          }}
+                          className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
+                          title="Desvincular Veículo"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">link_off</span>
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setNewOccurrence({...newOccurrence, driverId: driver.id})}
+                        className="text-warning-dark hover:text-warning-dark/80 transition-colors p-1.5 hover:bg-warning/10 rounded-lg"
+                        title="Registrar Ocorrência"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">report</span>
+                      </button>
                       <button 
                         onClick={() => setSearchParams({ editId: driver.id })}
                         className="text-on-surface-variant hover:text-primary transition-colors p-1.5 hover:bg-primary/10 rounded-lg"

@@ -50,10 +50,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: currentUser.email || '',
               name: currentUser.displayName || '',
               role: isAdmin ? 'admin' : 'operador',
-              isActive: true,
+              isActive: isAdmin,
               allowedScreens: isAdmin 
-                ? ['/', '/fleet', '/maintenance', '/drivers', '/settings', '/admin', '/fuel', '/tracking']
-                : ['/'],
+                ? ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist']
+                : [],
               createdAt: Date.now(),
               updatedAt: Date.now()
             };

@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
-import { APIProvider, Map, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { useState, useEffect } from 'react';
+import { db, OperationType, handleFirestoreError } from '../lib/firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
@@ -19,15 +21,72 @@ const itemVariants = {
   visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 300, damping: 24 } }
 };
 
-// Fake locations around Sao Paulo
-const vehicles = [
-  { id: 'FTL-8824', placa: 'XYZ-9876', status: 'Em Trânsito', location: { lat: -23.5505, lng: -46.6333 }, driver: 'Elena Gilbert' },
-  { id: 'TRK-2109', placa: 'ABC-1234', status: 'Disponível', location: { lat: -23.5615, lng: -46.6559 }, driver: 'Marco Vianna' },
-  { id: 'VOL-4411', placa: 'QWE-1234', status: 'Inativo', location: { lat: -23.5489, lng: -46.6388 }, driver: 'Não Atribuído' },
-];
+// Base coordinates for Sao Paulo
+const BASE_LAT = -23.5505;
+const BASE_LNG = -46.6333;
 
 export function Tracking() {
-  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const qVehicles = query(collection(db, 'vehicles'), orderBy('plate', 'asc'));
+    const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
+      setVehicles(snapshot.docs.map(doc => {
+        const data = doc.data();
+        const hash = (data.plate || doc.id).split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+        const latOffset = (hash % 100) / 1000;
+        const lngOffset = ((hash * 7) % 100) / 1000;
+        
+        return {
+          id: doc.id,
+          ...data,
+          location: {
+            lat: BASE_LAT + latOffset,
+            lng: BASE_LNG + lngOffset
+          }
+        };
+      }));
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'vehicles');
+    });
+
+    const qDrivers = query(collection(db, 'drivers'));
+    const unsubscribeDrivers = onSnapshot(qDrivers, (snapshot) => {
+      setDrivers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, error => {
+      handleFirestoreError(error, OperationType.LIST, 'drivers');
+    });
+
+    // Subtle movement simulation for "In Route" vehicles
+    const interval = setInterval(() => {
+      setVehicles(prev => prev.map(v => {
+        const driver = drivers.find(d => d.vehicleAssigned === v.plate);
+        if (driver?.status === 'Em Rota') {
+          return {
+            ...v,
+            location: {
+              lat: v.location.lat + (Math.random() - 0.5) * 0.0001,
+              lng: v.location.lng + (Math.random() - 0.5) * 0.0001
+            }
+          };
+        }
+        return v;
+      }));
+    }, 5000);
+
+    return () => {
+      unsubscribeVehicles();
+      unsubscribeDrivers();
+      clearInterval(interval);
+    };
+  }, [drivers]);
+
+  const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+  const selectedVehicleDriver = drivers.find(d => d.vehicleAssigned === selectedVehicle?.plate);
 
   if (!hasValidKey) {
     return (
@@ -70,83 +129,112 @@ export function Tracking() {
         <motion.div className="col-span-12 lg:col-span-8 h-full rounded-2xl overflow-hidden border border-outline-variant relative shadow-sm" variants={itemVariants}>
           <APIProvider apiKey={API_KEY} version="weekly">
             <Map
-              defaultCenter={{lat: -23.5505, lng: -46.6333}}
-              defaultZoom={13}
+              defaultCenter={{lat: BASE_LAT, lng: BASE_LNG}}
+              defaultZoom={12}
               mapId="FLEET_TRACKING_MAP"
               internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
               style={{width: '100%', height: '100%'}}
             >
-              {vehicles.map(v => (
-                <AdvancedMarker 
-                  key={v.id} 
-                  position={v.location} 
-                  onClick={() => setSelectedVehicle(v.id)}
-                >
-                  <Pin 
-                    background={v.status === 'Em Trânsito' ? '#34d399' : v.status === 'Disponível' ? '#60a5fa' : '#f87171'} 
-                    glyphColor="#fff" 
-                    borderColor={v.status === 'Em Trânsito' ? '#059669' : v.status === 'Disponível' ? '#2563eb' : '#dc2626'}
-                  />
-                </AdvancedMarker>
-              ))}
+              {vehicles.map(v => {
+                const driver = drivers.find(d => d.vehicleAssigned === v.plate);
+                const status = driver ? driver.status : 'Inativo';
+                
+                return (
+                  <AdvancedMarker 
+                    key={v.id} 
+                    position={v.location} 
+                    onClick={() => setSelectedVehicleId(v.id)}
+                  >
+                    <Pin 
+                      background={status === 'Em Rota' ? '#34d399' : status === 'Disponível' ? '#60a5fa' : '#f87171'} 
+                      glyphColor="#fff" 
+                      borderColor={status === 'Em Rota' ? '#059669' : status === 'Disponível' ? '#2563eb' : '#dc2626'}
+                    />
+                  </AdvancedMarker>
+                );
+              })}
             </Map>
           </APIProvider>
           {selectedVehicle && (
-            <div className="absolute top-4 right-4 bg-white p-4 rounded-xl shadow-lg border border-outline-variant w-64 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="absolute top-4 right-4 bg-white p-4 rounded-xl shadow-lg border border-outline-variant w-64 animate-in fade-in slide-in-from-right-4 duration-300 z-10">
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-bold text-primary">{selectedVehicle}</h4>
-                <button onClick={() => setSelectedVehicle(null)} className="text-on-surface-variant hover:text-error">
+                <h4 className="font-bold text-primary">{selectedVehicle.model}</h4>
+                <button onClick={() => setSelectedVehicleId(null)} className="text-on-surface-variant hover:text-error">
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
               </div>
               <p className="text-sm border-b border-outline-variant/30 pb-2 mb-2">
-                {vehicles.find(v => v.id === selectedVehicle)?.placa}
+                Placa: {selectedVehicle.plate}
               </p>
               <div className="space-y-1">
                 <p className="text-xs text-on-surface-variant flex justify-between">
                   <span>Status:</span>
-                  <span className="font-semibold text-on-surface">{vehicles.find(v => v.id === selectedVehicle)?.status}</span>
+                  <span className="font-semibold text-on-surface">{selectedVehicleDriver ? selectedVehicleDriver.status : 'Inativo'}</span>
                 </p>
                 <p className="text-xs text-on-surface-variant flex justify-between">
                   <span>Motorista:</span>
-                  <span className="font-semibold text-on-surface">{vehicles.find(v => v.id === selectedVehicle)?.driver}</span>
+                  <span className="font-semibold text-on-surface">{selectedVehicleDriver ? selectedVehicleDriver.name : 'Não Atribuído'}</span>
                 </p>
+                {selectedVehicleDriver?.workName && (
+                  <p className="text-xs text-on-surface-variant flex justify-between">
+                    <span>Obra:</span>
+                    <span className="font-semibold text-on-surface">{selectedVehicleDriver.workName}</span>
+                  </p>
+                )}
               </div>
             </div>
           )}
         </motion.div>
 
         <motion.div className="col-span-12 lg:col-span-4 h-full bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col" variants={itemVariants}>
-          <div className="p-4 border-b border-outline-variant bg-surface-container-low">
-            <h3 className="font-bold text-[18px]">Veículos Ativos</h3>
+          <div className="p-4 border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
+            <h3 className="font-bold text-[18px]">Frota Ativa</h3>
+            <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">{vehicles.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {vehicles.map(v => (
-              <div 
-                key={v.id} 
-                onClick={() => setSelectedVehicle(v.id)}
-                className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedVehicle === v.id ? 'border-primary bg-primary-container/20' : 'border-outline-variant hover:border-primary/50'}`}
-              >
-                <div className="flex justify-between items-center mb-1">
-                  <h4 className="font-bold text-base">{v.id}</h4>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${
-                    v.status === 'Em Trânsito' ? 'bg-emerald-100 text-emerald-800' : 
-                    v.status === 'Disponível' ? 'bg-blue-100 text-blue-800' : 
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {v.status}
-                  </span>
+            {vehicles.map(v => {
+              const driver = drivers.find(d => d.vehicleAssigned === v.plate);
+              const status = driver ? driver.status : 'Inativo';
+              
+              return (
+                <div 
+                  key={v.id} 
+                  onClick={() => setSelectedVehicleId(v.id)}
+                  className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedVehicleId === v.id ? 'border-primary bg-primary-container/20' : 'border-outline-variant hover:border-primary/50'}`}
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <h4 className="font-bold text-base">{v.model}</h4>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${
+                      status === 'Em Rota' ? 'bg-emerald-100 text-emerald-800' : 
+                      status === 'Disponível' ? 'bg-blue-100 text-blue-800' : 
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-on-surface-variant mb-2 font-mono">{v.plate}</p>
+                  <div className="text-xs flex items-center gap-1 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[14px]">person</span>
+                    <span className="font-medium text-on-surface">{driver ? driver.name : 'Sem Motorista'}</span>
+                  </div>
+                  {driver?.workName && (
+                     <div className="text-xs flex items-center gap-1 mt-1 text-on-surface-variant">
+                      <span className="material-symbols-outlined text-[14px]">location_on</span>
+                      <span>{driver.workName}</span>
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-on-surface-variant mb-2 font-mono">{v.placa}</p>
-                <div className="text-xs flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">person</span>
-                  <span>{v.driver}</span>
-                </div>
+              );
+            })}
+            {vehicles.length === 0 && !loading && (
+              <div className="text-center py-8 text-on-surface-variant">
+                Nenhum veículo cadastrado na frota.
               </div>
-            ))}
+            )}
           </div>
         </motion.div>
       </motion.div>
     </motion.div>
   );
 }
+
