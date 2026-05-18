@@ -1326,9 +1326,9 @@ export function Inspections() {
            lineWidth: 0.1
         },
         didParseCell: function(data) {
-          // Status não conforme em vermelho
-          if (data.section === 'body' && data.column.index === 2) {
-            const status = data.cell.raw;
+          // Status não conforme em vermelho para toda a linha
+          if (data.section === 'body') {
+            const status = data.row.cells[2].raw;
             if (status !== 'Em conformidade') {
               data.cell.styles.textColor = [220, 38, 38]; // Red-600
               data.cell.styles.fontStyle = 'bold';

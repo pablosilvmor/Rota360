@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -99,11 +99,29 @@ export function Reports() {
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [data, setData] = useState<any[]>([]);
   const [reportSearchTerm, setReportSearchTerm] = useState('');
+  const [filterWork, setFilterWork] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [works, setWorks] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [headerLogo, setHeaderLogo] = useState<{src: string, ratio: number} | null>(null);
   const [footerLogo, setFooterLogo] = useState<{src: string, ratio: number} | null>(null);
 
   useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const [wSnap, sSnap] = await Promise.all([
+          getDocs(query(collection(db, 'works'), orderBy('name', 'asc'))),
+          getDocs(query(collection(db, 'statuses'), orderBy('name', 'asc')))
+        ]);
+        setWorks(wSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setStatuses(sSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Error fetching filters", err);
+      }
+    };
+    fetchFilters();
+
     const loadImg = async (url: string, setter: (val: {src: string, ratio: number}) => void) => {
       try {
         const response = await fetch(url);
@@ -168,13 +186,19 @@ export function Reports() {
   const activeColumns = selectedModule?.columns.filter(c => selectedColumns.includes(c.key)) || [];
 
   const filteredData = data.filter(item => {
-    if (!reportSearchTerm) return true;
-    const term = reportSearchTerm.toLowerCase();
-    return activeColumns.some(c => {
+    const matchesSearch = !reportSearchTerm || activeColumns.some(c => {
       const val = item[c.key];
       const displayVal = c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '');
-      return displayVal.toLowerCase().includes(term);
+      return displayVal.toLowerCase().includes(reportSearchTerm.toLowerCase());
     });
+
+    const matchesWork = !filterWork || filterWork === 'Todas as Obras' || 
+      (Array.isArray(item.costCenter) ? item.costCenter.includes(filterWork) : item.costCenter === filterWork);
+    
+    const matchesStatus = !filterStatus || filterStatus === 'Todos os Status' || 
+      item.status === filterStatus;
+
+    return matchesSearch && matchesWork && matchesStatus;
   });
 
   const handleExportPDF = () => {
@@ -280,7 +304,7 @@ export function Reports() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-8">
         <div className="space-y-6">
           <div className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 border border-outline-variant/50 shadow-sm animate-in fade-in slide-in-from-left-4 duration-500">
             <h3 className="font-bold text-on-surface mb-4 flex items-center gap-2 uppercase tracking-wide text-sm">
@@ -364,15 +388,44 @@ export function Reports() {
                     O relatório no PDF será ajustado automaticamente para {activeColumns.length > 5 ? 'paisagem' : 'retrato'}.
                   </p>
                 </div>
-                <div className="relative w-full md:w-64">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-                  <input
-                    type="text"
-                    placeholder="Filtrar dados..."
-                    value={reportSearchTerm}
-                    onChange={(e) => setReportSearchTerm(e.target.value)}
-                    className="w-full bg-white border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all shadow-sm"
-                  />
+                <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+                    <input
+                      type="text"
+                      placeholder="Filtrar dados..."
+                      value={reportSearchTerm}
+                      onChange={(e) => setReportSearchTerm(e.target.value)}
+                      className="w-full bg-white border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all shadow-sm h-[40px]"
+                    />
+                  </div>
+                  {selectedModule?.id === 'vehicles' && (
+                    <>
+                      <div className="flex-1 min-w-[150px]">
+                        <select
+                          value={filterWork}
+                          onChange={(e) => setFilterWork(e.target.value)}
+                          className="w-full bg-white border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary shadow-sm h-[40px]"
+                        >
+                          <option value="">Todas as Obras</option>
+                          {works.map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 min-w-[150px]">
+                        <select
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                          className="w-full bg-white border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary shadow-sm h-[40px]"
+                        >
+                          <option value="">Todos os Status</option>
+                          <option value="Ativo">Ativo</option>
+                          <option value="Inativo">Inativo</option>
+                          <option value="Em Manutenção">Em Manutenção</option>
+                          {statuses.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                        </select>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

@@ -129,17 +129,19 @@ service cloud.firestore {
       allow read, write, delete: if isSignedIn();
     }
 
-    match /inspections/{allInspections=**} {
-      allow read, write, delete: if isSignedIn();
-    }
-    match /{path=**}/records/{record} {
-      allow read, write, delete: if isSignedIn();
-    }
-    match /{path=**}/items/{item} {
-      allow read, write, delete: if isSignedIn();
+    match /inspections {
+      match /{allInspections=**} {
+        allow read, write: if isSignedIn();
+      }
+      match /{vehicleId}/records/{record} {
+        allow read, write: if isSignedIn();
+      }
+      match /{vehicleId}/items/{item} {
+        allow read, write: if isSignedIn();
+      }
     }
     match /checklist_history/{allChecklists=**} {
-      allow read, write, delete: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
   }
 }

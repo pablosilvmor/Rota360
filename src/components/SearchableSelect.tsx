@@ -88,7 +88,7 @@ export function SearchableSelect({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: direction === 'down' ? -10 : 10, scale: 0.95 }}
             transition={{ duration: 0.1 }}
-            className={`absolute left-0 right-0 ${direction === 'down' ? 'top-[calc(100%+4px)]' : 'bottom-[calc(100%+4px)]'} bg-white border border-outline-variant rounded-xl shadow-2xl z-[100] overflow-hidden flex flex-col max-h-72 ring-1 ring-black/5`}
+            className={`absolute left-0 right-0 ${direction === 'down' ? 'top-[calc(100%+4px)]' : 'bottom-[calc(100%+4px)]'} bg-white border border-outline-variant rounded-xl shadow-2xl z-[1000] overflow-hidden flex flex-col max-h-72 ring-1 ring-black/5`}
           >
             <div className="p-3 border-b border-outline-variant bg-surface-container-lowest sticky top-0">
               <div className="relative">
