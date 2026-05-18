@@ -128,12 +128,17 @@ export function Admin() {
     try {
       let screens = user.allowedScreens || ['/'];
       if (newRole === 'admin') {
-        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin'];
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist'];
+      } else if (newRole === 'gestor') {
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports'];
+      } else if (newRole === 'operador') {
+        screens = ['/', '/inspections', '/checklist'];
       }
       
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         role: newRole,
+        isActive: true, // Automatically activate user when role is assigned
         allowedScreens: screens,
         updatedAt: Date.now()
       });
