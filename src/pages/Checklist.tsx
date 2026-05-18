@@ -166,14 +166,15 @@ export function Checklist() {
       setUploadProgress(50);
       
       // Fetch existing records for this vehicle
-      const recordsSnap = await getDocs(collection(db, `inspections/${vehicleId}/records`));
+      const currentVehicleId = vehicleId;
+      const recordsSnap = await getDocs(collection(db, `inspections/${currentVehicleId}/records`));
       const recordsByItemId = new Map();
       recordsSnap.forEach(doc => {
         recordsByItemId.set(doc.data().itemId, { id: doc.id, ...doc.data() });
       });
       setUploadProgress(70);
 
-      // Update records based on inspection items (just using setDoc to easily merge/create)
+      // Update records based on inspection items
       for (const item of items) {
         const conformityVal = item.conformidade === 'Em conformidade' ? 'SIM' : 'NÃO';
         let serviceExec = item.service || 'NÃO';
@@ -182,14 +183,13 @@ export function Checklist() {
         const existingRecord = recordsByItemId.get(item.id);
         
         if (existingRecord) {
-          await setDoc(doc(db, `inspections/${vehicleId}/records`, existingRecord.id), {
+          await setDoc(doc(db, `inspections/${currentVehicleId}/records`, existingRecord.id), {
             conformity: conformityVal,
             serviceExecuted: serviceExec,
             updatedAt: serverTimestamp()
           }, { merge: true });
         } else {
-          // Fallback if missing
-          await addDoc(collection(db, `inspections/${vehicleId}/records`), {
+          await addDoc(collection(db, `inspections/${currentVehicleId}/records`), {
             itemId: item.id,
             conformity: conformityVal,
             serviceExecuted: serviceExec,
@@ -201,14 +201,23 @@ export function Checklist() {
       }
       
       setUploadProgress(100);
-      setTimeout(() => setSuccess(true), 500);
+      setTimeout(() => {
+        setIsUploading(false);
+        setSuccess(true);
+        // Após 2 segundos, redirecionar
+        setTimeout(() => {
+          navigate('/inspections');
+        }, 2000);
+      }, 500);
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `inspections/${vehicleId}/records`);
-    } finally {
       setIsUploading(false);
       setLoading(false);
-      setUploadProgress(0);
     }
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (success) {
@@ -221,13 +230,13 @@ export function Checklist() {
         >
           <span className="material-symbols-outlined text-5xl">check_circle</span>
         </motion.div>
-        <h2 className="text-3xl font-bold text-on-surface mb-4">Checklist Concluído!</h2>
-        <p className="text-on-surface-variant mb-8 max-w-sm">Suas verificações foram enviadas ao controle de frota com sucesso.</p>
+        <h2 className="text-3xl font-bold text-on-surface mb-4">Checklist Enviado com Sucesso!</h2>
+        <p className="text-on-surface-variant mb-8 max-w-sm">Suas verificações foram enviadas ao controle de frota. Você será redirecionado em instantes.</p>
         <button 
-          onClick={() => window.location.reload()}
+          onClick={() => navigate('/inspections')}
           className="bg-primary text-on-primary font-bold px-8 py-3 rounded-full shadow-lg"
         >
-          Fazer Outro Checklist
+          Voltar para Inspeções
         </button>
       </div>
     );
@@ -413,6 +422,19 @@ export function Checklist() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Botão flutuante Voltar ao Topo */}
+        <motion.button
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={scrollToTop}
+          className="fixed bottom-24 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center z-50 hover:bg-opacity-90 transition-colors"
+          title="Voltar ao Topo"
+        >
+          <span className="material-symbols-outlined">arrow_upward</span>
+        </motion.button>
       </main>
     </div>
   );
