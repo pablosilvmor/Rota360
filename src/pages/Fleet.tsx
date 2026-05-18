@@ -42,6 +42,7 @@ export function Fleet() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterWork, setFilterWork] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const editingVehicle = vehicles.find(v => v.id === editingVehicleId) || null;
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId) || null;
@@ -197,7 +198,7 @@ export function Fleet() {
         </div>
       </motion.div>
 
-      <motion.div className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50" variants={itemVariants}>
+      <motion.div className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-50" variants={itemVariants}>
         <div className="flex-1 min-w-[250px]">
           <label className="block text-sm font-semibold text-on-surface-variant mb-2">Pesquisar</label>
           <div className="relative group">
@@ -259,10 +260,16 @@ export function Fleet() {
             </button>
           )}
           <div className="flex items-center gap-2">
-            <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors">
+            <button 
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'text-primary bg-secondary-container' : 'text-on-surface-variant hover:bg-surface-container'}`}
+            >
               <span className="material-symbols-outlined">grid_view</span>
             </button>
-            <button className="p-2 text-primary bg-secondary-container rounded-lg transition-colors">
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'text-primary bg-secondary-container' : 'text-on-surface-variant hover:bg-surface-container'}`}
+            >
               <span className="material-symbols-outlined">list</span>
             </button>
           </div>
@@ -288,7 +295,7 @@ export function Fleet() {
         </motion.div>
       </motion.div>
 
-      <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-8" variants={containerVariants}>
+      <motion.div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-3 gap-8" : "flex flex-col gap-4"} variants={containerVariants}>
         {loading ? (
           <div className="col-span-full flex justify-center py-20">
             <span className="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
@@ -309,7 +316,58 @@ export function Fleet() {
           </div>
         ) : (
           <AnimatePresence>
-            {filteredVehicles.map((vehicle, index) => (
+            {viewMode === 'list' && filteredVehicles.length > 0 ? (
+              <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-x-auto w-full">
+                <table className="w-full text-left min-w-[800px]">
+                  <thead>
+                    <tr className="bg-surface-container-low border-b border-outline-variant text-[12px] font-bold text-on-surface-variant uppercase tracking-wider">
+                      <th className="px-6 py-4">Veículo</th>
+                      <th className="px-6 py-4">Placa</th>
+                      <th className="px-6 py-4">Obra / CC</th>
+                      <th className="px-6 py-4">KM Atual</th>
+                      <th className="px-6 py-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant">
+                    {filteredVehicles.map((vehicle) => (
+                      <tr 
+                        key={vehicle.id} 
+                        onClick={() => setSearchParams({ vehicleId: vehicle.id })}
+                        className="hover:bg-surface-container-low transition-colors cursor-pointer group"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <img src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=100"} alt="Veículo" className="w-10 h-10 rounded object-cover" />
+                            <div>
+                              <div className="text-sm font-bold text-on-surface">{vehicle.model}</div>
+                              <div className="text-[10px] text-on-surface-variant uppercase">{vehicle.brand} • {vehicle.modelYear}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-bold whitespace-nowrap">{vehicle.plate}</span>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-on-surface-variant uppercase">
+                          {vehicle.costCenter || 'N/D'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-primary font-bold">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm ${
+                            vehicle.status === 'Ativo' ? 'bg-primary-fixed text-on-primary-fixed' : 
+                            vehicle.status === 'Em Manutenção' ? 'bg-warning-container text-on-warning-container' : 
+                            'bg-error-container text-on-error-container'
+                          }`}>
+                            {vehicle.status || 'Ativo'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : filteredVehicles.map((vehicle, index) => (
               <motion.div 
                 key={`card-${vehicle.id}`}
                 layout

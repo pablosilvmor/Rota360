@@ -222,7 +222,7 @@ export function VehicleDetails({ vehicle, assignedDriver, onBack, onEdit, onDele
                    </div>
                 </div>
                 <h4 className="text-[20px] font-bold leading-none mb-1">{assignedDriver.name}</h4>
-                <p className="text-sm text-on-surface-variant font-medium mb-1">Cat. {assignedDriver.cnhCategory} • {assignedDriver.cnhStatus || 'Status CNH N/A'}</p>
+                <p className="text-sm text-on-surface-variant font-medium mb-1">Cat. {assignedDriver.cnhCategory} • {assignedDriver.validUntil ? (new Date(assignedDriver.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'Status N/A'}</p>
                 <p className="text-xs text-on-surface-variant font-medium">{assignedDriver.phone || 'Telefone N/A'}</p>
               </div>
               <div className="w-full bg-surface-container px-4 py-2.5 rounded-lg flex justify-between items-center">

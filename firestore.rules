@@ -138,5 +138,8 @@ service cloud.firestore {
     match /{path=**}/items/{item} {
       allow read, write, delete: if isSignedIn();
     }
+    match /checklist_history/{allChecklists=**} {
+      allow read, write, delete: if isSignedIn();
+    }
   }
 }

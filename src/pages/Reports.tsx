@@ -9,7 +9,7 @@ type ModuleData = {
   id: string;
   name: string;
   collectionId: string;
-  columns: { key: string; label: string; renderer?: (val: any, item: any) => string }[];
+  columns: { key: string; label: string; renderer?: (val: any, item: any) => string; align?: 'left' | 'center' | 'right' }[];
   icon: string;
 };
 
@@ -31,12 +31,13 @@ const MODULES: ModuleData[] = [
       { key: 'plate', label: 'Placa' },
       { key: 'brand', label: 'Marca' },
       { key: 'model', label: 'Modelo' },
-      { key: 'year', label: 'Ano' },
+      { key: 'year', label: 'Ano', align: 'center', renderer: (val: any, item: any) => item?.modelYear || val || '-' },
       { key: 'bodywork', label: 'Carroceria' },
       { key: 'fuelType', label: 'Combustível' },
       { 
         key: 'currentKM', 
         label: 'KM Atual', 
+        align: 'center',
         renderer: (val: any, item: any) => (item?.currentKM || item?.odometer || 0).toLocaleString() 
       },
       { 
@@ -57,8 +58,19 @@ const MODULES: ModuleData[] = [
     columns: [
       { key: 'name', label: 'Nome' },
       { key: 'cnh', label: 'CNH' },
-      { key: 'cnhCategory', label: 'Categoria CNH' },
-      { key: 'validUntil', label: 'Validade CNH', renderer: formatDate },
+      { key: 'cnhCategory', label: 'Categoria CNH', align: 'center' },
+      { key: 'validUntil', label: 'Validade CNH', renderer: (val: any) => {
+        if (!val) return '-';
+        let d;
+        if (val instanceof Date) d = val;
+        else if (val.toDate) d = val.toDate();
+        else if (typeof val === 'number') d = new Date(val);
+        else d = new Date(val);
+        const day = String(d.getDate() + 1).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}-${month}-${d.getFullYear()}`;
+      } },
+      { key: 'cnhStatus', label: 'Status CNH', renderer: (val: any, item: any) => item.validUntil ? (new Date(item.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'N/A' },
       { key: 'phone', label: 'Telefone' },
       { key: 'vehicleAssigned', label: 'Veículo Atribuído' },
       { key: 'status', label: 'Status' },
@@ -86,6 +98,7 @@ export function Reports() {
   const [selectedModule, setSelectedModule] = useState<ModuleData | null>(null);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [data, setData] = useState<any[]>([]);
+  const [reportSearchTerm, setReportSearchTerm] = useState('');
   const [loadingData, setLoadingData] = useState(false);
   const [headerLogo, setHeaderLogo] = useState<{src: string, ratio: number} | null>(null);
   const [footerLogo, setFooterLogo] = useState<{src: string, ratio: number} | null>(null);
@@ -154,6 +167,16 @@ export function Reports() {
 
   const activeColumns = selectedModule?.columns.filter(c => selectedColumns.includes(c.key)) || [];
 
+  const filteredData = data.filter(item => {
+    if (!reportSearchTerm) return true;
+    const term = reportSearchTerm.toLowerCase();
+    return activeColumns.some(c => {
+      const val = item[c.key];
+      const displayVal = c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '');
+      return displayVal.toLowerCase().includes(term);
+    });
+  });
+
   const handleExportPDF = () => {
     if (!selectedModule) return;
 
@@ -169,7 +192,7 @@ export function Reports() {
     const pageHeight = doc.internal.pageSize.height;
 
     const tableCols = activeColumns.map(c => c.label);
-    const tableData = data.map(item => 
+    const tableData = filteredData.map(item => 
       activeColumns.map(c => {
         const val = item[c.key];
         return c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '-');
@@ -341,6 +364,16 @@ export function Reports() {
                     O relatório no PDF será ajustado automaticamente para {activeColumns.length > 5 ? 'paisagem' : 'retrato'}.
                   </p>
                 </div>
+                <div className="relative w-full md:w-64">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+                  <input
+                    type="text"
+                    placeholder="Filtrar dados..."
+                    value={reportSearchTerm}
+                    onChange={(e) => setReportSearchTerm(e.target.value)}
+                    className="w-full bg-white border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all shadow-sm"
+                  />
+                </div>
               </div>
 
               <div className="overflow-x-auto min-h-[400px]">
@@ -372,18 +405,18 @@ export function Reports() {
                     <thead>
                       <tr className="bg-surface-container-low/50">
                         {activeColumns.map(c => (
-                          <th key={c.key} className="px-5 py-3 text-sm font-semibold text-on-surface-variant border-b border-outline-variant/30 uppercase tracking-wider whitespace-nowrap">{c.label}</th>
+                          <th key={c.key} className={`px-5 py-3 text-sm font-semibold text-on-surface-variant border-b border-outline-variant/30 uppercase tracking-wider whitespace-nowrap text-${c.align || 'left'}`}>{c.label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/20">
-                      {data.slice(0, 15).map((item, idx) => (
+                      {filteredData.slice(0, 15).map((item, idx) => (
                         <tr key={item.id || idx} className="hover:bg-surface-container transition-colors">
                           {activeColumns.map(c => {
                             const val = item[c.key];
                             const displayVal = c.renderer ? c.renderer(val, item) : (val != null && val !== "" ? String(val) : '-');
                             return (
-                              <td key={c.key} className="px-5 py-3 text-sm text-on-surface whitespace-normal break-words align-top max-w-[250px] min-w-[120px]">
+                              <td key={c.key} className={`px-5 py-3 text-sm text-on-surface whitespace-normal break-words align-top max-w-[250px] min-w-[120px] text-${c.align || 'left'}`}>
                                 {displayVal}
                               </td>
                             );
