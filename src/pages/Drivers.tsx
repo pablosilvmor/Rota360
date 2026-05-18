@@ -34,7 +34,7 @@ export function Drivers() {
   const [works, setWorks] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [assignment, setAssignment] = useState({ driverId: '', vehiclePlate: '', workId: '', workName: '' });
+  const [assignment, setAssignment] = useState({ driverId: '', vehiclePlates: [] as string[], workId: '', workName: '' });
   const [newOccurrence, setNewOccurrence] = useState({ driverId: '', type: 'Multa Leve', description: '', points: 1 });
   const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '' });
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
@@ -106,18 +106,18 @@ export function Drivers() {
   }, []);
 
   const handleConfirmAssignment = async () => {
-    if (!assignment.driverId || !assignment.vehiclePlate) return;
+    if (!assignment.driverId || assignment.vehiclePlates.length === 0) return;
     try {
       const driverRef = doc(db, 'drivers', assignment.driverId);
       await updateDoc(driverRef, {
-        vehicleAssigned: assignment.vehiclePlate,
+        vehicleAssigned: assignment.vehiclePlates,
         workId: assignment.workId || '',
         workName: assignment.workName || '',
         status: 'Em Rota',
         updatedAt: Date.now()
       });
       setSearchParams({});
-      setAssignment({ driverId: '', vehiclePlate: '', workId: '', workName: '' });
+      setAssignment({ driverId: '', vehiclePlates: [], workId: '', workName: '' });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'drivers');
     }
@@ -208,7 +208,15 @@ export function Drivers() {
     setStatusFilter('');
     setWorkFilter('');
   };
-  const availableVehicles = vehicles.filter(v => !drivers.some(d => d.vehicleAssigned === v.plate && d.id !== assignment.driverId));
+  const uniqueVehicles = vehicles.reduce((acc: any[], current) => {
+    const plate = String(current.plate || '').trim().toUpperCase();
+    if (plate && !acc.some(v => String(v.plate || '').trim().toUpperCase() === plate)) {
+      acc.push(current);
+    }
+    return acc;
+  }, []);
+
+  const availableVehicles = uniqueVehicles;
 
   const SortButton = ({ column, label }: { column: string, label: string }) => (
     <th 
@@ -257,10 +265,11 @@ export function Drivers() {
                   value={assignment.driverId}
                   onChange={(val) => {
                     const driver = drivers.find(d => d.id === val);
+                    const vAssigned = driver?.vehicleAssigned;
                     setAssignment({ 
                       ...assignment, 
                       driverId: val,
-                      vehiclePlate: driver?.vehicleAssigned || '',
+                      vehiclePlates: Array.isArray(vAssigned) ? vAssigned : (vAssigned ? [vAssigned] : []),
                       workId: driver?.workId || '',
                       workName: driver?.workName || ''
                     });
@@ -268,10 +277,11 @@ export function Drivers() {
                 />
                 <SearchableSelect 
                   label="Veículo Disponível"
-                  placeholder="Selecione um veículo..."
+                  placeholder="Selecione um ou mais veículos..."
+                  multiple={true}
                   options={availableVehicles.map(v => ({ value: v.plate, label: `${v.plate} - ${v.model}` }))}
-                  value={assignment.vehiclePlate}
-                  onChange={(val) => setAssignment({ ...assignment, vehiclePlate: val })}
+                  value={assignment.vehiclePlates}
+                  onChange={(val) => setAssignment({ ...assignment, vehiclePlates: val })}
                 />
                 <SearchableSelect 
                   label="Obra (Opcional)"
@@ -291,7 +301,7 @@ export function Drivers() {
                    <button onClick={() => setSearchParams({})} className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">Cancelar</button>
                    <button 
                      onClick={handleConfirmAssignment} 
-                     disabled={!assignment.driverId || !assignment.vehiclePlate}
+                     disabled={!assignment.driverId || assignment.vehiclePlates.length === 0}
                      className="flex-1 px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                    >
                      Confirmar Atribuição
@@ -594,7 +604,11 @@ export function Drivers() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="font-mono bg-on-primary-fixed-variant/5 px-2 py-1 rounded text-on-surface border border-outline-variant/50">{driver.vehicleAssigned || 'Não Atribuído'}</span>
+                    <span className="font-mono bg-on-primary-fixed-variant/5 px-2 py-1 rounded text-on-surface border border-outline-variant/50">
+                      {Array.isArray(driver.vehicleAssigned) 
+                        ? (driver.vehicleAssigned.length > 0 ? driver.vehicleAssigned.join(', ') : 'Não Atribuído') 
+                        : (driver.vehicleAssigned || 'Não Atribuído')}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -630,12 +644,12 @@ export function Drivers() {
                          <span className="material-symbols-outlined text-[20px]">link</span>
                        </button>
                       )}
-                      {driver.vehicleAssigned && (
+                      {driver.vehicleAssigned && (Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned.length > 0 : true) && (
                         <button 
                          onClick={() => {
                            setAssignment({
                              driverId: driver.id, 
-                             vehiclePlate: driver.vehicleAssigned, 
+                             vehiclePlates: Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned : [driver.vehicleAssigned], 
                              workId: driver.workId || '', 
                              workName: driver.workName || ''
                            });
@@ -647,13 +661,13 @@ export function Drivers() {
                          <span className="material-symbols-outlined text-[20px]">edit_document</span>
                        </button>
                       )}
-                      {driver.vehicleAssigned && (
+                      {driver.vehicleAssigned && (Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned.length > 0 : true) && (
                         <button 
                           onClick={async () => {
-                            if(window.confirm('Deseja desvincular este veículo do motorista?')) {
+                            if(window.confirm('Deseja desvincular o(s) veículo(s) do motorista?')) {
                               try {
                                 await updateDoc(doc(db, 'drivers', driver.id), { 
-                                  vehicleAssigned: '',
+                                  vehicleAssigned: [],
                                   status: 'Disponível',
                                   updatedAt: Date.now()
                                 });

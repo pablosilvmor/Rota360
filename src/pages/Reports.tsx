@@ -169,12 +169,22 @@ export function Reports() {
         const driversSnap = await getDocs(query(collection(db, 'drivers')));
         const driversData = driversSnap.docs.map(d => d.data());
         docs = docs.map((v: any) => {
-          const assignedD = driversData.find(d => d.vehicleAssigned === v.plate);
-          return { ...v, assignedDriver: assignedD ? assignedD.name : 'Não Atribuída' };
+          const assignedDs = driversData.filter(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
+          return { ...v, assignedDriver: assignedDs.length > 0 ? assignedDs.map((d: any) => d.name).join(', ') : 'Não Atribuída' };
         });
       }
 
-      setData(docs);
+      const preparedData = docs.map((item: any) => {
+        if (mod.id === 'drivers' && item.vehicleAssigned) {
+           return {
+             ...item,
+             vehicleAssigned: Array.isArray(item.vehicleAssigned) ? item.vehicleAssigned.join(', ') : item.vehicleAssigned
+           };
+        }
+        return item;
+      });
+
+      setData(preparedData);
     } catch (e) {
       handleFirestoreError(e, OperationType.LIST, mod.collectionId);
     } finally {

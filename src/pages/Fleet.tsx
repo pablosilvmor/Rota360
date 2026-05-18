@@ -46,7 +46,8 @@ export function Fleet() {
 
   const editingVehicle = vehicles.find(v => v.id === editingVehicleId) || null;
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId) || null;
-  const assignedDriver = drivers.find(d => d.vehicleAssigned === selectedVehicle?.plate) || null;
+  const assignedDrivers = drivers.filter(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(selectedVehicle?.plate) : d.vehicleAssigned === selectedVehicle?.plate);
+  const assignedDriver = assignedDrivers[0] || null; // For backward compatibility with VehicleDetails if it only takes one
 
   useEffect(() => {
     // Listen to vehicles
@@ -158,7 +159,7 @@ export function Fleet() {
   if (selectedVehicle) {
     return <VehicleDetails 
       vehicle={selectedVehicle} 
-      assignedDriver={assignedDriver}
+      assignedDrivers={assignedDrivers}
       onBack={() => setSearchParams({})} 
       onDelete={() => {
         handleDelete(selectedVehicle.id);

@@ -2,13 +2,13 @@ import { motion } from 'framer-motion';
 
 interface VehicleDetailsProps {
   vehicle: any;
-  assignedDriver: any;
+  assignedDrivers: any[];
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export function VehicleDetails({ vehicle, assignedDriver, onBack, onEdit, onDelete }: VehicleDetailsProps) {
+export function VehicleDetails({ vehicle, assignedDrivers, onBack, onEdit, onDelete }: VehicleDetailsProps) {
   const containerVariants = {
     hidden: { opacity: 0, x: 20 },
     visible: { opacity: 1, x: 0, transition: { duration: 0.4 } }
@@ -216,31 +216,33 @@ export function VehicleDetails({ vehicle, assignedDriver, onBack, onEdit, onDele
           </div>
         </div>
 
-        <div className="col-span-12 lg:col-span-3 bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm flex flex-col justify-between items-center text-center">
-          <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-4 w-full text-left">Motorista Atribuído</h3>
-          {assignedDriver ? (
-            <>
-              <div className="mb-4">
-                <div className="h-24 w-24 rounded-full mx-auto overflow-hidden mb-4 border-2 border-primary-fixed p-1 bg-surface-container-low">
-                   <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-2xl">
-                     {assignedDriver.name?.charAt(0).toUpperCase()}
-                   </div>
+        <div className="col-span-12 lg:col-span-3 bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col items-center text-center">
+          <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-4 w-full text-left">Motoristas Atribuídos</h3>
+          <div className="w-full space-y-6 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
+            {assignedDrivers && assignedDrivers.length > 0 ? (
+              assignedDrivers.map((driver) => (
+                <div key={driver.id} className="pb-4 border-b border-outline-variant/30 last:border-0 last:pb-0">
+                  <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary-fixed p-1 bg-surface-container-low">
+                    <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-xl">
+                      {driver.name?.charAt(0).toUpperCase()}
+                    </div>
+                  </div>
+                  <h4 className="text-lg font-bold leading-tight mb-1">{driver.name}</h4>
+                  <p className="text-[12px] text-on-surface-variant font-medium mb-1 truncate px-2">Cat. {driver.cnhCategory} • {driver.validUntil ? (new Date(driver.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'Status N/A'}</p>
+                  <p className="text-[11px] text-on-surface-variant font-medium mb-3">{driver.phone || 'Telefone N/A'}</p>
+                  <div className="w-full bg-surface-container px-3 py-2 rounded-lg flex justify-between items-center">
+                    <span className="text-[9px] font-bold text-on-surface-variant uppercase">Status</span>
+                    <span className="text-xs font-bold text-emerald-600">{driver.status}</span>
+                  </div>
                 </div>
-                <h4 className="text-[20px] font-bold leading-none mb-1">{assignedDriver.name}</h4>
-                <p className="text-sm text-on-surface-variant font-medium mb-1">Cat. {assignedDriver.cnhCategory} • {assignedDriver.validUntil ? (new Date(assignedDriver.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'Status N/A'}</p>
-                <p className="text-xs text-on-surface-variant font-medium">{assignedDriver.phone || 'Telefone N/A'}</p>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <span className="material-symbols-outlined text-4xl text-on-surface-variant/30 mb-2">person_off</span>
+                <p className="text-sm font-medium text-on-surface-variant">Nenhum motorista atribuído</p>
               </div>
-              <div className="w-full bg-surface-container px-4 py-2.5 rounded-lg flex justify-between items-center">
-                 <span className="text-[10px] font-bold text-on-surface-variant uppercase">Status</span>
-                 <span className="text-sm font-bold text-emerald-600">{assignedDriver.status}</span>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8">
-              <span className="material-symbols-outlined text-4xl text-on-surface-variant/30 mb-2">person_off</span>
-              <p className="text-sm font-medium text-on-surface-variant">Nenhum motorista atribuído</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

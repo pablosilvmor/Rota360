@@ -64,7 +64,7 @@ export function Tracking() {
     // Subtle movement simulation for "In Route" vehicles
     const interval = setInterval(() => {
       setVehicles(prev => prev.map(v => {
-        const driver = drivers.find(d => d.vehicleAssigned === v.plate);
+        const driver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
         if (driver?.status === 'Em Rota') {
           return {
             ...v,
@@ -86,7 +86,7 @@ export function Tracking() {
   }, [drivers]);
 
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
-  const selectedVehicleDriver = drivers.find(d => d.vehicleAssigned === selectedVehicle?.plate);
+  const selectedVehicleDriver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(selectedVehicle?.plate) : d.vehicleAssigned === selectedVehicle?.plate);
 
   if (!hasValidKey) {
     return (
@@ -136,7 +136,7 @@ export function Tracking() {
               style={{width: '100%', height: '100%'}}
             >
               {vehicles.map(v => {
-                const driver = drivers.find(d => d.vehicleAssigned === v.plate);
+                const driver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
                 const status = driver ? driver.status : 'Inativo';
                 
                 return (
@@ -193,7 +193,7 @@ export function Tracking() {
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {vehicles.map(v => {
-              const driver = drivers.find(d => d.vehicleAssigned === v.plate);
+              const driver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
               const status = driver ? driver.status : 'Inativo';
               
               return (
