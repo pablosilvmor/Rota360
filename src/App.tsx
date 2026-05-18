@@ -88,12 +88,12 @@ export default function App() {
             <Route path="/fuel" element={<ProtectedRoute path="/fuel"><Fuel /></ProtectedRoute>} />
             <Route path="/tracking" element={<ProtectedRoute path="/tracking"><Tracking /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute path="/admin"><Admin /></ProtectedRoute>} />
-            <Route path="/works" element={<ProtectedRoute path="/"><Works /></ProtectedRoute>} />
+            <Route path="/works" element={<ProtectedRoute path="/works"><Works /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute path="/reports"><Reports /></ProtectedRoute>} />
             
-            <Route path="/suppliers" element={<ProtectedRoute path="/"><PlaceholderPage title="Fornecedores e Oficinas" description="Gestão de parceiros de manutenção e serviços externos." icon="build" /></ProtectedRoute>} />
-            <Route path="/parts" element={<ProtectedRoute path="/"><PlaceholderPage title="Peças e Estoque" description="Controle de Insumos e peças de manutenção." icon="inventory" /></ProtectedRoute>} />
-            <Route path="/fuel-stations" element={<ProtectedRoute path="/"><PlaceholderPage title="Postos de Combustível" description="Gestão de postos credenciados e relatórios de abastecimento." icon="local_gas_station" /></ProtectedRoute>} />
+            <Route path="/suppliers" element={<ProtectedRoute path="/suppliers"><PlaceholderPage title="Fornecedores e Oficinas" description="Gestão de parceiros de manutenção e serviços externos." icon="build" /></ProtectedRoute>} />
+            <Route path="/parts" element={<ProtectedRoute path="/parts"><PlaceholderPage title="Peças e Estoque" description="Controle de Insumos e peças de manutenção." icon="inventory" /></ProtectedRoute>} />
+            <Route path="/fuel-stations" element={<ProtectedRoute path="/fuel-stations"><PlaceholderPage title="Postos de Combustível" description="Gestão de postos credenciados e relatórios de abastecimento." icon="local_gas_station" /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

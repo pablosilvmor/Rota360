@@ -187,16 +187,6 @@ export function Layout({ children }: LayoutProps) {
                 {isSettingsOpen && (
                   <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 text-on-surface">
                     <div className="py-2">
-                      <Link 
-                        to="/settings" 
-                        onClick={() => setIsSettingsOpen(false)}
-                        className="flex items-center px-4 py-2 text-sm text-on-surface hover:bg-surface-container transition-colors"
-                        title="Configurações"
-                      >
-                        <span className="material-symbols-outlined text-[20px] mr-3">settings_applications</span>
-                        Configurações
-                      </Link>
-                      
                       {userData?.role === 'admin' && (
                         <Link 
                           to="/admin" 

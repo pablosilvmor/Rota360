@@ -128,9 +128,9 @@ export function Admin() {
     try {
       let screens = user.allowedScreens || ['/'];
       if (newRole === 'admin') {
-        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist'];
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist', '/works', '/suppliers', '/parts', '/fuel-stations'];
       } else if (newRole === 'gestor') {
-        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports'];
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works'];
       } else if (newRole === 'operador') {
         screens = ['/', '/inspections', '/checklist'];
       }
@@ -305,14 +305,20 @@ export function Admin() {
   };
 
   const availableScreens = [
-    { path: '/', label: 'Painel' },
+    { path: '/', label: 'Dashboard' },
     { path: '/fleet', label: 'Frota' },
     { path: '/inspections', label: 'Inspeções' },
     { path: '/maintenance', label: 'Manutenção' },
     { path: '/drivers', label: 'Motoristas' },
-    { path: '/settings', label: 'Configurações' },
     { path: '/reports', label: 'Relatórios' },
     { path: '/checklist', label: 'Checklist' },
+    { path: '/fuel', label: 'Combustível' },
+    { path: '/tracking', label: 'Rastreamento' },
+    { path: '/works', label: 'Obras' },
+    { path: '/admin', label: 'Admin' },
+    { path: '/suppliers', label: 'Fornecedores' },
+    { path: '/parts', label: 'Peças/Estoque' },
+    { path: '/fuel-stations', label: 'Postos' },
   ];
 
   const tabs = [
