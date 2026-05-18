@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, query, onSnapshot, doc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp, updateDoc, getDocs, where, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useParams, useNavigate } from 'react-router';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SearchableSelect } from '../components/SearchableSelect';
 import * as XLSX from 'xlsx';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -22,6 +23,25 @@ interface InspectionRecord {
   lastMaintenanceKM: number;
   nextMaintenanceKM: number;
 }
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { type: 'spring', stiffness: 300, damping: 24 }
+  }
+};
 
 function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () => void }) {
   const [vehicle, setVehicle] = useState<any>(null);
@@ -1246,11 +1266,16 @@ export function Inspections() {
   const navigate = useNavigate();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [checklistHistory, setChecklistHistory] = useState<any[]>([]);
+  const [works, setWorks] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'vehicles' | 'history'>('vehicles');
   const [isExportingChecklist, setIsExportingChecklist] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterWork, setFilterWork] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     // We fetch the vehicles list to show cards or if an ID is present, we just pass to the Form
@@ -1275,9 +1300,21 @@ export function Inspections() {
       if (activeTab === 'history') setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'checklist_history'));
 
+    const qWorks = query(collection(db, 'works'), orderBy('name', 'asc'));
+    const unsubscribeWorks = onSnapshot(qWorks, (snapshot) => {
+      setWorks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'works'));
+
+    const qStatuses = query(collection(db, 'statuses'), orderBy('name', 'asc'));
+    const unsubscribeStatuses = onSnapshot(qStatuses, (snapshot) => {
+      setStatuses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'statuses'));
+
     return () => {
       unsubscribeVehicles();
       unsubscribeHistory();
+      unsubscribeWorks();
+      unsubscribeStatuses();
     };
   }, [activeTab]);
 
@@ -1397,11 +1434,28 @@ export function Inspections() {
     }
   };
 
-  const filteredVehicles = vehicles.filter(v => 
-    (v.plate || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (v.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (v.brand || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredVehicles = vehicles.filter(v => {
+    const matchesSearch = 
+      (v.plate || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (v.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (v.brand || '').toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesWork = filterWork === '' || filterWork === 'Todas as Obras' || (Array.isArray(v.costCenter) ? v.costCenter.includes(filterWork) : v.costCenter === filterWork);
+    const matchesStatus = filterStatus === '' || filterStatus === 'Todos os Status' || v.status === filterStatus;
+
+    return matchesSearch && matchesWork && matchesStatus;
+  });
+
+  const stats = {
+    total: filteredVehicles.length,
+    inCompliance: filteredVehicles.filter(v => v.status === 'Ativo').length,
+    needsAttention: filteredVehicles.filter(v => v.status === 'Em Manutenção').length,
+    checklistsMonth: checklistHistory.filter(h => {
+      const hDate = new Date(h.createdAt);
+      const now = new Date();
+      return hDate.getMonth() === now.getMonth() && hDate.getFullYear() === now.getFullYear();
+    }).length
+  };
 
   const filteredHistory = checklistHistory.filter(h => 
     (h.vehiclePlate || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1414,7 +1468,12 @@ export function Inspections() {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="space-y-6"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">Inspeções da Frota</h2>
@@ -1433,63 +1492,192 @@ export function Inspections() {
             </button>
           </div>
         </div>
-        <div className="relative w-full md:w-72">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-          <input
-            type="text"
-            placeholder="Pesquisar..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm"
-          />
-        </div>
       </div>
 
+      <motion.div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10" variants={containerVariants}>
+        <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 transition-transform duration-300">
+          <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Veículos Filtrados</h3>
+          <p className="text-[32px] font-bold text-on-surface mt-1">{stats.total}</p>
+        </motion.div>
+        <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 transition-transform duration-300">
+          <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Em Conformidade</h3>
+          <p className="text-[32px] font-bold text-emerald-600 mt-1">{stats.inCompliance}</p>
+        </motion.div>
+        <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 transition-transform duration-300">
+          <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Em Manutenção</h3>
+          <p className="text-[32px] font-bold text-error mt-1">{stats.needsAttention}</p>
+        </motion.div>
+        <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 transition-transform duration-300">
+          <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Checklists (Mês)</h3>
+          <p className="text-[32px] font-bold text-primary mt-1">{stats.checklistsMonth}</p>
+        </motion.div>
+      </motion.div>
+
+      <motion.div className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-50" variants={itemVariants}>
+        <div className="flex-1 min-w-[250px]">
+          <label className="block text-sm font-semibold text-on-surface-variant mb-2">Pesquisar</label>
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+            <input
+              type="text"
+              placeholder="Pesquisar veículo ou placa..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm"
+            />
+          </div>
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <SearchableSelect 
+            label="Obra"
+            placeholder="Todas as Obras"
+            options={[
+              { value: '', label: 'Todas as Obras' },
+              ...works.map(work => ({ value: work.name, label: work.name }))
+            ]}
+            value={filterWork}
+            onChange={(val) => setFilterWork(val)}
+          />
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <SearchableSelect 
+            label="Status"
+            placeholder="Todos os Status"
+            options={[
+              { value: '', label: 'Todos os Status' },
+              { value: 'Ativo', label: 'Ativo' },
+              { value: 'Inativo', label: 'Inativo' },
+              { value: 'Em Manutenção', label: 'Em Manutenção' },
+              ...statuses.map(s => ({ value: s.name, label: s.name }))
+            ]}
+            value={filterStatus}
+            onChange={(val) => setFilterStatus(val)}
+          />
+        </div>
+
+        <div className="flex bg-surface-container-low p-1.5 rounded-xl border border-outline-variant items-center gap-1 self-end mb-1">
+          <button 
+            onClick={() => setViewMode('grid')}
+            className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${viewMode === 'grid' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container'}`}
+            title="Visualização em Grade"
+          >
+            <span className="material-symbols-outlined text-[20px]">grid_view</span>
+          </button>
+          <button 
+            onClick={() => setViewMode('list')}
+            className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${viewMode === 'list' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container'}`}
+            title="Visualização em Lista"
+          >
+            <span className="material-symbols-outlined text-[20px]">view_list</span>
+          </button>
+        </div>
+      </motion.div>
+
       {loading ? (
-        <div className="p-8 text-center text-on-surface-variant">Carregando dados...</div>
+        <div className="p-8 text-center text-on-surface-variant flex flex-col items-center gap-2">
+          <span className="material-symbols-outlined animate-spin">refresh</span>
+          Carregando dados...
+        </div>
       ) : activeTab === 'vehicles' ? (
-        <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <AnimatePresence>
-            {filteredVehicles.length === 0 ? (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="col-span-full p-12 text-center bg-surface-container-low text-on-surface-variant border border-outline-variant rounded-2xl border-dashed"
-              >
-                Nenhum veículo encontrado.
-              </motion.div>
-            ) : (
-              filteredVehicles.map(vehicle => (
+        viewMode === 'grid' ? (
+          <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <AnimatePresence>
+              {filteredVehicles.length === 0 ? (
                 <motion.div 
-                  layout
-                  key={vehicle.id} 
-                  onClick={() => navigate(`/inspections/${vehicle.id}`)}
-                  className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:bg-surface-container-low hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="col-span-full p-12 text-center bg-surface-container-low text-on-surface-variant border border-outline-variant rounded-2xl border-dashed"
                 >
-                  <div className="relative h-44 overflow-hidden bg-white border-b border-outline-variant/30 flex items-center justify-center p-4">
-                    <img 
-                      className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-sm" 
-                      src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} 
-                      alt={vehicle.model} 
-                    />
-                  </div>
-                  <div className="p-5 flex-1 flex flex-col">
-                    <div className="flex items-center gap-3 mb-2 flex-1">
-                      <div className="bg-primary/10 text-primary p-2.5 rounded-xl">
-                        <span className="material-symbols-outlined text-[20px]">fact_check</span>
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-on-surface leading-none mb-1">{vehicle.plate}</h3>
-                        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{vehicle.model}</p>
+                  Nenhum veículo encontrado.
+                </motion.div>
+              ) : (
+                filteredVehicles.map(vehicle => (
+                  <motion.div 
+                    layout
+                    key={vehicle.id} 
+                    onClick={() => navigate(`/inspections/${vehicle.id}`)}
+                    className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:bg-surface-container-low hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col"
+                  >
+                    <div className="relative h-44 overflow-hidden bg-white border-b border-outline-variant/30 flex items-center justify-center p-4">
+                      <img 
+                        className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-sm" 
+                        src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} 
+                        alt={vehicle.model} 
+                      />
+                    </div>
+                    <div className="p-5 flex-1 flex flex-col">
+                      <div className="flex items-center gap-3 mb-2 flex-1">
+                        <div className="bg-primary/10 text-primary p-2.5 rounded-xl">
+                          <span className="material-symbols-outlined text-[20px]">fact_check</span>
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-on-surface leading-none mb-1">{vehicle.plate}</h3>
+                          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{vehicle.model}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          </motion.div>
+        ) : (
+          <motion.div layout className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-surface-container-low border-b border-outline-variant text-[12px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    <th className="px-6 py-4">Veículo</th>
+                    <th className="px-6 py-4">Obra / Centro de Custo</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant">
+                  {filteredVehicles.map(vehicle => (
+                    <tr key={vehicle.id} className="hover:bg-surface-container-low transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded overflow-hidden bg-white border border-outline-variant p-0.5">
+                            <img src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=100"} className="w-full h-full object-contain" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-on-surface">{vehicle.plate}</div>
+                            <div className="text-[10px] text-on-surface-variant uppercase">{vehicle.model}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        {Array.isArray(vehicle.costCenter) ? vehicle.costCenter.join(', ') : (vehicle.costCenter || 'Não Definido')}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          vehicle.status === 'Ativo' ? 'bg-emerald-100 text-emerald-800' : 
+                          vehicle.status === 'Em Manutenção' ? 'bg-orange-100 text-orange-800' : 
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {vehicle.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => navigate(`/inspections/${vehicle.id}`)}
+                          className="px-4 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-bold hover:opacity-90 active:scale-95 transition-all shadow-sm"
+                        >
+                          INSPECIONAR
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {filteredVehicles.length === 0 && (
+              <div className="p-12 text-center text-on-surface-variant">Nenhum veículo encontrado com os filtros atuais.</div>
             )}
-          </AnimatePresence>
-        </motion.div>
+          </motion.div>
+        )
       ) : (
         <motion.div layout className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
@@ -1550,6 +1738,6 @@ export function Inspections() {
           )}
         </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }

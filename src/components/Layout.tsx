@@ -300,8 +300,12 @@ export function Layout({ children }: LayoutProps) {
         
         <div className="p-4 bg-black/30 mt-auto border-t border-white/5 flex flex-col gap-3">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center">
-              <span className="material-symbols-outlined text-white">person</span>
+            <div className="w-10 h-10 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden border border-white/20">
+              {userData?.photoURL ? (
+                <img src={userData.photoURL} alt={userData.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-white">person</span>
+              )}
             </div>
             <div className="overflow-hidden flex-1">
               <p className="text-sm font-semibold truncate text-white">{userData?.name || user?.displayName || 'Admin'}</p>

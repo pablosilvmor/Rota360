@@ -59,22 +59,6 @@ export function Drivers() {
     }
   }, [editingDriver]);
 
-  const stats = {
-    total: drivers.length,
-    activeShifts: drivers.filter(d => d.status === 'Em Rota').length,
-    averageRating: drivers.length > 0 
-      ? (drivers.reduce((acc, d) => acc + (parseFloat(d.rating) || 0), 0) / drivers.length).toFixed(1) 
-      : '0.0',
-    expiringCnh: drivers.filter(d => {
-      if (!d.validUntil) return false;
-      const expiry = new Date(d.validUntil);
-      const today = new Date();
-      const diffTime = expiry.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 30 && diffDays > 0;
-    }).length
-  };
-
   useEffect(() => {
     const qDrivers = query(collection(db, 'drivers'));
     const unsubscribeDrivers = onSnapshot(qDrivers, (snapshot) => {
@@ -189,6 +173,22 @@ export function Drivers() {
 
     return matchesSearch && matchesStatus && matchesWork;
   });
+
+  const stats = {
+    total: filteredDrivers.length,
+    activeShifts: filteredDrivers.filter(d => d.status === 'Em Rota').length,
+    averageRating: filteredDrivers.length > 0 
+      ? (filteredDrivers.reduce((acc, d) => acc + (parseFloat(d.rating) || 0), 0) / filteredDrivers.length).toFixed(1) 
+      : '0.0',
+    expiringCnh: filteredDrivers.filter(d => {
+      if (!d.validUntil) return false;
+      const expiry = new Date(d.validUntil);
+      const today = new Date();
+      const diffTime = expiry.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= 30 && diffDays > 0;
+    }).length
+  };
 
   const sortedDrivers = [...filteredDrivers].sort((a, b) => {
     const valA = a[sortConfig.key] || '';

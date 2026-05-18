@@ -3,6 +3,9 @@ import { useNavigate, Link } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, collectionGroup, getDocs } from 'firebase/firestore';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+const CHART_COLORS = ['#0ea5e9', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#f97316', '#eab308', '#22c55e'];
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -37,104 +40,123 @@ export function Dashboard() {
   const [loadingAlerts, setLoadingAlerts] = useState(true);
 
   const [nextServices, setNextServices] = useState<any[]>([]);
+  const [costCenterStats, setCostCenterStats] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      // Create listeners
-      const unsubscribeVehicles = onSnapshot(collection(db, 'vehicles'), async (snapshot) => {
-        const vehicles = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as any[];
+    // Create listeners
+    const unsubscribeVehicles = onSnapshot(collection(db, 'vehicles'), async (snapshot) => {
+      const vehicles = snapshot.docs.map(d => ({ ...d.data(), id: d.id })) as any[];
+      
+      const stats = {
+        total: vehicles.length,
+        active: vehicles.filter(v => v.status === 'Ativo').length,
+        maintenance: vehicles.filter(v => v.status === 'Em Manutenção').length
+      };
+      setVehicleStats(stats);
+
+      // Calculate Cost Center Stats for Chart
+      const ccMap: Record<string, number> = {};
+      vehicles.forEach(v => {
+        const ccs = Array.isArray(v.costCenter) ? v.costCenter : [v.costCenter || 'Não Definido'];
+        ccs.forEach((cc: any) => {
+          const ccName = String(cc || '')
+            .replace(/logística - região sul/gi, '')
+            .replace(/logístic a - região sul/gi, '')
+            .replace(/,? ?$/, '')
+            .trim();
+          
+          if (ccName) {
+            ccMap[ccName] = (ccMap[ccName] || 0) + 1;
+          }
+        });
+      });
+
+      const ccData = Object.entries(ccMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+      setCostCenterStats(ccData);
+
+      // Fetch expired inspections based on current vehicles
+      try {
+        const recordsSnap = await getDocs(collectionGroup(db, 'records'));
+        const itemsSnap = await getDocs(collectionGroup(db, 'items'));
         
-        const stats = {
-          total: vehicles.length,
-          active: vehicles.filter(v => v.status === 'Ativo').length,
-          maintenance: vehicles.filter(v => v.status === 'Em Manutenção').length
-        };
-        setVehicleStats(stats);
+        const itemsMap = new Map();
+        itemsSnap.forEach(doc => {
+          itemsMap.set(doc.id, { ...doc.data(), id: doc.id });
+        });
 
-        // Fetch expired inspections based on current vehicles
-        try {
-          const recordsSnap = await getDocs(collectionGroup(db, 'records'));
-          const itemsSnap = await getDocs(collectionGroup(db, 'items'));
+        const expired: any[] = [];
+        
+        recordsSnap.forEach(recordDoc => {
+          const record = recordDoc.data();
+          const vehicleId = recordDoc.ref.parent.parent?.id;
+          const item = itemsMap.get(record.itemId);
           
-          const itemsMap = new Map();
-          itemsSnap.forEach(doc => {
-            itemsMap.set(doc.id, { ...doc.data(), id: doc.id });
-          });
-
-          const expired: any[] = [];
-          
-          recordsSnap.forEach(recordDoc => {
-            const record = recordDoc.data();
-            const vehicleId = recordDoc.ref.parent.parent?.id;
-            const item = itemsMap.get(record.itemId);
-            
-            if (vehicleId && item) {
-              const vehicle = vehicles.find(v => v.id === vehicleId);
-              if (vehicle) {
-                const currentKM = vehicle.currentKM || vehicle.odometer || 0;
-                const nextKM = record.nextMaintenanceKM || 0;
-                const remaining = nextKM - currentKM;
-                
-                // If it's expired or within 500km of expiring
-                if (remaining <= 0) {
-                  expired.push({
-                    vehicleId: vehicleId,
-                    vehiclePlate: vehicle.plate,
-                    vehicleModel: vehicle.model,
-                    vehicleBrand: vehicle.brand,
-                    vehicleImage: vehicle.imageUrl,
-                    itemName: item.name,
-                    remainingKM: remaining,
-                    type: 'expired'
-                  });
-                } else if (remaining <= 1000) {
-                  expired.push({
-                    vehicleId: vehicleId,
-                    vehiclePlate: vehicle.plate,
-                    vehicleModel: vehicle.model,
-                    vehicleBrand: vehicle.brand,
-                    vehicleImage: vehicle.imageUrl,
-                    itemName: item.name,
-                    remainingKM: remaining,
-                    type: 'warning'
-                  });
-                }
+          if (vehicleId && item) {
+            const vehicle = vehicles.find(v => v.id === vehicleId);
+            if (vehicle) {
+              const currentKM = vehicle.currentKM || vehicle.odometer || 0;
+              const nextKM = record.nextMaintenanceKM || 0;
+              const remaining = nextKM - currentKM;
+              
+              // If it's expired or within 500km of expiring
+              if (remaining <= 0) {
+                expired.push({
+                  vehicleId: vehicleId,
+                  vehiclePlate: vehicle.plate,
+                  vehicleModel: vehicle.model,
+                  vehicleBrand: vehicle.brand,
+                  vehicleImage: vehicle.imageUrl,
+                  itemName: item.name,
+                  remainingKM: remaining,
+                  type: 'expired'
+                });
+              } else if (remaining <= 1000) {
+                expired.push({
+                  vehicleId: vehicleId,
+                  vehiclePlate: vehicle.plate,
+                  vehicleModel: vehicle.model,
+                  vehicleBrand: vehicle.brand,
+                  vehicleImage: vehicle.imageUrl,
+                  itemName: item.name,
+                  remainingKM: remaining,
+                  type: 'warning'
+                });
               }
             }
-          });
-          
-          // Sort so expired is first, then warnings by lowest remaining KM
-          expired.sort((a, b) => a.remainingKM - b.remainingKM);
-          
-          setExpiredInspections(expired);
-        } catch (error) {
-          console.error("Error fetching inspections:", error);
-        } finally {
-          setLoadingAlerts(false);
-        }
-      });
+          }
+        });
+        
+        // Sort so expired is first, then warnings by lowest remaining KM
+        expired.sort((a, b) => a.remainingKM - b.remainingKM);
+        
+        setExpiredInspections(expired);
+      } catch (error) {
+        console.error("Error fetching inspections:", error);
+      } finally {
+        setLoadingAlerts(false);
+      }
+    });
 
-      const unsubscribeAlerts = onSnapshot(collection(db, 'alerts'), (snapshot) => {
-        const alertsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-        setAlerts(alertsData);
-      });
+    const unsubscribeAlerts = onSnapshot(collection(db, 'alerts'), (snapshot) => {
+      const alertsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setAlerts(alertsData);
+    });
 
-      const unsubscribeMaintenance = onSnapshot(collection(db, 'maintenance'), (snapshot) => {
-        const maintenanceData = snapshot.docs
-          .map(doc => ({ ...doc.data(), id: doc.id }))
-          .filter((os: any) => os.status !== 'Concluído')
-          .slice(0, 5);
-        setNextServices(maintenanceData);
-      });
+    const unsubscribeMaintenance = onSnapshot(collection(db, 'maintenance'), (snapshot) => {
+      const maintenanceData = snapshot.docs
+        .map(doc => ({ ...doc.data(), id: doc.id }))
+        .filter((os: any) => os.status !== 'Concluído')
+        .slice(0, 5);
+      setNextServices(maintenanceData);
+    });
 
-      return () => {
-        unsubscribeVehicles();
-        unsubscribeAlerts();
-        unsubscribeMaintenance();
-      };
+    return () => {
+      unsubscribeVehicles();
+      unsubscribeAlerts();
+      unsubscribeMaintenance();
     };
-    
-    fetchData();
   }, []);
 
   return (
@@ -286,16 +308,41 @@ export function Dashboard() {
         <div className="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-outline-variant flex items-center justify-between">
             <div>
-              <h3 className="text-[24px] font-semibold">Custos Mensais da Frota</h3>
-              <p className="text-xs text-on-surface-variant mt-1">Gastos com Combustível, Manutenção e Conformidade</p>
+              <h3 className="text-[20px] font-semibold">Veículos por Centro de Custo</h3>
+              <p className="text-xs text-on-surface-variant mt-1">Quantidade de veículos ativos e em manutenção por obra/CC</p>
             </div>
-            <select className="bg-surface-container-low border-outline-variant text-sm font-semibold rounded-lg py-2 pl-4 pr-10 focus:ring-primary">
-              <option>Últimos 6 Meses</option>
-              <option>Último Ano</option>
-            </select>
           </div>
-          <div className="p-8 flex-1 flex items-center justify-center border-2 border-dashed border-outline-variant/30 m-4 rounded-xl">
-            <p className="text-on-surface-variant italic text-sm">Dados de custo serão exibidos após o primeiro mês de operação.</p>
+          <div className="p-6 h-[400px] w-full">
+            {costCenterStats.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={costCenterStats} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E2E8F0" />
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    width={150}
+                    tick={{ fontSize: 10, fontWeight: 600, fill: '#64748B' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: 'rgba(0,0,0,0.02)' }}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+                  />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24} name="Veículos">
+                    {costCenterStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center border-2 border-dashed border-outline-variant/30 rounded-xl">
+                <p className="text-on-surface-variant italic text-sm text-center px-10">Carregando dados estatísticos...</p>
+              </div>
+            )}
           </div>
         </div>
 

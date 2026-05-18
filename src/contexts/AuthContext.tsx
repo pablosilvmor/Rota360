@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Preloader } from '../components/Preloader';
 
 export interface UserData {
@@ -11,6 +11,7 @@ export interface UserData {
   role: string;
   isActive: boolean;
   allowedScreens: string[];
+  photoURL?: string;
 }
 
 interface AuthContextType {
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               allowedScreens: isAdmin 
                 ? ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist']
                 : [],
+              photoURL: currentUser.photoURL || '',
               createdAt: Date.now(),
               updatedAt: Date.now()
             };
@@ -66,7 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
-            setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
+            const data = docSnap.data();
+            // Sync photoURL if it changed or is missing in firestore
+            if (currentUser.photoURL && data.photoURL !== currentUser.photoURL) {
+              updateDoc(userRef, { photoURL: currentUser.photoURL }).catch(console.error);
+            }
+            setUserData({ uid: docSnap.id, ...data } as UserData);
           } else {
             setUserData(null);
           }

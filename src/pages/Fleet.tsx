@@ -113,14 +113,14 @@ export function Fleet() {
     };
   }, []);
 
-  const getAverageAge = () => {
-    if (vehicles.length === 0) return '--';
+  const getAverageAge = (list = vehicles) => {
+    if (list.length === 0) return '--';
     const currentYear = new Date().getFullYear();
-    const totalAge = vehicles.reduce((acc, v) => {
+    const totalAge = list.reduce((acc, v) => {
       const year = v.modelYear ? parseInt(v.modelYear) : currentYear;
       return acc + (currentYear - year);
     }, 0);
-    const avg = totalAge / vehicles.length;
+    const avg = totalAge / list.length;
     return avg.toFixed(1).replace('.', ',');
   };
 
@@ -279,20 +279,20 @@ export function Fleet() {
 
       <motion.div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12" variants={containerVariants}>
         <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:-translate-y-1 transition-transform duration-300">
-          <p className="font-semibold text-sm text-on-surface-variant mb-1 uppercase tracking-widest">Frota Total</p>
-          <p className="font-bold text-[48px] text-primary leading-[1.2] tracking-[-0.02em]">{vehicles.length}</p>
+          <p className="font-semibold text-sm text-on-surface-variant mb-1 uppercase tracking-widest">Frota Filtrada</p>
+          <p className="font-bold text-[48px] text-primary leading-[1.2] tracking-[-0.02em]">{filteredVehicles.length}</p>
         </motion.div>
         <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:-translate-y-1 transition-transform duration-300">
-          <p className="font-semibold text-sm text-on-surface-variant mb-1 uppercase tracking-widest">Em Operação</p>
-          <p className="font-bold text-[48px] text-primary leading-[1.2] tracking-[-0.02em]">{vehicles.filter(v => v.status === 'Ativo').length}</p>
+          <p className="font-semibold text-sm text-on-surface-variant mb-1 uppercase tracking-widest">Em Operação (Filtro)</p>
+          <p className="font-bold text-[48px] text-primary leading-[1.2] tracking-[-0.02em]">{filteredVehicles.filter(v => v.status === 'Ativo').length}</p>
         </motion.div>
         <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:-translate-y-1 transition-transform duration-300">
-          <p className="font-semibold text-sm text-on-surface-variant mb-1 uppercase tracking-widest">Manutenção</p>
-          <p className="font-bold text-[48px] text-error leading-[1.2] tracking-[-0.02em]">{vehicles.filter(v => v.status === 'Em Manutenção').length}</p>
+          <p className="font-semibold text-sm text-on-surface-variant mb-1 uppercase tracking-widest">Manutenção (Filtro)</p>
+          <p className="font-bold text-[48px] text-error leading-[1.2] tracking-[-0.02em]">{filteredVehicles.filter(v => v.status === 'Em Manutenção').length}</p>
         </motion.div>
         <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:-translate-y-1 transition-transform duration-300">
-          <p className="font-semibold text-sm text-on-surface-variant mb-1 uppercase tracking-widest">Idade Média</p>
-          <p className="font-bold text-[48px] text-primary leading-[1.2] tracking-[-0.02em]">{getAverageAge()} <span className="text-[24px]">anos</span></p>
+          <p className="font-semibold text-sm text-on-surface-variant mb-1 uppercase tracking-widest">Idade Média (Filtro)</p>
+          <p className="font-bold text-[48px] text-primary leading-[1.2] tracking-[-0.02em]">{getAverageAge(filteredVehicles)} <span className="text-[24px]">anos</span></p>
         </motion.div>
       </motion.div>
 
