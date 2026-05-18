@@ -43,7 +43,13 @@ const MODULES: ModuleData[] = [
       { 
         key: 'costCenter', 
         label: 'Centro de Custo',
-        renderer: (val: any) => Array.isArray(val) ? val.join(', ') : val
+        renderer: (val: any) => {
+          const clean = (v: any) => String(v || '').replace(/Logístic a - Região Sul,?/g, '').trim();
+          if (Array.isArray(val)) {
+            return val.map(clean).filter(Boolean).join(', ') || '-';
+          }
+          return clean(val) || '-';
+        }
       },
       { key: 'assignedDriver', label: 'Motorista Atribuído' },
       { key: 'status', label: 'Status' },
@@ -73,7 +79,6 @@ const MODULES: ModuleData[] = [
       { key: 'cnhStatus', label: 'Status CNH', renderer: (val: any, item: any) => item.validUntil ? (new Date(item.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'N/A' },
       { key: 'phone', label: 'Telefone' },
       { key: 'vehicleAssigned', label: 'Veículo Atribuído' },
-      { key: 'status', label: 'Status' },
     ]
   },
   {
