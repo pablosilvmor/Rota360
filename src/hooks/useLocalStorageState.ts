@@ -5,9 +5,13 @@ export function useLocalStorageState<T>(key: string, defaultValue: T): [T, Dispa
     const saved = localStorage.getItem(key);
     if (saved !== null) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Se esperarmos um array mas vier outra coisa, podemos opcionalmente tratar aqui, 
+        // mas por hora o fallback para o try-catch resolve a maioria dos erros de sintaxe.
+        return parsed;
       } catch (e) {
         console.error(`Error parsing localStorage key "${key}":`, e);
+        return defaultValue;
       }
     }
     return defaultValue;
