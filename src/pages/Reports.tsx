@@ -34,11 +34,11 @@ const MODULES: ModuleData[] = [
         label: 'Foto', 
         align: 'center',
         renderer: (val: any) => val ? (
-          <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0">
-            <img src={val} alt="Veículo" className="w-full h-full object-cover" />
+          <div className="w-16 h-12 rounded-lg overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0 flex items-center justify-center">
+            <img src={val} alt="Veículo" className="w-full h-full object-contain" />
           </div>
         ) : (
-          <div className="w-12 h-12 rounded-lg bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30">
+          <div className="w-16 h-12 rounded-lg bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30">
             <span className="material-symbols-outlined text-[20px]">image_not_supported</span>
           </div>
         )
@@ -82,11 +82,11 @@ const MODULES: ModuleData[] = [
         label: 'Foto', 
         align: 'center',
         renderer: (val: any) => val ? (
-          <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0 mx-auto">
+          <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0 mx-auto flex items-center justify-center">
             <img src={val} alt="Motorista" className="w-full h-full object-cover" />
           </div>
         ) : (
-          <div className="w-10 h-10 rounded-full bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30 mx-auto">
+          <div className="w-12 h-12 rounded-full bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30 mx-auto">
             <span className="material-symbols-outlined text-[16px]">person</span>
           </div>
         )
@@ -332,7 +332,7 @@ export function Reports() {
             if (!response.ok) throw new Error("Fetch failed");
           } catch (e) {
             // Fallback to CORS proxy if direct fetch fails (e.g. from Imgur or cross-origin Storage)
-            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300`;
+            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300&output=jpeg`;
             response = await fetch(proxyUrl);
           }
           
@@ -347,7 +347,28 @@ export function Reports() {
           
           const imgData = await new Promise<{src: string, ratio: number}>((resolve, reject) => {
             const img = new Image();
-            img.onload = () => resolve({ src: dataUrl, ratio: img.naturalWidth / img.naturalHeight });
+            img.onload = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.fillStyle = '#FFFFFF';
+                  ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  ctx.drawImage(img, 0, 0);
+                  resolve({ 
+                    src: canvas.toDataURL('image/jpeg', 0.8), 
+                    ratio: img.naturalWidth / img.naturalHeight 
+                  });
+                } else {
+                  resolve({ src: dataUrl, ratio: img.naturalWidth / img.naturalHeight });
+                }
+              } catch (e) {
+                // In case of taint error or other canvas errors, fallback to original dataUrl
+                resolve({ src: dataUrl, ratio: img.naturalWidth / img.naturalHeight });
+              }
+            };
             img.onerror = reject;
             img.src = dataUrl;
           });
@@ -382,7 +403,7 @@ export function Reports() {
         valign: 'middle'
       },
       bodyStyles: {
-        minCellHeight: imageColIdx !== -1 ? 12 : undefined
+        minCellHeight: imageColIdx !== -1 ? 20 : undefined
       },
       headStyles: {
         fillColor: [20, 24, 27],
@@ -393,7 +414,7 @@ export function Reports() {
         fillColor: [245, 245, 245]
       },
       columnStyles: {
-        ...(imageColIdx !== -1 ? { [imageColIdx]: { cellWidth: 15 } } : {})
+        ...(imageColIdx !== -1 ? { [imageColIdx]: { cellWidth: 20 } } : {})
       },
       didParseCell: function(data) {
         if (isFleetReport && data.section === 'body') {
@@ -434,7 +455,7 @@ export function Reports() {
             const x = hookData.cell.x + padding + (cellW - drawW) / 2;
             const y = hookData.cell.y + padding + (cellH - drawH) / 2;
             
-            doc.addImage(cached.src, 'PNG', x, y, drawW, drawH, '', 'FAST');
+            doc.addImage(cached.src, 'JPEG', x, y, drawW, drawH, '', 'FAST');
           }
         }
       },
