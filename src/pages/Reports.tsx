@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import jsPDF from 'jspdf';
@@ -10,7 +10,7 @@ type ModuleData = {
   id: string;
   name: string;
   collectionId: string;
-  columns: { key: string; label: string; renderer?: (val: any, item: any) => string; align?: 'left' | 'center' | 'right' }[];
+  columns: { key: string; label: string; renderer?: (val: any, item: any) => ReactNode; align?: 'left' | 'center' | 'right' }[];
   icon: string;
 };
 
@@ -29,6 +29,20 @@ const MODULES: ModuleData[] = [
     collectionId: 'vehicles',
     icon: 'local_shipping',
     columns: [
+      { 
+        key: 'imageUrl', 
+        label: 'Foto', 
+        align: 'center',
+        renderer: (val: any) => val ? (
+          <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0">
+            <img src={val} alt="Veículo" className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="w-12 h-12 rounded-lg bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30">
+            <span className="material-symbols-outlined text-[20px]">image_not_supported</span>
+          </div>
+        )
+      },
       { key: 'plate', label: 'Placa' },
       { key: 'brand', label: 'Marca' },
       { key: 'model', label: 'Modelo' },
@@ -231,8 +245,10 @@ export function Reports() {
 
       // Use renderer if available for sorting display values
       if (col?.renderer) {
-        valA = col.renderer(valA, a);
-        valB = col.renderer(valB, b);
+        const rendered = col.renderer(valA, a);
+        valA = typeof rendered === 'string' ? rendered : valA;
+        const renderedB = col.renderer(valB, b);
+        valB = typeof renderedB === 'string' ? renderedB : valB;
       }
 
       const aStr = String(valA || '').toLowerCase();
@@ -259,7 +275,8 @@ export function Reports() {
   const filteredData = data.filter(item => {
     const matchesSearch = !reportSearchTerm || activeColumns.some(c => {
       const val = item[c.key];
-      const displayVal = c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '');
+      const rendered = c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '');
+      const displayVal = typeof rendered === 'string' ? rendered : (val != null ? String(val) : '');
       return displayVal.toLowerCase().includes(reportSearchTerm.toLowerCase());
     });
 
@@ -274,25 +291,54 @@ export function Reports() {
 
   const sortedData = sortData(filteredData);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!selectedModule) return;
 
+    setLoadingData(true);
     const isLandscape = activeColumns.length > 5;
     const doc = new jsPDF(isLandscape ? 'landscape' : 'portrait');
 
     const title = `Relatório de ${selectedModule.name}`;
     
     // Header and footer setup
-    const headerLogoUrl = 'https://i.imgur.com/f2EH8ls.png';
-    const footerLogoUrl = 'https://i.imgur.com/1DaE4Bm.png';
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
+
+    const imageColIdx = activeColumns.findIndex(c => c.key === 'imageUrl');
+    const imageCache: { [url: string]: { src: string; ratio: number } } = {};
+
+    if (imageColIdx !== -1) {
+      const urls = Array.from(new Set(sortedData.map(item => item.imageUrl).filter(Boolean)));
+      await Promise.all(urls.map(async (url) => {
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          
+          const imgData = await new Promise<{src: string, ratio: number}>((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve({ src: dataUrl, ratio: img.naturalWidth / img.naturalHeight });
+            img.onerror = reject;
+            img.src = dataUrl;
+          });
+          imageCache[url] = imgData;
+        } catch (err) {
+          console.error("Failed to pre-load image in PDF export", url, err);
+        }
+      }));
+    }
 
     const tableCols = activeColumns.map(c => c.label);
     const tableData = sortedData.map(item => 
       activeColumns.map(c => {
         const val = item[c.key];
-        return c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '-');
+        if (c.key === 'imageUrl') return ''; // Empty so we can draw the image
+        const rendered = c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '-');
+        return typeof rendered === 'string' ? rendered : (val != null ? String(val) : '-');
       })
     );
 
@@ -306,6 +352,7 @@ export function Reports() {
       styles: {
         fontSize: isFleetReport ? 7.5 : 9,
         cellPadding: 3,
+        valign: 'middle'
       },
       headStyles: {
         fillColor: [20, 24, 27],
@@ -314,6 +361,9 @@ export function Reports() {
       },
       alternateRowStyles: {
         fillColor: [245, 245, 245]
+      },
+      columnStyles: {
+        ...(imageColIdx !== -1 ? { [imageColIdx]: { cellWidth: 15 } } : {})
       },
       didParseCell: function(data) {
         if (isFleetReport && data.section === 'body') {
@@ -330,6 +380,33 @@ export function Reports() {
               data.cell.styles.textColor = [22, 163, 74]; // Green
               data.cell.styles.fontStyle = 'bold';
             }
+          }
+        }
+      },
+      didDrawCell: function(hookData) {
+        if (imageColIdx !== -1 && hookData.column.index === imageColIdx && hookData.cell.section === 'body') {
+          const item = sortedData[hookData.row.index];
+          const imgUrl = item?.imageUrl;
+          const cached = imgUrl ? imageCache[imgUrl] : null;
+
+          if (cached) {
+            const padding = 1.5;
+            const cellW = hookData.cell.width - (padding * 2);
+            const cellH = hookData.cell.height - (padding * 2);
+            
+            // Calculate dimensions to fit and center in cell
+            let drawW = cellW;
+            let drawH = cellW / cached.ratio;
+            
+            if (drawH > cellH) {
+              drawH = cellH;
+              drawW = cellH * cached.ratio;
+            }
+            
+            const x = hookData.cell.x + padding + (cellW - drawW) / 2;
+            const y = hookData.cell.y + padding + (cellH - drawH) / 2;
+            
+            doc.addImage(cached.src, 'PNG', x, y, drawW, drawH, '', 'FAST');
           }
         }
       },
@@ -381,6 +458,7 @@ export function Reports() {
     }
 
     doc.save(`${title.replace(/\s+/g, '_').toLowerCase()}.pdf`);
+    setLoadingData(false);
   };
 
   const itemVariants = {
@@ -579,9 +657,11 @@ export function Reports() {
                         <tr key={item.id || idx} className="hover:bg-surface-container transition-colors">
                           {activeColumns.map(c => {
                             const val = item[c.key];
-                            const displayVal = c.renderer ? c.renderer(val, item) : (val != null && val !== "" ? String(val) : '-');
+                            const rendered = c.renderer ? c.renderer(val, item) : null;
+                            const displayVal = rendered !== null ? rendered : (val != null && val !== "" ? String(val) : '-');
+                            
                             return (
-                              <td key={c.key} className={`px-5 py-3 text-sm text-on-surface whitespace-normal break-words align-top max-w-[250px] min-w-[120px] text-${c.align || 'left'}`}>
+                              <td key={c.key} className={`px-5 py-3 text-sm text-on-surface whitespace-normal break-words align-middle max-w-[250px] min-w-[120px] text-${c.align || 'left'}`}>
                                 {displayVal}
                               </td>
                             );
