@@ -1,23 +1,23 @@
-import { ReactNode, useState, lazy, Suspense } from 'react';
+import { ReactNode, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { ConfirmModal } from './components/ConfirmModal';
 import { Preloader } from './components/Preloader';
 
-// Otimização: Code Splitting
-const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
-const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
-const Fleet = lazy(() => import('./pages/Fleet').then(m => ({ default: m.Fleet })));
-const Drivers = lazy(() => import('./pages/Drivers').then(m => ({ default: m.Drivers })));
-const Maintenance = lazy(() => import('./pages/Maintenance').then(m => ({ default: m.Maintenance })));
-const Admin = lazy(() => import('./pages/Admin').then(m => ({ default: m.Admin })));
-const Fuel = lazy(() => import('./pages/Fuel').then(m => ({ default: m.Fuel })));
-const Tracking = lazy(() => import('./pages/Tracking').then(m => ({ default: m.Tracking })));
-const Works = lazy(() => import('./pages/Works').then(m => ({ default: m.Works })));
-const Inspections = lazy(() => import('./pages/Inspections').then(m => ({ default: m.Inspections })));
-const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
-const Checklist = lazy(() => import('./pages/Checklist').then(m => ({ default: m.Checklist })));
+// Importações diretas para evitar problemas com code-splitting em produção
+import { Login } from './pages/Login';
+import { Dashboard } from './pages/Dashboard';
+import { Fleet } from './pages/Fleet';
+import { Drivers } from './pages/Drivers';
+import { Maintenance } from './pages/Maintenance';
+import { Admin } from './pages/Admin';
+import { Fuel } from './pages/Fuel';
+import { Tracking } from './pages/Tracking';
+import { Works } from './pages/Works';
+import { Inspections } from './pages/Inspections';
+import { Reports } from './pages/Reports';
+import { Checklist } from './pages/Checklist';
 
 function ProtectedRoute({ children, path }: { children: ReactNode, path: string }) {
   const { user, userData, loading, logout } = useAuth();
@@ -75,9 +75,8 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Suspense fallback={<Preloader />}>
-          <Routes>
-            <Route path="/checklist" element={<Checklist />} />
+        <Routes>
+          <Route path="/checklist" element={<Checklist />} />
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute path="/"><Dashboard /></ProtectedRoute>} />
             <Route path="/fleet" element={<ProtectedRoute path="/fleet"><Fleet /></ProtectedRoute>} />
@@ -97,7 +96,6 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );
