@@ -7,7 +7,12 @@ export function useLocalStorageState<T>(key: string, defaultValue: T): [T, Dispa
     try {
       const saved = localStorage.getItem(key);
       if (saved !== null) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // If parsed is null but defaultValue is not, return defaultValue
+        if (parsed === null && defaultValue !== null) {
+          return defaultValue;
+        }
+        return parsed;
       }
     } catch (e) {
       console.error(`Error reading/parsing localStorage key "${key}":`, e);

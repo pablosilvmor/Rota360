@@ -225,7 +225,7 @@ export function Reports() {
     if (!sortConfig) return list;
 
     const sorted = [...list].sort((a, b) => {
-      const col = selectedModule?.columns.find(c => c.key === sortConfig.key);
+      const col = selectedModule?.columns?.find(c => c.key === sortConfig.key);
       let valA = a[sortConfig.key];
       let valB = b[sortConfig.key];
 

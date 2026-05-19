@@ -157,17 +157,20 @@ export function Drivers() {
   };
 
   const handleSort = (key: string) => {
-    setSortConfig(current => ({
-      key,
-      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
-    }));
+    setSortConfig(current => {
+      const direction = current?.key === key && current?.direction === 'asc' ? 'desc' : 'asc';
+      return { key, direction };
+    });
   };
 
   const filteredDrivers = drivers.filter(driver => {
+    const vAssigned = driver.vehicleAssigned;
+    const vAssignedStr = Array.isArray(vAssigned) ? vAssigned.join(', ') : (vAssigned || '');
+    
     const matchesSearch = 
-      driver.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      driver.cpf?.includes(searchTerm) ||
-      driver.vehicleAssigned?.toLowerCase().includes(searchTerm.toLowerCase());
+      (driver.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (driver.cpf || '').includes(searchTerm) ||
+      vAssignedStr.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === '' || driver.status === statusFilter;
     const matchesWork = workFilter === '' || driver.workName === workFilter;
@@ -192,16 +195,19 @@ export function Drivers() {
   };
 
   const sortedDrivers = [...filteredDrivers].sort((a, b) => {
-    const valA = a[sortConfig.key] || '';
-    const valB = b[sortConfig.key] || '';
+    const key = sortConfig?.key || 'name';
+    const direction = sortConfig?.direction || 'asc';
+    
+    const valA = a[key] || '';
+    const valB = b[key] || '';
     
     if (typeof valA === 'string') {
-      return sortConfig.direction === 'asc' 
+      return direction === 'asc' 
         ? valA.localeCompare(valB)
         : valB.localeCompare(valA);
     }
     
-    return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+    return direction === 'asc' ? valA - valB : valB - valA;
   });
 
   const clearFilters = () => {
