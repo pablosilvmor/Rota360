@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -39,10 +40,10 @@ export function Fleet() {
   const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterWork, setFilterWork] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchTerm, setSearchTerm] = useLocalStorageState('fleet_searchTerm', '');
+  const [filterWork, setFilterWork] = useLocalStorageState('fleet_filterWork', '');
+  const [filterStatus, setFilterStatus] = useLocalStorageState('fleet_filterStatus', '');
+  const [viewMode, setViewMode] = useLocalStorageState<'grid' | 'list'>('fleet_viewMode', 'grid');
 
   const editingVehicle = vehicles.find(v => v.id === editingVehicleId) || null;
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId) || null;

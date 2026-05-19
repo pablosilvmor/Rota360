@@ -3,6 +3,7 @@ import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, write
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserData, useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 interface Work {
   id: string;
@@ -15,7 +16,7 @@ export function Admin() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('obras');
+  const [activeTab, setActiveTab] = useLocalStorageState('admin_activeTab', 'obras');
   
   // Batch states
   const [showImport, setShowImport] = useState(false);

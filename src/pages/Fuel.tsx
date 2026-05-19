@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -20,7 +21,7 @@ export function Fuel() {
   const [fuelRecords, setFuelRecords] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [filterWork, setFilterWork] = useState('Todas as Obras');
+  const [filterWork, setFilterWork] = useLocalStorageState('fuel_filterWork', 'Todas as Obras');
 
   const [formData, setFormData] = useState({
     vehicleId: '',

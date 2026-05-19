@@ -4,6 +4,7 @@ import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 type ModuleData = {
   id: string;
@@ -100,12 +101,14 @@ const MODULES: ModuleData[] = [
 ];
 
 export function Reports() {
-  const [selectedModule, setSelectedModule] = useState<ModuleData | null>(null);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+  const [selectedModuleId, setSelectedModuleId] = useLocalStorageState<string | null>('reports_selectedModuleId', null);
+  const selectedModule = MODULES.find(m => m.id === selectedModuleId) || null;
+  
+  const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>('reports_selectedColumns', []);
   const [data, setData] = useState<any[]>([]);
-  const [reportSearchTerm, setReportSearchTerm] = useState('');
-  const [filterWork, setFilterWork] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [reportSearchTerm, setReportSearchTerm] = useLocalStorageState('reports_searchTerm', '');
+  const [filterWork, setFilterWork] = useLocalStorageState('reports_filterWork', '');
+  const [filterStatus, setFilterStatus] = useLocalStorageState('reports_filterStatus', '');
   const [works, setWorks] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -151,15 +154,19 @@ export function Reports() {
   }, []);
 
   const handleModuleSelect = async (mod: ModuleData) => {
-    setSelectedModule(mod);
+    setSelectedModuleId(mod.id);
     setSelectedColumns(mod.columns.map(c => c.key));
     setSortConfig(null);
+    fetchModuleData(mod);
+  };
+
+  const fetchModuleData = async (mod: ModuleData) => {
     setLoadingData(true);
     setData([]);
     
     if (mod.id === 'inspections') {
       setLoadingData(false);
-      return; // Will be handled by empty state component logic to show warning
+      return; 
     }
 
     try {
@@ -193,6 +200,12 @@ export function Reports() {
       setLoadingData(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedModule && data.length === 0 && !loadingData) {
+      fetchModuleData(selectedModule);
+    }
+  }, [selectedModuleId]);
 
   const toggleColumn = (key: string) => {
     setSelectedColumns(prev => 

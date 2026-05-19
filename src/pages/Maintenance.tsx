@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MaintenanceAlertsConfig } from '../components/MaintenanceAlertsConfig';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc } from 'firebase/firestore';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -31,7 +32,7 @@ export function Maintenance() {
 
   const [osData, setOsData] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
-  const [statusFilter, setStatusFilter] = useState('Todos os Status');
+  const [statusFilter, setStatusFilter] = useLocalStorageState('maintenance_statusFilter', 'Todos os Status');
   const [newOS, setNewOS] = useState({ plate: '', priority: 'Média', description: '', provider: '', title: '', cost: '', obra: '' });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 

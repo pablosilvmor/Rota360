@@ -4,6 +4,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useParams, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import * as XLSX from 'xlsx';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -1269,13 +1270,13 @@ export function Inspections() {
   const [works, setWorks] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'vehicles' | 'history'>('vehicles');
+  const [activeTab, setActiveTab] = useLocalStorageState<'vehicles' | 'history'>('inspections_activeTab', 'vehicles');
   const [isExportingChecklist, setIsExportingChecklist] = useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterWork, setFilterWork] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useLocalStorageState('inspections_searchQuery', '');
+  const [filterWork, setFilterWork] = useLocalStorageState('inspections_filterWork', '');
+  const [filterStatus, setFilterStatus] = useLocalStorageState('inspections_filterStatus', '');
+  const [viewMode, setViewMode] = useLocalStorageState<'grid' | 'list'>('inspections_viewMode', 'grid');
 
   useEffect(() => {
     // We fetch the vehicles list to show cards or if an ID is present, we just pass to the Form

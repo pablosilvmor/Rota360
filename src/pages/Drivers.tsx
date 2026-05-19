@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -37,10 +38,10 @@ export function Drivers() {
   const [assignment, setAssignment] = useState({ driverId: '', vehiclePlates: [] as string[], workId: '', workName: '' });
   const [newOccurrence, setNewOccurrence] = useState({ driverId: '', type: 'Multa Leve', description: '', points: 1 });
   const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '' });
-  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [workFilter, setWorkFilter] = useState('');
+  const [sortConfig, setSortConfig] = useLocalStorageState<{ key: string, direction: 'asc' | 'desc' }>('drivers_sortConfig', { key: 'name', direction: 'asc' });
+  const [searchTerm, setSearchTerm] = useLocalStorageState('drivers_searchTerm', '');
+  const [statusFilter, setStatusFilter] = useLocalStorageState('drivers_statusFilter', '');
+  const [workFilter, setWorkFilter] = useLocalStorageState('drivers_workFilter', '');
 
   const editingDriver = drivers.find(d => d.id === editingDriverId) || null;
 
