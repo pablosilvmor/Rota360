@@ -24,7 +24,80 @@ interface InspectionRecord {
   serviceExecuted: 'SIM' | 'NÃO' | 'NaKM' | '';
   lastMaintenanceKM: number;
   nextMaintenanceKM: number;
+  lastMaintenanceDate?: string;
+  nextMaintenanceDate?: string;
 }
+
+const isTimeBasedUnit = (unit?: string) => {
+  if (!unit) return false;
+  const u = unit.toLowerCase();
+  return ['dias', 'diário', 'meses', 'mensal', 'anos', 'anual'].includes(u);
+};
+
+const calculateNextDate = (lastDateStr: string, unit: string, periodicity: number) => {
+  if (!lastDateStr) return '';
+  const dateObj = new Date(lastDateStr + 'T12:00:00');
+  const u = unit.toLowerCase();
+  
+  if (u === 'dias' || u === 'diário') {
+    dateObj.setDate(dateObj.getDate() + periodicity);
+  } else if (u === 'meses' || u === 'mensal') {
+    dateObj.setMonth(dateObj.getMonth() + periodicity);
+  } else if (u === 'anos' || u === 'anual') {
+    dateObj.setFullYear(dateObj.getFullYear() + periodicity);
+  }
+  
+  return dateObj.toISOString().split('T')[0];
+};
+
+const calculateDaysDiff = (date1Str: string, date2Str: string) => {
+  if (!date1Str || !date2Str) return 0;
+  const d1 = new Date(date1Str + 'T12:00:00').getTime();
+  const d2 = new Date(date2Str + 'T12:00:00').getTime();
+  return (d1 - d2) / (1000 * 60 * 60 * 24);
+};
+
+const calculateProgress = (item: InspectionItem, record: InspectionRecord, currentVehicleKM: number) => {
+  const isTimeBased = isTimeBasedUnit(item.unit);
+  let progressPercent = 0;
+  let remainingNumber = 0;
+  let isOutdated = false;
+  let descRemaining = '';
+  
+  if (isTimeBased) {
+    if (record.lastMaintenanceDate && record.nextMaintenanceDate) {
+      const today = new Date().toISOString().split('T')[0];
+      const totalDays = calculateDaysDiff(record.nextMaintenanceDate, record.lastMaintenanceDate) || 1;
+      const daysPassed = calculateDaysDiff(today, record.lastMaintenanceDate);
+      remainingNumber = Math.max(0, calculateDaysDiff(record.nextMaintenanceDate, today));
+      const daysOverdue = calculateDaysDiff(today, record.nextMaintenanceDate);
+      
+      if (daysOverdue > 0) {
+        progressPercent = 100;
+        isOutdated = true;
+        remainingNumber = daysOverdue; 
+        descRemaining = `VENCIDO HÁ ${Math.round(daysOverdue)} DIAS`;
+      } else {
+        progressPercent = Math.min(100, Math.max(0, (daysPassed / totalDays) * 100));
+        descRemaining = `RESTAM ${Math.round(remainingNumber)} DIAS`;
+      }
+    }
+  } else {
+    const kmSinceLast = currentVehicleKM - record.lastMaintenanceKM;
+    if (item.periodicityKM > 0) {
+       progressPercent = Math.min(100, Math.max(0, (kmSinceLast / item.periodicityKM) * 100));
+    }
+    remainingNumber = record.nextMaintenanceKM - currentVehicleKM;
+    if (progressPercent >= 100) {
+      isOutdated = true;
+      descRemaining = `VENCIDO HÁ ${Math.abs(remainingNumber).toLocaleString('pt-BR')} ${item.unit?.toUpperCase() || 'KM'}`;
+    } else {
+      descRemaining = `RESTAM ${remainingNumber.toLocaleString('pt-BR')} ${item.unit?.toUpperCase() || 'KM'}`;
+    }
+  }
+
+  return { progressPercent, remainingNumber, isOutdated, descRemaining };
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -318,24 +391,18 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
         const record = records[item.id] || { conformity: '', serviceExecuted: '', lastMaintenanceKM: 0, nextMaintenanceKM: 0 };
         const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
         
-        let progressPercent = 0;
-        let kmSinceLast = currentVehicleKM - record.lastMaintenanceKM;
-        if (item.periodicityKM > 0) {
-           progressPercent = Math.min(100, Math.max(0, (kmSinceLast / item.periodicityKM) * 100));
-        }
-        
-        const remainingKM = record.nextMaintenanceKM - currentVehicleKM;
-        let progressText = `${Math.round(progressPercent)}%`;
-        let desc = progressPercent >= 100 
-           ? `VENCIDO HÁ ${formatKM(Math.abs(remainingKM))} ${item.unit?.toUpperCase() || 'KM'}`
-           : `RESTAM ${formatKM(remainingKM)} ${item.unit?.toUpperCase() || 'KM'}`;
+        const { progressPercent, remainingNumber, isOutdated, descRemaining } = calculateProgress(item, record, currentVehicleKM);
+        const progressText = `${Math.round(progressPercent)}%`;
 
         tableData.push([
            `${item.name}\nPeriodicidade: ${formatKM(item.periodicityKM)} ${item.unit || 'km'}`,
            record.conformity || '-',
            record.serviceExecuted || '-',
-           formatKM(record.lastMaintenanceKM),
-           `Próx: ${formatKM(record.nextMaintenanceKM)}\n${desc}\nProgresso: ${progressText}\n`
+           isTimeBasedUnit(item.unit) ? (record.lastMaintenanceDate 
+              ? new Date(record.lastMaintenanceDate + 'T12:00:00').toLocaleDateString('pt-BR') 
+              : '-')
+              : formatKM(record.lastMaintenanceKM),
+           `Próx: ${isTimeBasedUnit(item.unit) ? (record.nextMaintenanceDate ? new Date(record.nextMaintenanceDate + 'T12:00:00').toLocaleDateString('pt-BR') : '-') : formatKM(record.nextMaintenanceKM)}\n${descRemaining}\nProgresso: ${progressText}\n`
         ]);
       });
 
@@ -425,11 +492,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
             const record = records[item.id] || { lastMaintenanceKM: 0 };
             const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
             
-            let progressPercent = 0;
-            let kmSinceLast = currentVehicleKM - record.lastMaintenanceKM;
-            if (item.periodicityKM > 0) {
-               progressPercent = Math.min(100, Math.max(0, (kmSinceLast / item.periodicityKM) * 100));
-            }
+            const { progressPercent } = calculateProgress(item, record as InspectionRecord, currentVehicleKM);
             
             const cell = data.cell;
             const barWidth = cell.width - 8;
@@ -550,12 +613,15 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
               });
               // Also create a default record
               const newRecordRef = doc(collection(db, `inspections/${vehicleId}/records`));
+              const isTimeBased = isTimeBasedUnit('km'); // Bulk import currently defaults to KM
               batch.set(newRecordRef, {
                 itemId: newItemRef.id,
                 conformity: 'SIM',
                 serviceExecuted: 'NÃO',
                 lastMaintenanceKM: 0,
                 nextMaintenanceKM: periodicityKM,
+                lastMaintenanceDate: isTimeBased ? new Date().toISOString().split('T')[0] : null,
+                nextMaintenanceDate: isTimeBased ? calculateNextDate(new Date().toISOString().split('T')[0], 'km', periodicityKM) : null,
                 updatedAt: serverTimestamp()
               });
               addedNames.add(normalizedName);
@@ -605,13 +671,17 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
         unit: newItemData.unit || 'km',
         createdAt: serverTimestamp()
       });
+      const isTimeBased = isTimeBasedUnit(newItemData.unit);
+      const today = new Date().toISOString().split('T')[0];
       const newRecordRef = doc(collection(db, `inspections/${vehicleId}/records`));
       batch.set(newRecordRef, {
         itemId: newItemRef.id,
         conformity: 'SIM',
         serviceExecuted: 'NÃO',
-        lastMaintenanceKM: 0,
-        nextMaintenanceKM: periodicityKM,
+        lastMaintenanceKM: isTimeBased ? 0 : vehicle?.currentKM || 0,
+        nextMaintenanceKM: isTimeBased ? 0 : (vehicle?.currentKM || 0) + periodicityKM,
+        lastMaintenanceDate: isTimeBased ? today : null,
+        nextMaintenanceDate: isTimeBased ? calculateNextDate(today, newItemData.unit || 'km', periodicityKM) : null,
         updatedAt: serverTimestamp()
       });
       await batch.commit();
@@ -723,11 +793,17 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
           unit: editItemData.unit || 'km'
        });
        if(records[id]) {
-          // Recompute nextMaintenanceKM
-          const next = records[id].lastMaintenanceKM + editItemData.periodicityKM;
-          batch.update(doc(db, `inspections/${resolvedVehicleId}/records`, records[id].id), {
-             nextMaintenanceKM: next
-          });
+          // Recompute nextMaintenance
+          const isTimeBased = isTimeBasedUnit(editItemData.unit);
+          let updates: any = {};
+          if (isTimeBased && records[id].lastMaintenanceDate) {
+             updates.nextMaintenanceDate = calculateNextDate(records[id].lastMaintenanceDate!, editItemData.unit, editItemData.periodicityKM);
+          } else if (!isTimeBased) {
+             updates.nextMaintenanceKM = records[id].lastMaintenanceKM + editItemData.periodicityKM;
+          }
+          if (Object.keys(updates).length > 0) {
+            batch.update(doc(db, `inspections/${resolvedVehicleId}/records`, records[id].id), updates);
+          }
        }
        await batch.commit();
        setEditingItemId(null);
@@ -741,14 +817,14 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
     if (!record) return;
 
     try {
-      if (updates.lastMaintenanceKM !== undefined) {
+      if (updates.lastMaintenanceKM !== undefined || updates.lastMaintenanceDate !== undefined) {
         const item = items.find(i => i.id === itemId);
         if (item) {
-          const value = Number(updates.lastMaintenanceKM);
+          const isTimeBased = isTimeBasedUnit(item.unit);
           const batch = writeBatch(db);
           
-          // Find all items with same periodicityKM
-          const matchingItems = items.filter(i => i.periodicityKM === item.periodicityKM);
+          // Find all items with same periodicityKM and unit
+          const matchingItems = items.filter(i => i.periodicityKM === item.periodicityKM && (i.unit || 'km') === (item.unit || 'km'));
           
           // Optimistic state updates
           const newRecordsState = { ...records };
@@ -756,15 +832,23 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
           for (const mItem of matchingItems) {
             const mRecord = records[mItem.id];
             if (mRecord) {
-               const nextKM = value + mItem.periodicityKM;
-               newRecordsState[mItem.id] = { ...mRecord, lastMaintenanceKM: value, nextMaintenanceKM: nextKM };
-               
                const mRecRef = doc(db, `inspections/${resolvedVehicleId}/records`, mRecord.id);
-               batch.update(mRecRef, {
-                 lastMaintenanceKM: value,
-                 nextMaintenanceKM: nextKM,
-                 updatedAt: serverTimestamp()
-               });
+               let dbUpdates: any = { updatedAt: serverTimestamp() };
+               
+               if (isTimeBased && updates.lastMaintenanceDate !== undefined) {
+                 const nextDate = calculateNextDate(updates.lastMaintenanceDate, mItem.unit || 'km', mItem.periodicityKM);
+                 newRecordsState[mItem.id] = { ...mRecord, lastMaintenanceDate: updates.lastMaintenanceDate, nextMaintenanceDate: nextDate };
+                 dbUpdates.lastMaintenanceDate = updates.lastMaintenanceDate;
+                 dbUpdates.nextMaintenanceDate = nextDate;
+               } else if (!isTimeBased && updates.lastMaintenanceKM !== undefined) {
+                 const value = Number(updates.lastMaintenanceKM);
+                 const nextKM = value + mItem.periodicityKM;
+                 newRecordsState[mItem.id] = { ...mRecord, lastMaintenanceKM: value, nextMaintenanceKM: nextKM };
+                 dbUpdates.lastMaintenanceKM = value;
+                 dbUpdates.nextMaintenanceKM = nextKM;
+               }
+               
+               batch.update(mRecRef, dbUpdates);
             }
           }
           
@@ -774,7 +858,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
         }
       }
 
-      // Normal single update
+      // Normal single update fallback
       const recRef = doc(db, `inspections/${resolvedVehicleId}/records`, record.id);
       
       // Calculate nextMaintenanceKM if lastMaintenanceKM changes (fallback if previous block bypassed)
@@ -950,8 +1034,12 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                 className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 <option value="km">km</option>
+                <option value="dias">dias</option>
+                <option value="diário">diário</option>
                 <option value="meses">meses</option>
+                <option value="mensal">mensal</option>
                 <option value="anos">anos</option>
+                <option value="anual">anual</option>
                 <option value="horas">horas</option>
               </select>
             </div>
@@ -1142,13 +1230,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                   if (!record) return null;
 
                   const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
-                  const kmSinceLast = currentVehicleKM - record.lastMaintenanceKM;
-                  let progressPercent = 0;
-                  if (item.periodicityKM > 0) {
-                     progressPercent = Math.min(100, Math.max(0, (kmSinceLast / item.periodicityKM) * 100));
-                  }
-                  
-                  const remainingKM = record.nextMaintenanceKM - currentVehicleKM;
+                  const { progressPercent, remainingNumber, isOutdated, descRemaining } = calculateProgress(item, record, currentVehicleKM);
 
                   let progressColor = 'bg-primary';
                   if (progressPercent > 80) progressColor = 'bg-tertiary';
@@ -1176,8 +1258,12 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                                  className="border border-outline-variant rounded px-2 py-1 text-sm bg-surface-container-lowest outline-none focus:ring-1 focus:ring-primary"
                                >
                                  <option value="km">km</option>
+                                 <option value="dias">dias</option>
+                                 <option value="diário">diário</option>
                                  <option value="meses">meses</option>
+                                 <option value="mensal">mensal</option>
                                  <option value="anos">anos</option>
+                                 <option value="anual">anual</option>
                                  <option value="horas">horas</option>
                                </select>
                              </div>
@@ -1225,21 +1311,32 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col gap-1">
-                          <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-tighter opacity-70 mb-0.5">KM Informado</div>
-                          <input 
-                            type="text"
-                            value={formatKM(record.lastMaintenanceKM)}
-                            onChange={(e) => updateRecord(item.id, { lastMaintenanceKM: parseKM(e.target.value) })}
-                            className="w-24 bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-primary outline-none"
-                            placeholder="KM"
-                          />
+                          <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-tighter opacity-70 mb-0.5">
+                            {isTimeBasedUnit(item.unit) ? 'Data Informada' : 'KM Informado'}
+                          </div>
+                          {isTimeBasedUnit(item.unit) ? (
+                            <input
+                              type="date"
+                              value={record.lastMaintenanceDate || ''}
+                              onChange={(e) => updateRecord(item.id, { lastMaintenanceDate: e.target.value })}
+                              className="w-[125px] bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary outline-none"
+                            />
+                          ) : (
+                            <input 
+                              type="text"
+                              value={formatKM(record.lastMaintenanceKM)}
+                              onChange={(e) => updateRecord(item.id, { lastMaintenanceKM: parseKM(e.target.value) })}
+                              className="w-24 bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-primary outline-none"
+                              placeholder="KM"
+                            />
+                          )}
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col mb-1.5 justify-between gap-1 items-start">
                           <div className="flex justify-between w-full text-xs font-bold font-mono">
                             <span className={progressPercent >= 100 ? 'text-error' : 'text-on-surface-variant'}>
-                              Próx: {formatKM(record.nextMaintenanceKM)}
+                              Próx: {isTimeBasedUnit(item.unit) ? (record.nextMaintenanceDate ? new Date(record.nextMaintenanceDate + 'T12:00:00').toLocaleDateString('pt-BR') : '-') : formatKM(record.nextMaintenanceKM)}
                             </span>
                             <span className={progressPercent >= 100 ? 'text-error' : 'text-primary'}>
                               {Math.round(progressPercent)}%
@@ -1253,15 +1350,9 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                           </div>
                           
                           <div className="flex justify-between w-full mt-1 items-center">
-                            {remainingKM > 0 ? (
-                              <span className={`text-[10px] font-bold uppercase tracking-tight ${remainingKM <= 1000 ? 'text-warning' : 'text-on-surface-variant/60'}`}>
-                                Restam {formatKM(remainingKM)} {item.unit || 'km'}
+                              <span className={`text-[10px] font-bold uppercase tracking-tight ${isOutdated ? 'text-error' : (remainingNumber <= 1000 && !isTimeBasedUnit(item.unit) ? 'text-warning' : (remainingNumber <= 7 && isTimeBasedUnit(item.unit) ? 'text-warning' : 'text-on-surface-variant/60'))}`}>
+                                {descRemaining}
                               </span>
-                            ) : (
-                              <span className="text-[10px] font-bold uppercase text-error tracking-tight">
-                                Vencido há {formatKM(Math.abs(remainingKM))} {item.unit || 'km'}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </td>
