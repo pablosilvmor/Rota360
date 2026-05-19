@@ -161,6 +161,8 @@ export function Fleet() {
     return <VehicleDetails 
       vehicle={selectedVehicle} 
       assignedDrivers={assignedDrivers}
+      allDrivers={drivers}
+      works={works}
       onBack={() => setSearchParams({})} 
       onDelete={() => {
         handleDelete(selectedVehicle.id);
