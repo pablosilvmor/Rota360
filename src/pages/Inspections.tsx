@@ -203,11 +203,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
         if (!isMounted) return;
         const itemsData = snapshot.docs.map(d => {
           const data = d.data();
-          let periodicityKM = Number(data.periodicityKM);
-          if (periodicityKM === 100000) {
-            periodicityKM = 10000;
-            updateDoc(doc(db, `inspections/${resolvedVehicleId}/items`, d.id), { periodicityKM: 10000 }).catch(console.error);
-          }
+          const periodicityKM = Number(data.periodicityKM);
           return { id: d.id, ...data, periodicityKM };
         }) as InspectionItem[];
         setItems(itemsData);
