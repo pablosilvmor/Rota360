@@ -77,6 +77,20 @@ const MODULES: ModuleData[] = [
     collectionId: 'drivers',
     icon: 'group',
     columns: [
+      { 
+        key: 'imageUrl', 
+        label: 'Foto', 
+        align: 'center',
+        renderer: (val: any) => val ? (
+          <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0 mx-auto">
+            <img src={val} alt="Motorista" className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30 mx-auto">
+            <span className="material-symbols-outlined text-[16px]">person</span>
+          </div>
+        )
+      },
       { key: 'name', label: 'Nome' },
       { key: 'cnh', label: 'CNH' },
       { key: 'cnhCategory', label: 'Categoria CNH', align: 'center' },
@@ -406,15 +420,13 @@ export function Reports() {
             const padding = 1.5;
             const cellW = hookData.cell.width - (padding * 2);
             const cellH = hookData.cell.height - (padding * 2);
-            
-            // Calculate dimensions to fit and center in cell
-            let drawW = cellW;
-            let drawH = cellW / cached.ratio;
-            
-            if (drawH > cellH) {
-              drawH = cellH;
-              drawW = cellH * cached.ratio;
-            }
+
+            const imgW = cached.ratio * 100;
+            const imgH = 100;
+
+            const scale = Math.min(cellW / imgW, cellH / imgH);
+            const drawW = imgW * scale;
+            const drawH = imgH * scale;
             
             const x = hookData.cell.x + padding + (cellW - drawW) / 2;
             const y = hookData.cell.y + padding + (cellH - drawH) / 2;

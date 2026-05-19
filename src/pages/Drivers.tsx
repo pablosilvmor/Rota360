@@ -37,7 +37,7 @@ export function Drivers() {
   const [loading, setLoading] = useState(true);
   const [assignment, setAssignment] = useState({ driverId: '', vehiclePlates: [] as string[], workId: '', workName: '' });
   const [newOccurrence, setNewOccurrence] = useState({ driverId: '', type: 'Multa Leve', description: '', points: 1 });
-  const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '' });
+  const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '' });
   const [sortConfig, setSortConfig] = useLocalStorageState<{ key: string, direction: 'asc' | 'desc' }>('drivers_sortConfig', { key: 'name', direction: 'asc' });
   const [searchTerm, setSearchTerm] = useLocalStorageState('drivers_searchTerm', '');
   const [statusFilter, setStatusFilter] = useLocalStorageState('drivers_statusFilter', '');
@@ -53,10 +53,11 @@ export function Drivers() {
         cnh: editingDriver.cnh || '',
         cnhCategory: editingDriver.cnhCategory || 'A',
         validUntil: editingDriver.validUntil || '',
-        phone: editingDriver.phone || ''
+        phone: editingDriver.phone || '',
+        imageUrl: editingDriver.imageUrl || ''
       });
     } else {
-      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '' });
+      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '' });
     }
   }, [editingDriver]);
 
@@ -129,7 +130,7 @@ export function Drivers() {
         });
       }
       setSearchParams({});
-      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '' });
+      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '' });
     } catch(e) {
       handleFirestoreError(e, editingDriverId ? OperationType.UPDATE : OperationType.CREATE, 'drivers');
     }
@@ -401,6 +402,19 @@ export function Drivers() {
               </div>
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
+                   <div className="col-span-2 flex items-center gap-4">
+                     {newDriver.imageUrl ? (
+                       <img src={newDriver.imageUrl} alt="Preview" className="w-16 h-16 rounded-full object-cover border border-outline-variant/50" />
+                     ) : (
+                       <div className="w-16 h-16 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center shrink-0">
+                         <span className="material-symbols-outlined text-on-surface-variant/50 text-[24px]">person</span>
+                       </div>
+                     )}
+                     <div className="flex-1">
+                       <label className="block text-sm font-semibold text-on-surface-variant mb-2">Link da Foto (Opcional)</label>
+                       <input type="text" value={newDriver.imageUrl} onChange={e => setNewDriver({...newDriver, imageUrl: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="URL da imagem (http://...)" />
+                     </div>
+                   </div>
                    <div className="col-span-2">
                      <label className="block text-sm font-semibold text-on-surface-variant mb-2">Nome Completo</label>
                      <input type="text" value={newDriver.name} onChange={e => setNewDriver({...newDriver, name: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" placeholder="Digite o nome..." />
@@ -601,9 +615,15 @@ export function Drivers() {
                 <tr key={driver.id} className="hover:bg-surface-container transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary-container border border-outline-variant flex items-center justify-center font-bold text-primary">
-                        {driver.name ? driver.name.charAt(0).toUpperCase() : '?'}
-                      </div>
+                      {driver.imageUrl ? (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-outline-variant/30">
+                          <img src={driver.imageUrl} alt={driver.name} className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-secondary-container border border-outline-variant flex items-center justify-center font-bold text-primary">
+                          {driver.name ? driver.name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      )}
                       <div>
                         <p className="text-base text-on-surface font-semibold">{driver.name}</p>
                         <p className="text-[12px] text-on-surface-variant flex gap-2"><span>CPF: {driver.cpf}</span> {driver.phone && <span>• Tel: {driver.phone}</span>}</p>
