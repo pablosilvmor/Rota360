@@ -100,7 +100,7 @@ export function Layout({ children }: LayoutProps) {
   ];
 
   const allowedNavItems = navItems.filter(item => 
-    item.path === '/' || (userData?.allowedScreens || []).includes(item.path) || (userData?.role === 'admin')
+    item.path === '/' || (userData?.allowedScreens || []).includes(item.path) || (userData?.role?.toLowerCase() === 'admin')
   );
 
   if (!user) {
@@ -187,7 +187,7 @@ export function Layout({ children }: LayoutProps) {
                 {isSettingsOpen && (
                   <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 text-on-surface">
                     <div className="py-2">
-                      {userData?.role === 'admin' && (
+                      {userData?.role?.toLowerCase() === 'admin' && (
                         <Link 
                           to="/admin" 
                           onClick={() => setIsSettingsOpen(false)}

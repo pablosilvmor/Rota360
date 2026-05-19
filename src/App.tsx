@@ -47,7 +47,7 @@ function ProtectedRoute({ children, path }: { children: ReactNode, path: string 
       </div>
     );
   }
-  if (userData && path !== '/' && !(userData.allowedScreens ?? []).includes(path) && userData.role !== 'admin') {
+  if (userData && path !== '/' && !(userData.allowedScreens ?? []).includes(path) && userData.role?.toLowerCase() !== 'admin') {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-full text-center">

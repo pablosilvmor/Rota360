@@ -29,7 +29,7 @@ export function Admin() {
   const [statuses, setStatuses] = useState<any[]>([]);
 
   useEffect(() => {
-    if (userData?.role !== 'admin') {
+    if (userData?.role?.toLowerCase() !== 'admin') {
       return;
     }
 
@@ -109,7 +109,7 @@ export function Admin() {
     };
   }, [userData]);
 
-  if (userData?.role !== 'admin') {
+  if (userData?.role?.toLowerCase() !== 'admin') {
     return <Navigate to="/" replace />;
   }
 
@@ -149,7 +149,7 @@ export function Admin() {
   };
 
   const toggleScreenAccess = async (user: UserData, screen: string) => {
-    if (user.role === 'admin') return; 
+    if (user.role?.toLowerCase() === 'admin') return; 
     
     try {
       let currentScreens = [...(user.allowedScreens || [])];
@@ -423,7 +423,7 @@ export function Admin() {
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-2">
-                          {u.role === 'admin' ? (
+                          {u.role?.toLowerCase() === 'admin' ? (
                             <span className="text-xs font-medium text-primary bg-primary-container px-2 py-1 rounded">Acesso Total</span>
                           ) : (
                             availableScreens.map(screen => (

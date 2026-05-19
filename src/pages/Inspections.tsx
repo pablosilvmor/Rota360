@@ -14,6 +14,7 @@ interface InspectionItem {
   id: string;
   name: string;
   periodicityKM: number;
+  unit?: string;
 }
 
 interface InspectionRecord {
@@ -57,7 +58,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
   
   const [showImport, setShowImport] = useState(false);
   const [showNewItem, setShowNewItem] = useState(false);
-  const [newItemData, setNewItemData] = useState({ name: '', periodicityKM: '' });
+  const [newItemData, setNewItemData] = useState({ name: '', periodicityKM: '', unit: 'km' });
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -70,7 +71,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
 
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editItemData, setEditItemData] = useState<{name: string, periodicityKM: number}>({name: '', periodicityKM: 0});
+  const [editItemData, setEditItemData] = useState<{name: string, periodicityKM: number, unit: string}>({name: '', periodicityKM: 0, unit: 'km'});
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc'|'desc' } | null>(null);
   const [itemSearchText, setItemSearchText] = useState('');
 
@@ -326,11 +327,11 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
         const remainingKM = record.nextMaintenanceKM - currentVehicleKM;
         let progressText = `${Math.round(progressPercent)}%`;
         let desc = progressPercent >= 100 
-           ? `VENCIDO HÁ ${formatKM(Math.abs(remainingKM))} KM`
-           : `RESTAM ${formatKM(remainingKM)} KM`;
+           ? `VENCIDO HÁ ${formatKM(Math.abs(remainingKM))} ${item.unit?.toUpperCase() || 'KM'}`
+           : `RESTAM ${formatKM(remainingKM)} ${item.unit?.toUpperCase() || 'KM'}`;
 
         tableData.push([
-           `${item.name}\nPeriodicidade: ${formatKM(item.periodicityKM)} km`,
+           `${item.name}\nPeriodicidade: ${formatKM(item.periodicityKM)} ${item.unit || 'km'}`,
            record.conformity || '-',
            record.serviceExecuted || '-',
            formatKM(record.lastMaintenanceKM),
@@ -601,6 +602,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
       batch.set(newItemRef, {
         name,
         periodicityKM,
+        unit: newItemData.unit || 'km',
         createdAt: serverTimestamp()
       });
       const newRecordRef = doc(collection(db, `inspections/${vehicleId}/records`));
@@ -614,7 +616,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
       });
       await batch.commit();
       setShowNewItem(false);
-      setNewItemData({ name: '', periodicityKM: '' });
+      setNewItemData({ name: '', periodicityKM: '', unit: 'km' });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `inspections/${vehicleId}/items`);
     } finally {
@@ -709,7 +711,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
 
   const startEditing = (item: InspectionItem) => {
      setEditingItemId(item.id);
-     setEditItemData({ name: item.name, periodicityKM: item.periodicityKM });
+     setEditItemData({ name: item.name, periodicityKM: item.periodicityKM, unit: item.unit || 'km' });
   };
 
   const saveEdit = async (id: string) => {
@@ -717,7 +719,8 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
        const batch = writeBatch(db);
        batch.update(doc(db, `inspections/${resolvedVehicleId}/items`, id), {
           name: editItemData.name,
-          periodicityKM: editItemData.periodicityKM
+          periodicityKM: editItemData.periodicityKM,
+          unit: editItemData.unit || 'km'
        });
        if(records[id]) {
           // Recompute nextMaintenanceKM
@@ -915,8 +918,8 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
               <span className="material-symbols-outlined">close</span>
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="col-span-2">
               <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1 block">Nome do Item</label>
               <input 
                 type="text" 
@@ -927,7 +930,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1 block">Periodicidade (KM)</label>
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1 block">Periodicidade</label>
               <input 
                 type="text" 
                 value={newItemData.periodicityKM ? formatKM(parseKM(newItemData.periodicityKM)) : ''}
@@ -938,6 +941,19 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                 placeholder="Ex: 10.000"
                 className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-primary outline-none"
               />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1 block">Unidade</label>
+              <select
+                value={newItemData.unit}
+                onChange={e => setNewItemData({...newItemData, unit: e.target.value})}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none"
+              >
+                <option value="km">km</option>
+                <option value="meses">meses</option>
+                <option value="anos">anos</option>
+                <option value="horas">horas</option>
+              </select>
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-outline-variant">
@@ -1154,7 +1170,16 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                                  onChange={e => setEditItemData({...editItemData, periodicityKM: parseKM(e.target.value)})} 
                                  className="border border-outline-variant rounded px-2 py-1 text-sm w-24 bg-surface-container-lowest font-mono outline-none focus:ring-1 focus:ring-primary" 
                                />
-                               <span className="text-xs text-on-surface-variant font-mono">km</span>
+                               <select
+                                 value={editItemData.unit}
+                                 onChange={e => setEditItemData({...editItemData, unit: e.target.value})}
+                                 className="border border-outline-variant rounded px-2 py-1 text-sm bg-surface-container-lowest outline-none focus:ring-1 focus:ring-primary"
+                               >
+                                 <option value="km">km</option>
+                                 <option value="meses">meses</option>
+                                 <option value="anos">anos</option>
+                                 <option value="horas">horas</option>
+                               </select>
                              </div>
                              <div className="flex items-center gap-2 mt-1">
                                 <button onClick={() => saveEdit(item.id)} className="text-success hover:bg-success/10 p-1 rounded" title="Salvar"><span className="material-symbols-outlined text-[18px]">check</span></button>
@@ -1164,7 +1189,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                         ) : (
                            <div>
                              <div className="font-semibold text-on-surface text-sm">{item.name}</div>
-                             <div className="text-xs text-on-surface-variant mt-0.5 font-mono">Periodicidade: {formatKM(item.periodicityKM)} km</div>
+                             <div className="text-xs text-on-surface-variant mt-0.5 font-mono">Periodicidade: {formatKM(item.periodicityKM)} {item.unit || 'km'}</div>
                            </div>
                         )}
                       </td>
@@ -1230,11 +1255,11 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
                           <div className="flex justify-between w-full mt-1 items-center">
                             {remainingKM > 0 ? (
                               <span className={`text-[10px] font-bold uppercase tracking-tight ${remainingKM <= 1000 ? 'text-warning' : 'text-on-surface-variant/60'}`}>
-                                Restam {formatKM(remainingKM)} km
+                                Restam {formatKM(remainingKM)} {item.unit || 'km'}
                               </span>
                             ) : (
                               <span className="text-[10px] font-bold uppercase text-error tracking-tight">
-                                Vencido há {formatKM(Math.abs(remainingKM))} km
+                                Vencido há {formatKM(Math.abs(remainingKM))} {item.unit || 'km'}
                               </span>
                             )}
                           </div>
