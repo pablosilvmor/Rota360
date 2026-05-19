@@ -372,9 +372,13 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
                     <span className="material-symbols-outlined text-[18px]">link_off</span>
                   </button>
                   <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary-fixed p-1 bg-surface-container-low">
-                    <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-xl">
-                      {driver.name?.charAt(0).toUpperCase()}
-                    </div>
+                    {driver.imageUrl ? (
+                      <img src={driver.imageUrl} alt={driver.name} className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-xl">
+                        {driver.name?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <h4 className="text-lg font-bold leading-tight mb-1">{driver.name}</h4>
                   <p className="text-[12px] text-on-surface-variant font-medium mb-1 truncate px-2">Cat. {driver.cnhCategory} • {driver.validUntil ? (new Date(driver.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'Status N/A'}</p>
