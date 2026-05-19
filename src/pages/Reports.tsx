@@ -332,7 +332,7 @@ export function Reports() {
             if (!response.ok) throw new Error("Fetch failed");
           } catch (e) {
             // Fallback to CORS proxy if direct fetch fails (e.g. from Imgur or cross-origin Storage)
-            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=150&h=150&fit=cover`;
+            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300`;
             response = await fetch(proxyUrl);
           }
           
@@ -380,6 +380,9 @@ export function Reports() {
         fontSize: isFleetReport ? 7.5 : 9,
         cellPadding: 3,
         valign: 'middle'
+      },
+      bodyStyles: {
+        minCellHeight: imageColIdx !== -1 ? 12 : undefined
       },
       headStyles: {
         fillColor: [20, 24, 27],
