@@ -111,6 +111,7 @@ export function Reports() {
   const [loadingData, setLoadingData] = useState(false);
   const [headerLogo, setHeaderLogo] = useState<{src: string, ratio: number} | null>(null);
   const [footerLogo, setFooterLogo] = useState<{src: string, ratio: number} | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   useEffect(() => {
     const fetchFilters = async () => {
@@ -152,6 +153,7 @@ export function Reports() {
   const handleModuleSelect = async (mod: ModuleData) => {
     setSelectedModule(mod);
     setSelectedColumns(mod.columns.map(c => c.key));
+    setSortConfig(null);
     setLoadingData(true);
     setData([]);
     
@@ -198,6 +200,47 @@ export function Reports() {
     );
   };
 
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortData = (list: any[]) => {
+    if (!sortConfig) return list;
+
+    const sorted = [...list].sort((a, b) => {
+      const col = selectedModule?.columns.find(c => c.key === sortConfig.key);
+      let valA = a[sortConfig.key];
+      let valB = b[sortConfig.key];
+
+      // Use renderer if available for sorting display values
+      if (col?.renderer) {
+        valA = col.renderer(valA, a);
+        valB = col.renderer(valB, b);
+      }
+
+      const aStr = String(valA || '').toLowerCase();
+      const bStr = String(valB || '').toLowerCase();
+
+      // Check if it's numeric
+      const aNum = parseFloat(aStr.replace(/[^\d.,-]/g, '').replace(',', '.'));
+      const bNum = parseFloat(bStr.replace(/[^\d.,-]/g, '').replace(',', '.'));
+
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
+      }
+
+      if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  };
+
   const activeColumns = selectedModule?.columns.filter(c => selectedColumns.includes(c.key)) || [];
 
   const filteredData = data.filter(item => {
@@ -216,6 +259,8 @@ export function Reports() {
     return matchesSearch && matchesWork && matchesStatus;
   });
 
+  const sortedData = sortData(filteredData);
+
   const handleExportPDF = () => {
     if (!selectedModule) return;
 
@@ -231,7 +276,7 @@ export function Reports() {
     const pageHeight = doc.internal.pageSize.height;
 
     const tableCols = activeColumns.map(c => c.label);
-    const tableData = filteredData.map(item => 
+    const tableData = sortedData.map(item => 
       activeColumns.map(c => {
         const val = item[c.key];
         return c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '-');
@@ -293,7 +338,7 @@ export function Reports() {
             doc.setFontSize(10);
             doc.setTextColor(100);
             doc.setFont('helvetica', 'normal');
-            doc.text(`Total de Veículos na Frota: ${filteredData.length}`, marginX, 39);
+            doc.text(`Total de Veículos na Frota: ${sortedData.length}`, marginX, 39);
           }
         }
 
@@ -501,12 +546,23 @@ export function Reports() {
                     <thead>
                       <tr className="bg-surface-container-low/50">
                         {activeColumns.map(c => (
-                          <th key={c.key} className={`px-5 py-3 text-sm font-semibold text-on-surface-variant border-b border-outline-variant/30 uppercase tracking-wider whitespace-nowrap text-${c.align || 'left'}`}>{c.label}</th>
+                          <th 
+                            key={c.key} 
+                            onClick={() => handleSort(c.key)}
+                            className={`px-5 py-3 text-sm font-bold text-on-surface-variant border-b border-outline-variant/30 uppercase tracking-wider whitespace-nowrap text-${c.align || 'left'} cursor-pointer hover:bg-surface-container transition-colors group select-none`}
+                          >
+                            <div className={`flex items-center gap-1 ${c.align === 'center' ? 'justify-center' : c.align === 'right' ? 'justify-end' : ''}`}>
+                              {c.label}
+                              <span className={`material-symbols-outlined text-[18px] transition-opacity ${sortConfig?.key === c.key ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-40'}`}>
+                                {sortConfig?.key === c.key && sortConfig.direction === 'desc' ? 'arrow_downward' : 'arrow_upward'}
+                              </span>
+                            </div>
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/20">
-                      {filteredData.slice(0, 15).map((item, idx) => (
+                      {sortedData.slice(0, 15).map((item, idx) => (
                         <tr key={item.id || idx} className="hover:bg-surface-container transition-colors">
                           {activeColumns.map(c => {
                             const val = item[c.key];
