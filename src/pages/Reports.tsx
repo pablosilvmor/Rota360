@@ -68,7 +68,7 @@ const MODULES: ModuleData[] = [
       },
       { key: 'assignedDriver', label: 'Motorista Atribuído' },
       { key: 'status', label: 'Status' },
-      { key: 'observations', label: 'Observações' },
+      { key: 'observation', label: 'Observações', renderer: (val: any, item: any) => item?.observation || item?.observations || val || '-' },
     ]
   },
   {
@@ -311,7 +311,19 @@ export function Reports() {
       const urls = Array.from(new Set(sortedData.map(item => item.imageUrl).filter(Boolean)));
       await Promise.all(urls.map(async (url) => {
         try {
-          const response = await fetch(url);
+          const fetchUrl = typeof url === 'string' ? url : '';
+          let response: Response;
+          try {
+            response = await fetch(fetchUrl);
+            if (!response.ok) throw new Error("Fetch failed");
+          } catch (e) {
+            // Fallback to CORS proxy if direct fetch fails (e.g. from Imgur or cross-origin Storage)
+            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=150&h=150&fit=cover`;
+            response = await fetch(proxyUrl);
+          }
+          
+          if (!response.ok) throw new Error("Proxy fetch failed");
+
           const blob = await response.blob();
           const dataUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
@@ -325,7 +337,7 @@ export function Reports() {
             img.onerror = reject;
             img.src = dataUrl;
           });
-          imageCache[url] = imgData;
+          imageCache[fetchUrl] = imgData;
         } catch (err) {
           console.error("Failed to pre-load image in PDF export", url, err);
         }
@@ -349,6 +361,7 @@ export function Reports() {
       body: tableData,
       startY: isFleetReport ? 45 : 40,
       margin: { top: 45, bottom: 30, left: 8, right: 8 },
+      rowPageBreak: 'avoid',
       styles: {
         fontSize: isFleetReport ? 7.5 : 9,
         cellPadding: 3,
