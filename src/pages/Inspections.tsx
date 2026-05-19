@@ -1517,8 +1517,8 @@ export function Inspections() {
       <motion.div className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-50" variants={itemVariants}>
         <div className="flex-1 min-w-[250px]">
           <label className="block text-sm font-semibold text-on-surface-variant mb-2">Pesquisar</label>
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+          <div className="relative group">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors">search</span>
             <input
               type="text"
               placeholder="Pesquisar veículo ou placa..."
@@ -1526,6 +1526,15 @@ export function Inspections() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-full transition-colors"
+                title="Limpar pesquisa"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="flex-1 min-w-[200px]">
@@ -1556,21 +1565,32 @@ export function Inspections() {
           />
         </div>
 
-        <div className="flex bg-surface-container-low p-1.5 rounded-xl border border-outline-variant items-center gap-1 self-end mb-1">
-          <button 
-            onClick={() => setViewMode('grid')}
-            className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${viewMode === 'grid' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container'}`}
-            title="Visualização em Grade"
-          >
-            <span className="material-symbols-outlined text-[20px]">grid_view</span>
-          </button>
-          <button 
-            onClick={() => setViewMode('list')}
-            className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${viewMode === 'list' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container'}`}
-            title="Visualização em Lista"
-          >
-            <span className="material-symbols-outlined text-[20px]">view_list</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-4 pt-6 w-full md:w-auto">
+          {(searchQuery || filterWork || filterStatus) && (
+            <button 
+              onClick={() => { setSearchQuery(''); setFilterWork(''); setFilterStatus(''); }}
+              className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-surface-container-low"
+            >
+              LIMPAR FILTRO
+              <span className="material-symbols-outlined text-[14px]">filter_alt_off</span>
+            </button>
+          )}
+          <div className="flex bg-surface-container-low p-1.5 rounded-xl border border-outline-variant items-center gap-1 self-end mb-1">
+            <button 
+              onClick={() => setViewMode('grid')}
+              className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${viewMode === 'grid' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container'}`}
+              title="Visualização em Grade"
+            >
+              <span className="material-symbols-outlined text-[20px]">grid_view</span>
+            </button>
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${viewMode === 'list' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container'}`}
+              title="Visualização em Lista"
+            >
+              <span className="material-symbols-outlined text-[20px]">view_list</span>
+            </button>
+          </div>
         </div>
       </motion.div>
 
