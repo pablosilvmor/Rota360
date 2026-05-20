@@ -930,7 +930,15 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
         </div>
         <div className="flex items-center gap-4 bg-surface-container p-4 rounded-xl border border-outline-variant shadow-sm w-full md:w-auto">
           <div className="w-full">
-            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1.5 block">KM Atual</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block">KM Atual</label>
+              {vehicle.lastKmUpdate && (
+                <span className="text-[10px] text-on-surface-variant/70 italic flex items-center gap-1" title="Última atualização via telemetria">
+                  <span className="material-symbols-outlined text-[12px]">sync</span>
+                  {new Date(vehicle.lastKmUpdate).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <input 
                 type="text"

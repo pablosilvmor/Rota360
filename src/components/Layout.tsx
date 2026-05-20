@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useLocation, Link } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { LogOut } from "lucide-react";
 import { ConfirmModal } from "./ConfirmModal";
+import { KmSyncService } from "./KmSyncService";
 
 interface LayoutProps {
   children: ReactNode;
@@ -121,6 +122,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background text-on-background flex">
+      <KmSyncService />
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
