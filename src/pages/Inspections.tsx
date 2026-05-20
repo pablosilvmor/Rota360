@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, onSnapshot, doc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp, updateDoc, getDocs, where, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useParams, useNavigate } from 'react-router';
@@ -1374,6 +1374,136 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
   );
 }
 
+const VehicleInspectionCard: React.FC<{ vehicle: any, onClick: () => any }> = ({ vehicle, onClick }) => {
+  const [expiredCount, setExpiredCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const qRecords = query(collection(db, `inspections/${vehicle.id}/records`));
+    const qItems = query(collection(db, `inspections/${vehicle.id}/items`));
+    
+    const fetchData = async () => {
+      try {
+        const [itemsSnap, recordsSnap] = await Promise.all([
+          getDocs(qItems),
+          getDocs(qRecords)
+        ]);
+        
+        const itemsMap: Record<string, InspectionItem> = {};
+        itemsSnap.docs.forEach(d => {
+           itemsMap[d.id] = { id: d.id, ...d.data() } as InspectionItem;
+        });
+        
+        let count = 0;
+        recordsSnap.docs.forEach(d => {
+           const record = { id: d.id, ...d.data() } as InspectionRecord;
+           const item = itemsMap[record.itemId];
+           if (item) {
+              const { isOutdated } = calculateProgress(item, record, vehicle.currentKM || 0);
+              if (isOutdated) count++;
+           }
+        });
+        setExpiredCount(count);
+      } catch (e) {
+        console.error("Error fetching card summary:", e);
+      }
+    };
+    
+    fetchData();
+  }, [vehicle.id, vehicle.currentKM]);
+
+  return (
+    <motion.div 
+      layout
+      onClick={onClick}
+      className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:bg-surface-container-low hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col h-full"
+    >
+      <div className="relative h-44 overflow-hidden bg-white border-b border-outline-variant/30 flex items-center justify-center p-4">
+        <img 
+          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-sm" 
+          src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} 
+          alt={vehicle.model} 
+        />
+        {expiredCount !== null && expiredCount > 0 && (
+          <div className="absolute top-3 right-3 bg-error text-onError px-2 py-1 rounded-full text-[10px] font-bold shadow-lg animate-pulse whitespace-nowrap z-10 border border-white/20">
+            {expiredCount} {expiredCount === 1 ? 'ITEM VENCIDO' : 'ITENS VENCIDOS'}
+          </div>
+        )}
+      </div>
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="bg-primary/10 text-primary p-2.5 rounded-xl group-hover:bg-primary group-hover:text-on-primary transition-all duration-300">
+            <span className="material-symbols-outlined text-[20px]">fact_check</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-bold text-on-surface leading-none mb-1 truncate">{vehicle.plate}</h3>
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest truncate opacity-70">{vehicle.brand} {vehicle.model}</p>
+          </div>
+        </div>
+        
+        <div className="flex flex-col gap-2 mt-auto pt-3 border-t border-outline-variant/30">
+          <div className="flex items-center gap-1.5 text-on-surface-variant bg-surface-container-low w-fit px-2 py-1 rounded-lg overflow-hidden max-w-full border border-outline-variant/20">
+            <span className="material-symbols-outlined text-[14px] flex-shrink-0">domain</span>
+            <span className="text-[10px] font-bold truncate uppercase tracking-tight">
+              {(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
+                .map((v: any) => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim())
+                .filter(Boolean)
+                .join(', ') || 'NÃO ATRIBUÍDA'}
+            </span>
+          </div>
+          
+          <div className="flex items-center justify-between text-[9px] font-extrabold text-on-surface-variant/60 uppercase tracking-[0.1em] mt-1">
+            <span>KM ATUAL</span>
+            <span className="font-mono text-primary text-xs">{(vehicle.currentKM || 0).toLocaleString('pt-BR')}</span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const VehicleOverdueBadge: React.FC<{ vehicleId: string, currentKM: number }> = ({ vehicleId, currentKM }) => {
+  const [expiredCount, setExpiredCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [itemsSnap, recordsSnap] = await Promise.all([
+          getDocs(query(collection(db, `inspections/${vehicleId}/items`))),
+          getDocs(query(collection(db, `inspections/${vehicleId}/records`)))
+        ]);
+        
+        const itemsMap: Record<string, InspectionItem> = {};
+        itemsSnap.docs.forEach(d => {
+           itemsMap[d.id] = { id: d.id, ...d.data() } as InspectionItem;
+        });
+        
+        let count = 0;
+        recordsSnap.docs.forEach(d => {
+           const record = { id: d.id, ...d.data() } as InspectionRecord;
+           const item = itemsMap[record.itemId];
+           if (item) {
+              const { isOutdated } = calculateProgress(item, record, currentKM || 0);
+              if (isOutdated) count++;
+           }
+        });
+        setExpiredCount(count);
+      } catch (e) {
+        console.error("Error fetching badge summary:", e);
+      }
+    };
+    fetchData();
+  }, [vehicleId, currentKM]);
+
+  if (expiredCount === null || expiredCount === 0) return null;
+
+  return (
+    <span className="inline-flex items-center gap-1 bg-error/10 text-error px-2 py-0.5 rounded-full text-[10px] font-bold border border-error/20">
+      <span className="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+      {expiredCount} {expiredCount === 1 ? 'VENCIDO' : 'VENCIDOS'}
+    </span>
+  );
+};
+
 export function Inspections() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -1726,31 +1856,11 @@ export function Inspections() {
                 </motion.div>
               ) : (
                 filteredVehicles.map(vehicle => (
-                  <motion.div 
-                    layout
+                  <VehicleInspectionCard 
                     key={vehicle.id} 
-                    onClick={() => navigate(`/inspections/${vehicle.id}`)}
-                    className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:bg-surface-container-low hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col"
-                  >
-                    <div className="relative h-44 overflow-hidden bg-white border-b border-outline-variant/30 flex items-center justify-center p-4">
-                      <img 
-                        className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-sm" 
-                        src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} 
-                        alt={vehicle.model} 
-                      />
-                    </div>
-                    <div className="p-5 flex-1 flex flex-col">
-                      <div className="flex items-center gap-3 mb-2 flex-1">
-                        <div className="bg-primary/10 text-primary p-2.5 rounded-xl">
-                          <span className="material-symbols-outlined text-[20px]">fact_check</span>
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-on-surface leading-none mb-1">{vehicle.plate}</h3>
-                          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{vehicle.model}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
+                    vehicle={vehicle} 
+                    onClick={() => { navigate(`/inspections/${vehicle.id}`); }} 
+                  />
                 ))
               )}
             </AnimatePresence>
@@ -1764,6 +1874,7 @@ export function Inspections() {
                     <th className="px-6 py-4">Veículo</th>
                     <th className="px-6 py-4">Obra / Centro de Custo</th>
                     <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Itens Vencidos</th>
                     <th className="px-6 py-4 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -1781,8 +1892,11 @@ export function Inspections() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm">
-                        {Array.isArray(vehicle.costCenter) ? vehicle.costCenter.join(', ') : (vehicle.costCenter || 'Não Definido')}
+                      <td className="px-6 py-4 text-sm font-bold text-on-surface-variant uppercase">
+                        {(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
+                          .map(v => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim())
+                          .filter(Boolean)
+                          .join(', ') || 'N/D'}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -1792,6 +1906,9 @@ export function Inspections() {
                         }`}>
                           {vehicle.status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <VehicleOverdueBadge vehicleId={vehicle.id} currentKM={vehicle.currentKM || 0} />
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button 
