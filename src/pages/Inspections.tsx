@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, onSnapshot, doc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp, updateDoc, getDocs, where, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, Link } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
@@ -924,7 +924,7 @@ function InspectionForm({ vehicleId, onBack }: { vehicleId: string, onBack: () =
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold text-on-surface">Inspeção: <span className="text-primary tracking-wide">{vehicle.plate}</span></h2>
+            <h2 className="text-2xl font-bold text-on-surface">Inspeção: <Link to={`/fleet?vehicleId=${vehicle.id}`} className="text-primary tracking-wide hover:underline decoration-2 underline-offset-4 transition-all">{vehicle.plate}</Link></h2>
             <p className="text-on-surface-variant font-medium text-sm mt-0.5">{vehicle.brand} {vehicle.model}</p>
           </div>
         </div>
