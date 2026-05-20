@@ -5,6 +5,8 @@ import { UserData, useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
+import { IntegrationsTab } from '../components/IntegrationsTab';
+
 interface Work {
   id: string;
   name: string;
@@ -328,6 +330,7 @@ export function Admin() {
     { id: 'motoristas', label: 'Motoristas' },
     { id: 'status', label: 'Status' },
     { id: 'adm', label: 'ADM' },
+    { id: 'integracoes', label: 'Integrações' },
   ];
 
   return (
@@ -363,6 +366,10 @@ export function Admin() {
           </button>
         ))}
       </div>
+
+      {(activeTab === 'integracoes') && (
+        <IntegrationsTab />
+      )}
 
       {(activeTab === 'adm') && (
         <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
