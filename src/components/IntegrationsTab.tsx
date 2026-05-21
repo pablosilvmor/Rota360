@@ -13,6 +13,7 @@ export interface IntegrationProvider {
 export function IntegrationsTab() {
   const [providers, setProviders] = useState<IntegrationProvider[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -60,14 +61,34 @@ export function IntegrationsTab() {
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveProgress(0);
+    
+    // Simular progresso visual já que Firestore é rápido
+    const interval = setInterval(() => {
+      setSaveProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(interval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 100);
+
     try {
       const docRef = doc(db, 'settings', 'integrations');
       await setDoc(docRef, {
         providers,
         updatedAt: new Date().toISOString()
       }, { merge: true });
-      alert("Configurações salvas com sucesso!");
+      
+      setSaveProgress(100);
+      setTimeout(() => {
+        alert("Configurações salvas com sucesso!");
+        setSaveProgress(0);
+      }, 300);
     } catch (error) {
+      clearInterval(interval);
+      setSaveProgress(0);
       handleFirestoreError(error, OperationType.UPDATE, 'settings/integrations');
     } finally {
       setIsSaving(false);
@@ -79,7 +100,25 @@ export function IntegrationsTab() {
   }
 
   return (
-    <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 p-6 space-y-6">
+    <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 p-6 space-y-6 relative">
+      <AnimatePresence>
+        {isSaving && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="absolute top-0 left-0 right-0 h-1 bg-surface-container z-50 overflow-hidden"
+          >
+            <motion.div 
+              className="h-full bg-primary"
+              initial={{ width: "0%" }}
+              animate={{ width: `${saveProgress}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex justify-between items-start">
         <div>
           <h3 className="text-xl font-bold text-on-surface mb-1 flex items-center gap-2">
