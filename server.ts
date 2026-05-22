@@ -20,15 +20,18 @@ async function startServer() {
 
   // Solusat Proxy Route
   app.get("/api/proxy/solusat/vehicles", async (req, res) => {
+    const apiBase = "https://ws.solusat.com.br/espelho/full/vehicles";
     try {
       const apiKey = req.headers['apikey'] as string;
       const apiToken = req.headers['apitoken'] as string;
 
       if (!apiKey || !apiToken) {
+        console.warn("[SOLUSAT PROXY] Missing headers");
         return res.status(400).json({ error: "apiKey and apiToken headers are required" });
       }
 
-      const response = await fetch("https://ws.solusat.com.br/espelho/full/vehicles", {
+      console.log(`[SOLUSAT PROXY] Fetching: ${apiBase} (Key: ${apiKey.substring(0, 4)}...)`);
+      const response = await fetch(apiBase, {
         method: "GET",
         headers: {
           "apiKey": apiKey,
@@ -37,9 +40,10 @@ async function startServer() {
       });
 
       const data = await response.json();
+      console.log(`[SOLUSAT PROXY] Solusat Response Status: ${response.status}, API Data Status: ${data.status}`);
       res.json(data);
     } catch (error) {
-      console.error("Error proxying to Solusat:", error);
+      console.error("[SOLUSAT PROXY] Fatal Error:", error);
       res.status(500).json({ error: "Failed to fetch from Solusat" });
     }
   });

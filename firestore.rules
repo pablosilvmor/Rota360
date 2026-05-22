@@ -129,7 +129,7 @@ service cloud.firestore {
       allow read, write, delete: if isSignedIn();
     }
 
-    match /inspections/{vehicleId} {
+    match /inspections/{docId} {
       allow read, write: if isSignedIn();
       match /{allChildren=**} {
         allow read, write: if isSignedIn();

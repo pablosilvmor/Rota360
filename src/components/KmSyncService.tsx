@@ -21,9 +21,12 @@ export function KmSyncService() {
     label: ""
   });
 
+  console.log("[SYNC DEBUG] KmSyncService component mounted");
+
   useEffect(() => {
     // Escutar por evento de sincronização manual individual
     const handleManualSync = async (e: any) => {
+      console.log("[SYNC DEBUG] Evento MANUAL_KM_SYNC detectado", e.detail);
       const { vehicleId, plate } = e.detail || {};
       if (vehicleId) {
         await checkAndSync(true, vehicleId, plate);
@@ -33,7 +36,12 @@ export function KmSyncService() {
     window.addEventListener('MANUAL_KM_SYNC', handleManualSync);
 
     const checkAndSync = async (isManual = false, targetVehicleId?: string, targetPlate?: string) => {
-      if (isSyncing.current && !isManual) return;
+      console.log(`[SYNC DEBUG] checkAndSync called. isManual=${isManual}, targetVehicleId=${targetVehicleId}`);
+      
+      if (isSyncing.current && !isManual) {
+        console.log("[SYNC DEBUG] checkAndSync: Already syncing, returning.");
+        return;
+      }
 
       const now = new Date();
       const currentHour = now.getHours();
@@ -82,6 +90,8 @@ export function KmSyncService() {
         const integrationsData = integrationsSnap.data();
         const providers: IntegrationProvider[] = integrationsData.providers || [];
 
+        console.log(`[SYNC DEBUG] Providers encontrados: ${providers.length}`);
+
         if (providers.length === 0) {
           setSyncStatus({ active: false, progress: 0, label: "" });
           isSyncing.current = false;
@@ -95,10 +105,12 @@ export function KmSyncService() {
         if (targetVehicleId) {
            const vDoc = await getDoc(doc(db, "vehicles", targetVehicleId));
            if (vDoc.exists()) vehiclesToSync = [{ id: vDoc.id, ...vDoc.data() }];
+           console.log(`[SYNC DEBUG] Alvo único, veículos para sync: ${vehiclesToSync.length}, ID: ${targetVehicleId}`);
         } else {
            const vehiclesRef = collection(db, "vehicles");
            const vehiclesSnap = await getDocs(vehiclesRef);
            vehiclesToSync = vehiclesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+           console.log(`[SYNC DEBUG] Todos veículos, veículos para sync: ${vehiclesToSync.length}`);
         }
 
         setSyncStatus(prev => ({ ...prev, progress: 50 }));
@@ -108,6 +120,7 @@ export function KmSyncService() {
         let updatesCount = 0;
 
         for (const provider of providers) {
+          console.log(`[SYNC DEBUG] Processando provedor: ${provider.name}, URL: ${provider.url}`);
           try {
             if (provider.url.toLowerCase().includes('solusat')) {
               // Extract apiKey and apiToken if the user placed them in the token field
@@ -122,12 +135,13 @@ export function KmSyncService() {
               } else if (provider.token.includes(':')) {
                 [apiKey, apiToken] = provider.token.split(':').map(s => s.trim());
               } else {
-                 // Fallback to expecting keys in format if they put it in token somehow
-                 // Or we might need to update the IntegrationsTab UI and wait for them to re-enter
-                 console.log("Formato do token Solusat inválido. Utilize apiKey,apiToken");
+                 // Try a single token as apiKey just in case, but warn
+                 apiKey = provider.token.trim();
+                 console.log("Token Solusat sem separador óbvio. Tentando como apiKey pura.");
               }
 
               if (apiKey && apiToken) {
+                console.log(`[SYNC] Iniciando fetch para Solusat (Proxied)...`);
                 const response = await fetch("/api/proxy/solusat/vehicles", {
                   method: 'GET',
                   headers: {
@@ -138,27 +152,52 @@ export function KmSyncService() {
                 
                 if (response.ok) {
                    const data = await response.json();
+                   console.log("[SYNC] Resposta Solusat recebida:", data.status);
                    if (data.status && data.data) {
-                      Object.values(data.data).forEach((apiVehicles: any) => {
+                      // Iterate over keys (groups like "SOLUSAT - TESTES")
+                      Object.keys(data.data).forEach(groupKey => {
+                        const apiVehicles = data.data[groupKey];
                         if (Array.isArray(apiVehicles)) {
+                          console.log(`[SYNC] Processando grupo ${groupKey} (${apiVehicles.length} veículos)`);
                           apiVehicles.forEach((av: any) => {
-                             const plate = av.ras_vei_placa;
-                             const currentKmApi = Number(av.ras_eve_hodometro) || 0;
+                             const plate = (av.ras_vei_placa || av.ras_vei_veiculo || "").toString();
+                             // Solusat odometer can be in meters or KM. Usually ras_eve_hodometro is meters in some systems.
+                             // But documentation shows KM-like values (93096).
+                             const rawKm = av.ras_eve_hodometro;
+                             const currentKmApi = Math.floor(Number(rawKm)) || 0;
                              
-                             const matchedVehicle = vehiclesToSync.find(v => (v.plate || '').replace(/\s/g, '').toUpperCase() === (plate || '').replace(/\s/g, '').toUpperCase());
-                             if (matchedVehicle && currentKmApi > (matchedVehicle.currentKM || 0)) {
-                               const vRef = doc(db, 'vehicles', matchedVehicle.id);
-                               batch.update(vRef, {
-                                 currentKM: currentKmApi,
-                                 lastKmUpdate: new Date().toISOString()
-                               });
-                               updatesCount++;
+                             const cleanApiPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                             const matchedVehicle = vehiclesToSync.find(v => {
+                               const cleanVPlate = (v.plate || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                               return cleanVPlate === cleanApiPlate;
+                             });
+                             
+                             if (matchedVehicle) {
+                               const currentInDb = matchedVehicle.currentKM || 0;
+                               console.log(`[SYNC] Match: ${matchedVehicle.plate} (API: ${currentKmApi} | Banco: ${currentInDb})`);
+                               
+                               if (currentKmApi > currentInDb || (currentInDb === 0 && currentKmApi > 0)) {
+                                 console.log(`[SYNC] ATUALIZANDO ${matchedVehicle.plate} -> ${currentKmApi}`);
+                                 const vRef = doc(db, 'vehicles', matchedVehicle.id);
+                                 batch.update(vRef, {
+                                   currentKM: currentKmApi,
+                                   lastKmUpdate: new Date().toISOString()
+                                 });
+                                 updatesCount++;
+                               }
                              }
                           });
                         }
                       });
+                   } else {
+                     console.log("[SYNC] API Solusat retornou erro ou data vazio:", data);
                    }
+                } else {
+                   const errText = await response.text();
+                   console.error("[SYNC] Erro HTTP no Proxy Solusat:", response.status, errText);
                 }
+              } else {
+                console.warn("[SYNC] Configuração Solusat incompleta. Use apiKey,apiToken no campo Token.");
               }
             } else {
               // MOCK: Simulação de delay de rede e processamento para os outros

@@ -115,123 +115,121 @@ function InspectionForm({
   };
 
   useEffect(() => {
-    // Fetch vehicle details
+    // Fetch vehicle details with real-time listener
     let isMounted = true;
-    const fetchVehicle = async () => {
+
+    const findAndListenVehicle = async () => {
+      let unsubscribe: (() => void) | null = null;
+      setLoadingVehicle(true);
+      const decId = decodeURIComponent(vehicleId);
+
       try {
-        let vDoc = await getDoc(doc(db, "vehicles", vehicleId));
-        if (!vDoc.exists()) {
-          vDoc = await getDoc(
-            doc(db, "vehicles", decodeURIComponent(vehicleId)),
-          );
-        }
-
-        let vehicleData = null;
-        let finalId = vehicleId;
-
-        if (vDoc.exists()) {
-          vehicleData = vDoc.data();
-          finalId = vDoc.id;
+        let targetId = "";
+        
+        // 1. Tentar ID direto
+        const vRef = doc(db, "vehicles", decId);
+        const vSnap = await getDoc(vRef);
+        if (vSnap.exists()) {
+          targetId = vSnap.id;
         } else {
-          // Fallback to querying by plate or other possible mangled IDs
-          const decId = decodeURIComponent(vehicleId);
-          let q = query(
-            collection(db, "vehicles"),
-            where("plate", "==", decId),
-          );
-          let snap = await getDocs(q);
-
-          if (snap.empty) {
-            q = query(
-              collection(db, "vehicles"),
-              where("plate", "==", decId.trim()),
-            );
-            snap = await getDocs(q);
-          }
-
+          // 2. Tentar por placa
+          const q = query(collection(db, "vehicles"), where("plate", "==", decId));
+          const snap = await getDocs(q);
           if (!snap.empty) {
-            vehicleData = snap.docs[0].data();
-            finalId = snap.docs[0].id;
+            targetId = snap.docs[0].id;
           } else {
-            // one more try if the doc ID actually has spaces
-            q = query(collection(db, "vehicles"));
-            const allSnap = await getDocs(q);
+            // 3. Busca fuzzy
+            const allSnap = await getDocs(collection(db, "vehicles"));
             const matched = allSnap.docs.find(
               (d) =>
-                d.id.replace(/[^a-zA-Z0-9]/g, "") ===
-                  decId.replace(/[^a-zA-Z0-9]/g, "") ||
-                d.data().plate === decId,
+                d.id.replace(/[^a-zA-Z0-9]/g, "") === decId.replace(/[^a-zA-Z0-9]/g, "") ||
+                d.data().plate === decId
             );
-            if (matched) {
-              vehicleData = matched.data();
-              finalId = matched.id;
-            }
+            if (matched) targetId = matched.id;
           }
         }
 
-        if (vehicleData && isMounted) {
-          setVehicle({ id: finalId, ...vehicleData });
-          setCurrentKM(vehicleData.currentKM || 0);
-          setResolvedVehicleId(finalId);
-
-          // Pre-load vehicle image to handle CORS for PDF export
-          const imgUrl =
-            vehicleData.imageUrl ||
-            "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800";
-
-          const proxies = [
-            `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}`,
-            `https://corsproxy.io/?${encodeURIComponent(imgUrl)}`,
-            imgUrl,
-          ];
-
-          let proxyIdx = 0;
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-
-          img.onload = () => {
-            try {
-              const canvas = document.createElement("canvas");
-              canvas.width = img.width;
-              canvas.height = img.height;
-              const ctx = canvas.getContext("2d");
-              if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                const dataUrl = canvas.toDataURL("image/jpeg");
-                if (isMounted) setVehicleImgDataUrl(dataUrl);
-              }
-            } catch (e) {
-              console.warn("CORS blocked canvas export for image:", imgUrl);
+        if (targetId && isMounted) {
+          unsubscribe = onSnapshot(doc(db, "vehicles", targetId), (docSnap) => {
+            if (docSnap.exists() && isMounted) {
+              const data = docSnap.data();
+              setVehicle({ id: docSnap.id, ...data });
+              setResolvedVehicleId(docSnap.id);
+              // Sempre atualiza o KM local quando o banco mudar (útil para o Sync)
+              setCurrentKM(data.currentKM || 0);
+              setLoadingVehicle(false);
+              setLoadingForm(false);
             }
-          };
-
-          img.onerror = () => {
-            proxyIdx++;
-            if (proxyIdx < proxies.length) {
-              img.src = proxies[proxyIdx];
-            } else {
-              console.warn("Failed to load image from all proxies:", imgUrl);
-            }
-          };
-
-          img.src = proxies[0];
+          });
+        } else {
+          if (isMounted) {
+            setLoadingVehicle(false);
+            setLoadingForm(false);
+          }
         }
-      } catch (error) {
-        console.error("Error fetching vehicle:", error);
-        handleFirestoreError(error, OperationType.GET, `vehicles/${vehicleId}`);
-      } finally {
+      } catch (err) {
+        console.error("Erro ao buscar e ouvir veículo:", err);
         if (isMounted) {
           setLoadingVehicle(false);
-          // If after all attempts vehicleData is null, finalId is not resolving,
-          // we are not going to set resolvedVehicleId, so second effect won't run.
-          // In that case we must clear loadingForm to let the !vehicle check trigger.
           setLoadingForm(false);
         }
       }
+
+      return unsubscribe;
     };
 
-    fetchVehicle();
+    const unsubPromise = findAndListenVehicle();
+
+    return () => {
+      isMounted = false;
+      unsubPromise.then((unsub) => unsub?.());
+    };
   }, [vehicleId]);
+
+  useEffect(() => {
+    if (!vehicle?.imageUrl) return;
+
+    let isMounted = true;
+    const imgUrl = vehicle.imageUrl;
+    const proxies = [
+      `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}`,
+      `https://corsproxy.io/?${encodeURIComponent(imgUrl)}`,
+      imgUrl,
+    ];
+
+    let proxyIdx = 0;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL("image/jpeg");
+          if (isMounted) setVehicleImgDataUrl(dataUrl);
+        }
+      } catch (e) {
+        console.warn("CORS blocked canvas export for image:", imgUrl);
+      }
+    };
+
+    img.onerror = () => {
+      proxyIdx++;
+      if (proxyIdx < proxies.length && isMounted) {
+        img.src = proxies[proxyIdx];
+      }
+    };
+
+    img.src = proxies[0];
+
+    return () => {
+      isMounted = false;
+    };
+  }, [vehicle?.imageUrl]);
 
   useEffect(() => {
     if (!resolvedVehicleId) return;
