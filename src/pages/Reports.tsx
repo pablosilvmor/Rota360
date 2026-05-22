@@ -285,7 +285,11 @@ export function Reports() {
         const driversData = driversSnap.docs.map(d => d.data());
         docs = docs.map((v: any) => {
           const assignedDs = driversData.filter(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
-          return { ...v, assignedDriver: assignedDs.length > 0 ? assignedDs.map((d: any) => d.name).join(', ') : 'Não Atribuída' };
+          return { 
+            ...v, 
+            assignedDriver: assignedDs.length > 0 ? assignedDs.map((d: any) => d.name).join(', ') : 'Não Atribuída',
+            imageUrl: v.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"
+          };
         });
       }
 
@@ -372,14 +376,18 @@ export function Reports() {
       return displayVal.toLowerCase().includes(reportSearchTerm.toLowerCase());
     });
 
-    const isVehicles = selectedModule?.id === 'vehicles';
-    const matchesWork = !isVehicles || filterWork.length === 0 || filterWork.includes('Todas as Obras') || 
-      (Array.isArray(item.costCenter) 
-        ? item.costCenter.some(c => filterWork.includes(c)) 
-        : filterWork.includes(item.costCenter));
-    
-    const matchesStatus = !isVehicles || filterStatus.length === 0 || filterStatus.includes('Todos os Status') || 
-      filterStatus.includes(item.status);
+    let matchesWork = true;
+    let matchesStatus = true;
+
+    if (selectedModule?.id === 'vehicles') {
+      matchesWork = filterWork.length === 0 || filterWork.includes('Todas as Obras') || 
+        (Array.isArray(item.costCenter) 
+          ? item.costCenter.some((c: string) => filterWork.includes(c)) 
+          : filterWork.includes(item.costCenter));
+      
+      matchesStatus = filterStatus.length === 0 || filterStatus.includes('Todos os Status') || 
+        filterStatus.includes(item.status);
+    }
 
     return matchesSearch && matchesWork && matchesStatus;
   });
@@ -402,36 +410,36 @@ export function Reports() {
 
     const imageColIdx = activeColumns.findIndex(c => c.key === 'imageUrl');
     const imageCache: { [url: string]: { src: string; ratio: number } } = {};
-    const PLACEHOLDER_IMG = "https://cdn-icons-png.flaticon.com/512/3774/3774278.png"; // Ícone de caminhão/veículo estável
 
     let loadedCount = 0;
     if (imageColIdx !== -1) {
-      const urlsToLoad = Array.from(new Set(sortedData.map(item => item.imageUrl || PLACEHOLDER_IMG)));
-      
-      await Promise.all(urlsToLoad.map(async (url) => {
+      const urls = Array.from(new Set(sortedData.map(item => item.imageUrl).filter(Boolean)));
+      await Promise.all(urls.map(async (url) => {
         try {
-          const fetchUrl = typeof url === 'string' ? url : PLACEHOLDER_IMG;
-          let response: Response | null = null;
+          const fetchUrl = typeof url === 'string' ? url : '';
+          if (!fetchUrl) throw new Error("Empty URL");
+
+          let response: Response;
+          console.log(`[PDF EXPORT] Tentando carregar imagem: ${fetchUrl}`);
           
-          // Tentativa 1: Proxy WSRV (Redimensionado e estável)
+          // Tentativa 1: Direto
           try {
-            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300&output=jpeg&q=80&errorredirect=${encodeURIComponent(PLACEHOLDER_IMG)}`;
-            response = await fetch(proxyUrl);
-          } catch (err) {}
-
-          // Tentativa 2: Direto
-          if (!response || !response.ok) {
+            response = await fetch(fetchUrl);
+            if (!response.ok) throw new Error("Fetch failed");
+          } catch (e) {
+            // Tentativa 2: Proxy WSRV com compressão
             try {
-              response = await fetch(fetchUrl);
-            } catch (err) {}
-          }
-
-          // Tentativa 3: Placeholder Final
-          if (!response || !response.ok) {
-            response = await fetch(PLACEHOLDER_IMG);
+              const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300&output=jpeg&q=80`;
+              response = await fetch(proxyUrl);
+              if (!response.ok) throw new Error("WSRV proxy failed");
+            } catch (e2) {
+              // Tentativa 3: Proxy All Origins
+              const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}`;
+              response = await fetch(proxyUrl);
+            }
           }
           
-          if (!response || !response.ok) throw new Error("Image unreachable");
+          if (!response.ok) throw new Error("All image proxies failed");
 
           const blob = await response.blob();
           const dataUrl = await new Promise<string>((resolve) => {
@@ -440,7 +448,7 @@ export function Reports() {
             reader.readAsDataURL(blob);
           });
           
-          const imgData = await new Promise<{src: string, ratio: number}>((resolve) => {
+          const imgData = await new Promise<{src: string, ratio: number}>((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
               try {
@@ -452,23 +460,28 @@ export function Reports() {
                   ctx.fillStyle = '#FFFFFF';
                   ctx.fillRect(0, 0, canvas.width, canvas.height);
                   ctx.drawImage(img, 0, 0);
-                  resolve({ src: canvas.toDataURL('image/jpeg', 0.8), ratio: img.naturalWidth / img.naturalHeight });
+                  resolve({ 
+                    src: canvas.toDataURL('image/jpeg', 0.8), 
+                    ratio: img.naturalWidth / img.naturalHeight 
+                  });
                 } else {
                   resolve({ src: dataUrl, ratio: img.naturalWidth / img.naturalHeight });
                 }
               } catch (e) {
+                // In case of taint error or other canvas errors, fallback to original dataUrl
                 resolve({ src: dataUrl, ratio: img.naturalWidth / img.naturalHeight });
               }
             };
-            img.onerror = () => resolve({ src: PLACEHOLDER_IMG, ratio: 1 });
+            img.onerror = reject;
             img.src = dataUrl;
           });
-          imageCache[url] = imgData;
+          imageCache[fetchUrl] = imgData;
+          console.log(`[PDF EXPORT] Imagem carregada com sucesso: ${fetchUrl}`);
         } catch (err) {
-          console.error(`[PDF EXPORT] Erro irrecuperável na imagem: ${url}`, err);
+          console.error(`[PDF EXPORT] Erro ao carregar imagem: ${url}`, err);
         }
         loadedCount++;
-        setExportProgress(Math.floor((loadedCount / urlsToLoad.length) * 100));
+        setExportProgress(Math.floor((loadedCount / urls.length) * 100));
       }));
     }
 
@@ -530,8 +543,8 @@ export function Reports() {
       didDrawCell: function(hookData) {
         if (imageColIdx !== -1 && hookData.column.index === imageColIdx && hookData.cell.section === 'body') {
           const item = sortedData[hookData.row.index];
-          const imgUrl = item?.imageUrl || "https://cdn-icons-png.flaticon.com/512/3774/3774278.png";
-          const cached = imageCache[imgUrl];
+          const imgUrl = item?.imageUrl;
+          const cached = imgUrl ? imageCache[imgUrl] : null;
 
           if (cached) {
             const padding = 1.5;
