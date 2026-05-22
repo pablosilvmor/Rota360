@@ -161,6 +161,13 @@ export function KmSyncService() {
                              const currentKmApi = Math.floor(Number(rawKm)) || 0;
                              
                              const cleanApiPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                             
+                             // Debug para investigar veículos que não estão atualizando
+                             const debugPlates = ['TXW2D79', 'SYM3F65', 'QUF7E26'];
+                             if (debugPlates.includes(plate)) {
+                               console.log(`[DEBUG SYNC] Investigando placa ${plate}: API KM raw ${rawKm}, convertido ${currentKmApi}`);
+                             }
+
                              if (!cleanApiPlate) return;
 
                              const matchingVehicles = vehiclesToSync.filter(v => {

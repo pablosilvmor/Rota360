@@ -220,6 +220,7 @@ export function Reports() {
   const [headerLogo, setHeaderLogo] = useState<{src: string, ratio: number} | null>(null);
   const [footerLogo, setFooterLogo] = useState<{src: string, ratio: number} | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [exportProgress, setExportProgress] = useState(0);
 
   useEffect(() => {
     const fetchFilters = async () => {
@@ -388,6 +389,7 @@ export function Reports() {
     if (!selectedModule) return;
 
     setLoadingData(true);
+    setExportProgress(0);
     const isLandscape = activeColumns.length > 5;
     const doc = new jsPDF(isLandscape ? 'landscape' : 'portrait');
 
@@ -400,6 +402,7 @@ export function Reports() {
     const imageColIdx = activeColumns.findIndex(c => c.key === 'imageUrl');
     const imageCache: { [url: string]: { src: string; ratio: number } } = {};
 
+    let loadedCount = 0;
     if (imageColIdx !== -1) {
       const urls = Array.from(new Set(sortedData.map(item => item.imageUrl).filter(Boolean)));
       await Promise.all(urls.map(async (url) => {
@@ -408,6 +411,7 @@ export function Reports() {
           if (!fetchUrl) throw new Error("Empty URL");
 
           let response: Response;
+          console.log(`[PDF EXPORT] Tentando carregar imagem: ${fetchUrl}`);
           
           // Tentativa 1: Direto
           try {
@@ -463,9 +467,12 @@ export function Reports() {
             img.src = dataUrl;
           });
           imageCache[fetchUrl] = imgData;
+          console.log(`[PDF EXPORT] Imagem carregada com sucesso: ${fetchUrl}`);
         } catch (err) {
-          console.error("Failed to pre-load image in PDF export", url, err);
+          console.error(`[PDF EXPORT] Erro ao carregar imagem: ${url}`, err);
         }
+        loadedCount++;
+        setExportProgress(Math.floor((loadedCount / urls.length) * 100));
       }));
     }
 
@@ -598,6 +605,7 @@ export function Reports() {
 
     doc.save(`${title.replace(/\s+/g, '_').toLowerCase()}.pdf`);
     setLoadingData(false);
+    setExportProgress(0);
   };
 
   const itemVariants = {
@@ -615,10 +623,15 @@ export function Reports() {
         <button
           onClick={handleExportPDF}
           disabled={!selectedModule || selectedColumns.length === 0 || loadingData}
-          className="px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:hover:shadow-lg flex items-center gap-2 justify-center"
+          className="relative px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:hover:shadow-lg flex items-center gap-2 justify-center overflow-hidden"
         >
-          <span className="material-symbols-outlined">picture_as_pdf</span>
-          Exportar PDF Selecionado
+          {loadingData && exportProgress > 0 && (
+            <div className="absolute bottom-0 left-0 h-1 bg-primary-container" style={{ width: `${exportProgress}%` }} />
+          )}
+          <span className="material-symbols-outlined">
+            {loadingData ? 'progress_activity' : 'picture_as_pdf'}
+          </span>
+          {loadingData ? `Exportando (${exportProgress}%)` : 'Exportar PDF Selecionado'}
         </button>
       </div>
 
