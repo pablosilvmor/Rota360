@@ -2454,10 +2454,10 @@ export function Inspections() {
           onClick={() => {
             window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { detail: {} }));
           }}
-          className="p-3 bg-surface-variant text-primary rounded-xl shadow-sm hover:bg-surface-variant/80 active:scale-95 transition-all"
+          className="group p-3.5 transition-all duration-300 rounded-2xl bg-[#E8F0FE] text-primary hover:bg-primary hover:text-white border border-[#D2E3FC] shadow-sm hover:shadow-lg active:scale-95 hover:-translate-y-0.5"
           title="Sincronizar GPS Agora"
         >
-          <span className="material-symbols-outlined text-[24px]">satellite_alt</span>
+          <span className="material-symbols-outlined text-[26px] block group-hover:rotate-[360deg] transition-transform duration-700 ease-in-out">satellite_alt</span>
         </button>
       </div>
 

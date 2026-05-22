@@ -102,12 +102,12 @@ export function KmSyncService() {
         if (targetVehicleId) {
            const vDoc = await getDoc(doc(db, "vehicles", targetVehicleId));
            if (vDoc.exists()) vehiclesToSync = [{ id: vDoc.id, ...vDoc.data() }];
-           console.log(`[SYNC DEBUG] Alvo único, veículos para sync: ${vehiclesToSync.length}, ID: ${targetVehicleId}`);
+           console.log(`[SYNC DEBUG] Alvo único. Veículos: ${vehiclesToSync.length}`);
         } else {
            const vehiclesRef = collection(db, "vehicles");
            const vehiclesSnap = await getDocs(vehiclesRef);
            vehiclesToSync = vehiclesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-           console.log(`[SYNC DEBUG] Todos veículos, veículos para sync: ${vehiclesToSync.length}`);
+           console.log(`[SYNC DEBUG] Sincronização Geral. Veículos no Banco: ${vehiclesToSync.length}`);
         }
 
         setSyncStatus(prev => ({ ...prev, progress: 50 }));
@@ -115,12 +115,13 @@ export function KmSyncService() {
         let hasError = false;
         const batch = writeBatch(db);
         let updatesCount = 0;
-        let notUpdatedPlates: string[] = [];
+        let notFoundInApi: string[] = [];
+        let notUpdatedKm: string[] = [];
         let updatedPlates: string[] = [];
-        let processedPlates = new Set<string>();
+        let processedIds = new Set<string>();
 
         for (const provider of providers) {
-          console.log(`[SYNC DEBUG] Processando provedor: ${provider.name}, URL: ${provider.url}`);
+          console.log(`[SYNC DEBUG] Provedor: ${provider.name}`);
           try {
             if (provider.url.toLowerCase().includes('solusat')) {
               let apiKey = "";
@@ -137,57 +138,64 @@ export function KmSyncService() {
               }
 
               if (apiKey && apiToken) {
-                console.log(`[SYNC] Iniciando fetch para Solusat (Proxied)...`);
                 const response = await fetch("/api/proxy/solusat/vehicles", {
                   method: 'GET',
-                  headers: {
-                    'apiKey': apiKey,
-                    'apiToken': apiToken
-                  }
+                  headers: { 'apiKey': apiKey, 'apiToken': apiToken }
                 });
                 
                 if (response.ok) {
-                   const data = await response.json();
-                   if (data.status && data.data) {
-                      Object.keys(data.data).forEach(groupKey => {
-                        const apiVehicles = data.data[groupKey];
-                        if (Array.isArray(apiVehicles)) {
+                    const data = await response.json();
+                    if (data.status && data.data) {
+                      const groupKeys = Object.keys(data.data);
+                      
+                      groupKeys.forEach(groupKey => {
+                        const apiContent = data.data[groupKey];
+                        const apiVehicles = Array.isArray(apiContent) ? apiContent : (apiContent ? Object.values(apiContent) : []);
+                        
+                        if (apiVehicles.length > 0) {
+                          console.log(`[SYNC DEBUG] Grupo ${groupKey}: ${apiVehicles.length} veículos na API`);
                           apiVehicles.forEach((av: any) => {
-                             const plate = (av.ras_vei_placa || av.ras_vei_veiculo || "").toString();
-                             const rawKm = av.ras_eve_hodometro;
+                             const plate = (av.ras_vei_placa || av.ras_vei_veiculo || av.veiculo_placa || av.vei_placa || "").toString();
+                             console.log(`[SYNC DEBUG] Placa recebida da API Solusat: ${plate}`);
+                             const rawKm = av.ras_eve_hodometro || av.hodometro || av.ras_eve_odometro || 0;
                              const currentKmApi = Math.floor(Number(rawKm)) || 0;
                              
                              const cleanApiPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-                             const matchedVehicle = vehiclesToSync.find(v => {
+                             if (!cleanApiPlate) return;
+
+                             const matchingVehicles = vehiclesToSync.filter(v => {
                                const cleanVPlate = (v.plate || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
                                return cleanVPlate === cleanApiPlate;
                              });
                              
-                             if (matchedVehicle) {
-                               processedPlates.add(matchedVehicle.plate);
-                               const currentInDb = matchedVehicle.currentKM || 0;
-                               
-                               if (currentKmApi > currentInDb || (currentInDb === 0 && currentKmApi > 0)) {
-                                 const vRef = doc(db, 'vehicles', matchedVehicle.id);
-                                 batch.update(vRef, {
-                                   currentKM: currentKmApi,
-                                   lastKmUpdate: new Date().toISOString()
-                                 });
-                                 updatesCount++;
-                                 updatedPlates.push(matchedVehicle.plate);
-                               } else {
-                                 notUpdatedPlates.push(matchedVehicle.plate);
-                               }
+                             if (matchingVehicles.length > 0) {
+                               matchingVehicles.forEach(matchedVehicle => {
+                                 processedIds.add(matchedVehicle.id);
+                                 const currentInDb = matchedVehicle.currentKM || 0;
+                                 
+                                 if (currentKmApi > currentInDb || (currentInDb === 0 && currentKmApi > 0)) {
+                                   console.log(`[SYNC DEBUG] >>> ATUALIZANDO ${matchedVehicle.plate} (ID: ${matchedVehicle.id}) para ${currentKmApi}`);
+                                   const vRef = doc(db, 'vehicles', matchedVehicle.id);
+                                   batch.update(vRef, {
+                                     currentKM: currentKmApi,
+                                     lastKmUpdate: new Date().toISOString()
+                                   });
+                                   updatesCount++;
+                                   updatedPlates.push(matchedVehicle.plate);
+                                 } else {
+                                   notUpdatedKm.push(matchedVehicle.plate);
+                                 }
+                               });
+                             } else {
+                               console.log(`[SYNC DEBUG] Veículo API [${plate}] não tem placa correspondente no Banco. Dados API:`, av);
                              }
                           });
                         }
                       });
-                   }
+                    }
                 } else if (isManual && providers.length === 1) {
                    const errData = await response.json().catch(() => ({}));
-                   if (errData.error_message) {
-                     alert(errData.error_message);
-                   }
+                   if (errData.error_message) alert(errData.error_message);
                 }
               }
             } else {
@@ -199,11 +207,11 @@ export function KmSyncService() {
           }
         }
 
-        // Se fomos sincronizar todos mas algum veículo cadastrado não foi encontrado na API
+        // Verifica quem não foi encontrado na API
         if (!targetVehicleId) {
           vehiclesToSync.forEach(v => {
-            if (!processedPlates.has(v.plate)) {
-              notUpdatedPlates.push(v.plate);
+            if (!processedIds.has(v.id)) {
+              notFoundInApi.push(v.plate);
             }
           });
         }
@@ -227,19 +235,17 @@ export function KmSyncService() {
           );
         }
 
-        const totalProcessed = processedPlates.size;
+        const totalProcessed = processedIds.size;
         const summaryLabel = updatesCount > 0 
-          ? `Sincronização concluída! ${updatesCount} atualizado(s), ${totalProcessed - updatesCount} sem alteração.` 
-          : `Sincronização concluída! Todos os ${totalProcessed} veículos já estão com KM atualizado.`;
+          ? `Sincronização concluída! ${updatesCount} veículos atualizados.` 
+          : `Sincronização concluída! ${totalProcessed} veículos processados, sem novos dados de KM.`;
         
         setSyncStatus({ active: true, progress: 100, label: summaryLabel });
 
-        if (isManual && notUpdatedPlates.length > 0) {
-           console.log("Veículos sem alteração no KM:", notUpdatedPlates.join(", "));
-           // Podemos mostrar um alerta se houver muitos não atualizados em modo manual
-           if (!targetVehicleId && updatesCount === 0) {
-              // alert("Sincronização realizada, mas nenhum veículo teve o KM alterado (dados da API iguais ou menores que o banco).");
-           }
+        if (isManual) {
+           if (updatedPlates.length > 0) console.log("Atualizados:", updatedPlates.join(", "));
+           if (notUpdatedKm.length > 0) console.log("Sem alteração no KM (Já atualizado):", notUpdatedKm.join(", "));
+           if (notFoundInApi.length > 0) console.log("Veículos não encontrados na API:", notFoundInApi.join(", "));
         }
 
         setTimeout(() => setSyncStatus({ active: false, progress: 0, label: "" }), 3500);

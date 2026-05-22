@@ -128,6 +128,83 @@ const MODULES: ModuleData[] = [
   }
 ];
 
+const MultiSelect = ({ label, options, selected, onChange, placeholder }: { label: string, options: any[], selected: string[], onChange: (val: string[]) => void, placeholder: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative flex-1 min-w-[180px]">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-white border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary shadow-sm h-[40px] flex items-center justify-between gap-2"
+      >
+        <span className="truncate max-w-[140px]">
+          {selected.length === 0 ? placeholder : `${selected.length} selecionado(s)`}
+        </span>
+        <span className="material-symbols-outlined text-[20px] transition-transform" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }}>
+          expand_more
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute left-0 right-0 top-[44px] bg-white border border-outline-variant rounded-xl shadow-xl z-20 max-h-[250px] overflow-y-auto py-2"
+            >
+              <div 
+                className="px-3 py-2 hover:bg-surface-container-low cursor-pointer flex items-center gap-2"
+                onClick={() => {
+                  onChange([]);
+                  setIsOpen(false);
+                }}
+              >
+                <div className={`w-4 h-4 border border-outline-variant rounded flex items-center justify-center ${selected.length === 0 ? 'bg-primary border-primary' : ''}`}>
+                  {selected.length === 0 && <span className="material-symbols-outlined text-white text-[12px]">check</span>}
+                </div>
+                <span className="text-xs font-bold uppercase text-on-surface-variant">Limpar Filtros</span>
+              </div>
+              <div 
+                className="px-3 py-2 hover:bg-surface-container-low cursor-pointer flex items-center gap-2"
+                onClick={() => {
+                  const allNames = options.map(o => o.name);
+                  onChange(allNames);
+                }}
+              >
+                <div className={`w-4 h-4 border border-outline-variant rounded flex items-center justify-center ${selected.length === options.length ? 'bg-primary border-primary' : ''}`}>
+                  {selected.length === options.length && <span className="material-symbols-outlined text-white text-[12px]">check</span>}
+                </div>
+                <span className="text-xs font-bold uppercase text-on-surface-variant">Selecionar Todos</span>
+              </div>
+              <div className="h-px bg-outline-variant/30 my-1" />
+              {options.map(opt => (
+                <div 
+                  key={opt.id || opt.name} 
+                  className="px-3 py-2 hover:bg-surface-container-low cursor-pointer flex items-center gap-2"
+                  onClick={() => {
+                    const next = selected.includes(opt.name) 
+                      ? selected.filter(s => s !== opt.name) 
+                      : [...selected, opt.name];
+                    onChange(next);
+                  }}
+                >
+                  <div className={`w-4 h-4 border border-outline-variant rounded flex items-center justify-center ${selected.includes(opt.name) ? 'bg-primary border-primary' : ''}`}>
+                    {selected.includes(opt.name) && <span className="material-symbols-outlined text-white text-[12px]">check</span>}
+                  </div>
+                  <span className="text-sm truncate">{opt.name}</span>
+                </div>
+              ))}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export function Reports() {
   const [selectedModuleId, setSelectedModuleId] = useLocalStorageState<string | null>('reports_selectedModuleId', null);
   const selectedModule = MODULES.find(m => m.id === selectedModuleId) || null;
@@ -135,8 +212,8 @@ export function Reports() {
   const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>('reports_selectedColumns', []);
   const [data, setData] = useState<any[]>([]);
   const [reportSearchTerm, setReportSearchTerm] = useLocalStorageState('reports_searchTerm', '');
-  const [filterWork, setFilterWork] = useLocalStorageState('reports_filterWork', '');
-  const [filterStatus, setFilterStatus] = useLocalStorageState('reports_filterStatus', '');
+  const [filterWork, setFilterWork] = useLocalStorageState<string[]>('reports_filterWork', []);
+  const [filterStatus, setFilterStatus] = useLocalStorageState<string[]>('reports_filterStatus', []);
   const [works, setWorks] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -294,11 +371,13 @@ export function Reports() {
       return displayVal.toLowerCase().includes(reportSearchTerm.toLowerCase());
     });
 
-    const matchesWork = !filterWork || filterWork === 'Todas as Obras' || 
-      (Array.isArray(item.costCenter) ? item.costCenter.includes(filterWork) : item.costCenter === filterWork);
+    const matchesWork = filterWork.length === 0 || filterWork.includes('Todas as Obras') || 
+      (Array.isArray(item.costCenter) 
+        ? item.costCenter.some(c => filterWork.includes(c)) 
+        : filterWork.includes(item.costCenter));
     
-    const matchesStatus = !filterStatus || filterStatus === 'Todos os Status' || 
-      item.status === filterStatus;
+    const matchesStatus = filterStatus.length === 0 || filterStatus.includes('Todos os Status') || 
+      filterStatus.includes(item.status);
 
     return matchesSearch && matchesWork && matchesStatus;
   });
@@ -326,17 +405,28 @@ export function Reports() {
       await Promise.all(urls.map(async (url) => {
         try {
           const fetchUrl = typeof url === 'string' ? url : '';
+          if (!fetchUrl) throw new Error("Empty URL");
+
           let response: Response;
+          
+          // Tentativa 1: Direto
           try {
             response = await fetch(fetchUrl);
             if (!response.ok) throw new Error("Fetch failed");
           } catch (e) {
-            // Fallback to CORS proxy if direct fetch fails (e.g. from Imgur or cross-origin Storage)
-            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300&output=jpeg`;
-            response = await fetch(proxyUrl);
+            // Tentativa 2: Proxy WSRV com compressão
+            try {
+              const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300&output=jpeg&q=80`;
+              response = await fetch(proxyUrl);
+              if (!response.ok) throw new Error("WSRV proxy failed");
+            } catch (e2) {
+              // Tentativa 3: Proxy All Origins
+              const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}`;
+              response = await fetch(proxyUrl);
+            }
           }
           
-          if (!response.ok) throw new Error("Proxy fetch failed");
+          if (!response.ok) throw new Error("All image proxies failed");
 
           const blob = await response.blob();
           const dataUrl = await new Promise<string>((resolve) => {
@@ -629,29 +719,25 @@ export function Reports() {
                   </div>
                   {selectedModule?.id === 'vehicles' && (
                     <>
-                      <div className="flex-1 min-w-[150px]">
-                        <select
-                          value={filterWork}
-                          onChange={(e) => setFilterWork(e.target.value)}
-                          className="w-full bg-white border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary shadow-sm h-[40px]"
-                        >
-                          <option value="">Todas as Obras</option>
-                          {works.map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="flex-1 min-w-[150px]">
-                        <select
-                          value={filterStatus}
-                          onChange={(e) => setFilterStatus(e.target.value)}
-                          className="w-full bg-white border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary shadow-sm h-[40px]"
-                        >
-                          <option value="">Todos os Status</option>
-                          <option value="Ativo">Ativo</option>
-                          <option value="Inativo">Inativo</option>
-                          <option value="Em Manutenção">Em Manutenção</option>
-                          {statuses.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                        </select>
-                      </div>
+                      <MultiSelect 
+                        label="Obras"
+                        placeholder="Obras"
+                        options={works}
+                        selected={filterWork}
+                        onChange={setFilterWork}
+                      />
+                      <MultiSelect 
+                        label="Status"
+                        placeholder="Status"
+                        options={[
+                          { name: 'Ativo' },
+                          { name: 'Inativo' },
+                          { name: 'Em Manutenção' },
+                          ...statuses
+                        ]}
+                        selected={filterStatus}
+                        onChange={setFilterStatus}
+                      />
                     </>
                   )}
                 </div>
