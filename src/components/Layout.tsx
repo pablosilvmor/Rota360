@@ -156,6 +156,9 @@ export function Layout({ children }: LayoutProps) {
             alt="Rota 360"
             className="h-16 object-contain"
           />
+          <p className="text-[11px] text-center font-medium text-on-primary-container/80 italic mt-1">
+            Inteligência que move sua frota
+          </p>
           <p className="text-[10px] text-center font-normal text-on-primary-container uppercase tracking-wider mt-2">
             BEMON ENGENHARIA E MONTAGENS LTDA.
           </p>
