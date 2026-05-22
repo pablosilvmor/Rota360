@@ -422,6 +422,24 @@ function InspectionForm({
         ]);
       });
 
+      // Garantir que a imagem do veículo esteja carregada antes de exportar
+      let finalImgDataUrl = vehicleImgDataUrl;
+      if (!finalImgDataUrl && vehicle.imageUrl) {
+        try {
+          const imgUrl = vehicle.imageUrl;
+          const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}&w=400&output=jpeg`;
+          const resp = await fetch(proxyUrl);
+          const blob = await resp.blob();
+          finalImgDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) {
+          console.warn("Could not load image for PDF:", e);
+        }
+      }
+
       autoTable(pdf, {
         startY: 40,
         margin: { top: 40, bottom: 20, left: 14, right: 14 },
@@ -467,16 +485,18 @@ function InspectionForm({
           let startY = 15;
 
           // Imagem do veículo
-          if (vehicleImgDataUrl) {
-            pdf.addImage(vehicleImgDataUrl, "JPEG", 14, startY, 20, 20);
+          if (finalImgDataUrl) {
+            // Aumentando largura para 35mm e mantendo altura de 20mm para evitar distorção
+            pdf.addImage(finalImgDataUrl, "JPEG", 14, startY, 35, 20);
             pdf.setFontSize(16);
             pdf.setFont("helvetica", "bold");
             pdf.setTextColor(0, 0, 0);
-            pdf.text(`Inspeção: ${vehicle.plate}`, 38, startY + 8);
+            // Ajustando X para 54 para dar espaço à imagem mais larga
+            pdf.text(`Inspeção: ${vehicle.plate}`, 54, startY + 8);
             pdf.setFontSize(10);
             pdf.setFont("helvetica", "normal");
             pdf.setTextColor(100, 100, 100);
-            pdf.text(`${vehicle.model}`, 38, startY + 14);
+            pdf.text(`${vehicle.model}`, 54, startY + 14);
           } else {
             pdf.setFontSize(16);
             pdf.setFont("helvetica", "bold");
@@ -498,18 +518,6 @@ function InspectionForm({
           pdf.setFontSize(12);
           pdf.setFont("helvetica", "normal");
           pdf.text(formatKM(currentKM), pageWidth - 50, startY + 14);
-
-          // Rodapé
-          const pageCount = (pdf as any).internal.getNumberOfPages();
-          pdf.setFontSize(8);
-          pdf.setTextColor(150);
-          pdf.text("By Pablo Moreira", 14, pageHeight - 10);
-          const pageCountStr = `Página ${pageCount}`;
-          pdf.text(
-            pageCountStr,
-            pageWidth - 14 - pdf.getTextWidth(pageCountStr),
-            pageHeight - 10,
-          );
         },
         didDrawCell: function (data) {
           if (data.section === "body" && data.column.index === 4) {
@@ -551,6 +559,42 @@ function InspectionForm({
             pdf.setTextColor(0, 0, 0);
           }
         },
+      });
+
+      // Adicionar paginação inteligente e assinatura
+      const totalPages = (pdf as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(150);
+        pdf.setFont("helvetica", "normal");
+        pdf.text("By Pablo Moreira", 14, pageHeight - 10);
+        const pageStr = `Pág. ${i}/${totalPages}`;
+        pdf.text(
+          pageStr,
+          pageWidth - 14 - pdf.getTextWidth(pageStr),
+          pageHeight - 10,
+        );
+      }
+
+      // Campo de assinatura na última página
+      pdf.setPage(totalPages);
+      const finalY = (pdf as any).lastAutoTable.finalY || 40;
+      let signatureY = finalY + 30;
+
+      if (signatureY > pageHeight - 30) {
+        pdf.addPage();
+        signatureY = 40;
+      }
+
+      pdf.setLineWidth(0.5);
+      pdf.setDrawColor(200);
+      pdf.line(pageWidth / 2 - 45, signatureY, pageWidth / 2 + 45, signatureY);
+      pdf.setFontSize(10);
+      pdf.setTextColor(50);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Assinatura do Responsável", pageWidth / 2, signatureY + 6, {
+        align: "center",
       });
 
       pdf.save(`Relatorio_Inspecao_${vehicle.plate}.pdf`);
@@ -2157,12 +2201,32 @@ export function Inspections() {
     };
   }, [activeTab]);
 
-  const handleExportChecklistPDF = (checklist: any) => {
+  const handleExportChecklistPDF = async (checklist: any) => {
     setIsExportingChecklist(checklist.id);
     try {
       const pdf = new jsPDF();
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Buscar dados do veículo para pegar a imagem
+      const vehicle = vehicles.find((v) => v.id === checklist.vehicleId);
+      let vehicleLogoDataUrl = "";
+
+      if (vehicle?.imageUrl) {
+        try {
+          const imgUrl = vehicle.imageUrl;
+          const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}&w=400&output=jpeg`;
+          const resp = await fetch(proxyUrl);
+          const blob = await resp.blob();
+          vehicleLogoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) {
+          console.warn("Could not load vehicle image for checklist PDF:", e);
+        }
+      }
 
       // Cálculos de resumo
       const totalItems = checklist.items.length;
@@ -2217,15 +2281,26 @@ export function Inspections() {
           // Cabeçalho (renderizado em todas as páginas)
           let startY = 15;
 
-          pdf.setFontSize(16);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(0, 0, 0);
-          pdf.text(`Checklist: ${checklist.vehiclePlate}`, 14, startY + 8);
-
-          pdf.setFontSize(10);
-          pdf.setFont("helvetica", "normal");
-          pdf.setTextColor(100, 100, 100);
-          pdf.text(`${checklist.vehicleModel}`, 14, startY + 14);
+          if (vehicleLogoDataUrl) {
+            pdf.addImage(vehicleLogoDataUrl, "JPEG", 14, startY, 35, 20);
+            pdf.setFontSize(16);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(0, 0, 0);
+            pdf.text(`Checklist: ${checklist.vehiclePlate}`, 54, startY + 8);
+            pdf.setFontSize(10);
+            pdf.setFont("helvetica", "normal");
+            pdf.setTextColor(100, 100, 100);
+            pdf.text(`${checklist.vehicleModel}`, 54, startY + 14);
+          } else {
+            pdf.setFontSize(16);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(0, 0, 0);
+            pdf.text(`Checklist: ${checklist.vehiclePlate}`, 14, startY + 8);
+            pdf.setFontSize(10);
+            pdf.setFont("helvetica", "normal");
+            pdf.setTextColor(100, 100, 100);
+            pdf.text(`${checklist.vehicleModel}`, 14, startY + 14);
+          }
 
           // Resumo no cabeçalho
           pdf.setFontSize(8);
@@ -2262,13 +2337,33 @@ export function Inspections() {
         pdf.setTextColor(150);
         pdf.setFont("helvetica", "normal");
         pdf.text("By Pablo Moreira", 14, pageHeight - 10);
-        const pageStr = `Página ${i}/${totalPages}`;
+        const pageStr = `Pág. ${i}/${totalPages}`;
         pdf.text(
           pageStr,
           pageWidth - 14 - pdf.getTextWidth(pageStr),
           pageHeight - 10,
         );
       }
+
+      // Campo de assinatura na última página
+      pdf.setPage(totalPages);
+      const finalY = (pdf as any).lastAutoTable.finalY || 40;
+      let signatureY = finalY + 30;
+
+      if (signatureY > pageHeight - 30) {
+        pdf.addPage();
+        signatureY = 40;
+      }
+
+      pdf.setLineWidth(0.5);
+      pdf.setDrawColor(200);
+      pdf.line(pageWidth / 2 - 45, signatureY, pageWidth / 2 + 45, signatureY);
+      pdf.setFontSize(10);
+      pdf.setTextColor(50);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Assinatura do Responsável", pageWidth / 2, signatureY + 6, {
+        align: "center",
+      });
 
       pdf.save(`Checklist_${checklist.vehiclePlate}_${checklist.date}.pdf`);
     } catch (error) {
