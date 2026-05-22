@@ -372,12 +372,13 @@ export function Reports() {
       return displayVal.toLowerCase().includes(reportSearchTerm.toLowerCase());
     });
 
-    const matchesWork = filterWork.length === 0 || filterWork.includes('Todas as Obras') || 
+    const isVehicles = selectedModule?.id === 'vehicles';
+    const matchesWork = !isVehicles || filterWork.length === 0 || filterWork.includes('Todas as Obras') || 
       (Array.isArray(item.costCenter) 
         ? item.costCenter.some(c => filterWork.includes(c)) 
         : filterWork.includes(item.costCenter));
     
-    const matchesStatus = filterStatus.length === 0 || filterStatus.includes('Todos os Status') || 
+    const matchesStatus = !isVehicles || filterStatus.length === 0 || filterStatus.includes('Todos os Status') || 
       filterStatus.includes(item.status);
 
     return matchesSearch && matchesWork && matchesStatus;
@@ -401,36 +402,36 @@ export function Reports() {
 
     const imageColIdx = activeColumns.findIndex(c => c.key === 'imageUrl');
     const imageCache: { [url: string]: { src: string; ratio: number } } = {};
+    const PLACEHOLDER_IMG = "https://cdn-icons-png.flaticon.com/512/3774/3774278.png"; // Ícone de caminhão/veículo estável
 
     let loadedCount = 0;
     if (imageColIdx !== -1) {
-      const urls = Array.from(new Set(sortedData.map(item => item.imageUrl).filter(Boolean)));
-      await Promise.all(urls.map(async (url) => {
+      const urlsToLoad = Array.from(new Set(sortedData.map(item => item.imageUrl || PLACEHOLDER_IMG)));
+      
+      await Promise.all(urlsToLoad.map(async (url) => {
         try {
-          const fetchUrl = typeof url === 'string' ? url : '';
-          if (!fetchUrl) throw new Error("Empty URL");
-
-          let response: Response;
-          console.log(`[PDF EXPORT] Tentando carregar imagem: ${fetchUrl}`);
+          const fetchUrl = typeof url === 'string' ? url : PLACEHOLDER_IMG;
+          let response: Response | null = null;
           
-          // Tentativa 1: Direto
+          // Tentativa 1: Proxy WSRV (Redimensionado e estável)
           try {
-            response = await fetch(fetchUrl);
-            if (!response.ok) throw new Error("Fetch failed");
-          } catch (e) {
-            // Tentativa 2: Proxy WSRV com compressão
+            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300&output=jpeg&q=80&errorredirect=${encodeURIComponent(PLACEHOLDER_IMG)}`;
+            response = await fetch(proxyUrl);
+          } catch (err) {}
+
+          // Tentativa 2: Direto
+          if (!response || !response.ok) {
             try {
-              const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(fetchUrl)}&w=300&output=jpeg&q=80`;
-              response = await fetch(proxyUrl);
-              if (!response.ok) throw new Error("WSRV proxy failed");
-            } catch (e2) {
-              // Tentativa 3: Proxy All Origins
-              const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}`;
-              response = await fetch(proxyUrl);
-            }
+              response = await fetch(fetchUrl);
+            } catch (err) {}
+          }
+
+          // Tentativa 3: Placeholder Final
+          if (!response || !response.ok) {
+            response = await fetch(PLACEHOLDER_IMG);
           }
           
-          if (!response.ok) throw new Error("All image proxies failed");
+          if (!response || !response.ok) throw new Error("Image unreachable");
 
           const blob = await response.blob();
           const dataUrl = await new Promise<string>((resolve) => {
@@ -439,7 +440,7 @@ export function Reports() {
             reader.readAsDataURL(blob);
           });
           
-          const imgData = await new Promise<{src: string, ratio: number}>((resolve, reject) => {
+          const imgData = await new Promise<{src: string, ratio: number}>((resolve) => {
             const img = new Image();
             img.onload = () => {
               try {
@@ -451,28 +452,23 @@ export function Reports() {
                   ctx.fillStyle = '#FFFFFF';
                   ctx.fillRect(0, 0, canvas.width, canvas.height);
                   ctx.drawImage(img, 0, 0);
-                  resolve({ 
-                    src: canvas.toDataURL('image/jpeg', 0.8), 
-                    ratio: img.naturalWidth / img.naturalHeight 
-                  });
+                  resolve({ src: canvas.toDataURL('image/jpeg', 0.8), ratio: img.naturalWidth / img.naturalHeight });
                 } else {
                   resolve({ src: dataUrl, ratio: img.naturalWidth / img.naturalHeight });
                 }
               } catch (e) {
-                // In case of taint error or other canvas errors, fallback to original dataUrl
                 resolve({ src: dataUrl, ratio: img.naturalWidth / img.naturalHeight });
               }
             };
-            img.onerror = reject;
+            img.onerror = () => resolve({ src: PLACEHOLDER_IMG, ratio: 1 });
             img.src = dataUrl;
           });
-          imageCache[fetchUrl] = imgData;
-          console.log(`[PDF EXPORT] Imagem carregada com sucesso: ${fetchUrl}`);
+          imageCache[url] = imgData;
         } catch (err) {
-          console.error(`[PDF EXPORT] Erro ao carregar imagem: ${url}`, err);
+          console.error(`[PDF EXPORT] Erro irrecuperável na imagem: ${url}`, err);
         }
         loadedCount++;
-        setExportProgress(Math.floor((loadedCount / urls.length) * 100));
+        setExportProgress(Math.floor((loadedCount / urlsToLoad.length) * 100));
       }));
     }
 
@@ -534,8 +530,8 @@ export function Reports() {
       didDrawCell: function(hookData) {
         if (imageColIdx !== -1 && hookData.column.index === imageColIdx && hookData.cell.section === 'body') {
           const item = sortedData[hookData.row.index];
-          const imgUrl = item?.imageUrl;
-          const cached = imgUrl ? imageCache[imgUrl] : null;
+          const imgUrl = item?.imageUrl || "https://cdn-icons-png.flaticon.com/512/3774/3774278.png";
+          const cached = imageCache[imgUrl];
 
           if (cached) {
             const padding = 1.5;
