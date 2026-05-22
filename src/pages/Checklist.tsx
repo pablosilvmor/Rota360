@@ -596,7 +596,7 @@ export function Checklist() {
                       </span>
                     </button>
                     {vehicle?.imageUrl && (
-                      <div className="w-12 h-12 rounded bg-surface-container border border-outline-variant/30 overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="w-14 h-14 rounded-lg bg-surface-container border border-outline-variant/50 overflow-hidden flex items-center justify-center shrink-0 shadow-sm p-1">
                         <img
                           src={vehicle.imageUrl}
                           alt={vehicle.plate}
@@ -732,13 +732,14 @@ export function Checklist() {
                         <input
                           type="text"
                           value={formatKM(record.lastMaintenanceKM || 0)}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const val = parseKM(e.target.value);
                             handleLocalRecordUpdate(
                               item.id,
                               "lastMaintenanceKM",
-                              parseKM(e.target.value),
-                            )
-                          }
+                              val,
+                            );
+                          }}
                           onBlur={(e) =>
                             handleUpdateRecordField(
                               item.id,
@@ -746,7 +747,7 @@ export function Checklist() {
                               parseKM(e.target.value),
                             )
                           }
-                          className="w-full md:w-40 bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                          className="w-full md:w-44 bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-mono focus:border-primary focus:ring-2 focus:ring-primary outline-none transition-all"
                           placeholder="Ex: 10.000"
                         />
                       </div>
