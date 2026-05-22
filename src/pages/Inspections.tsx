@@ -2429,7 +2429,7 @@ export function Inspections() {
       animate="visible"
       variants={containerVariants}
     >
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">
             Inspeções da Frota
@@ -2449,6 +2449,16 @@ export function Inspections() {
             </button>
           </div>
         </div>
+
+        <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { detail: {} }));
+          }}
+          className="p-3 bg-surface-variant text-primary rounded-xl shadow-sm hover:bg-surface-variant/80 active:scale-95 transition-all"
+          title="Sincronizar GPS Agora"
+        >
+          <span className="material-symbols-outlined text-[24px]">satellite_alt</span>
+        </button>
       </div>
 
       <motion.div
