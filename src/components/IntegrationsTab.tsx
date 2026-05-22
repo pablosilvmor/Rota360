@@ -12,6 +12,7 @@ export interface IntegrationProvider {
 
 export function IntegrationsTab() {
   const [providers, setProviders] = useState<IntegrationProvider[]>([]);
+  const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -177,9 +178,20 @@ export function IntegrationsTab() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-on-surface-variant uppercase tracking-widest mb-1.5">Token de Acesso / Chave</label>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">Token de Acesso / Chave</label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="h-3 w-3 rounded border-outline-variant accent-primary"
+                          checked={!!showTokens[provider.id]}
+                          onChange={() => setShowTokens(prev => ({ ...prev, [provider.id]: !prev[provider.id] }))}
+                        />
+                        <span className="text-[10px] text-on-surface-variant font-bold uppercase">Mostrar</span>
+                      </label>
+                    </div>
                     <input
-                      type="password"
+                      type={showTokens[provider.id] ? "text" : "password"}
                       className="w-full bg-white border border-outline-variant rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary transition-all text-sm text-on-surface font-mono"
                       value={provider.token}
                       onChange={(e) => handleChange(provider.id, 'token', e.target.value)}
