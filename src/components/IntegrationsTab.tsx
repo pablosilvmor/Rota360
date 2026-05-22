@@ -183,8 +183,13 @@ export function IntegrationsTab() {
                       className="w-full bg-white border border-outline-variant rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary transition-all text-sm text-on-surface font-mono"
                       value={provider.token}
                       onChange={(e) => handleChange(provider.id, 'token', e.target.value)}
-                      placeholder="Token Bearer ou Basic Auth"
+                      placeholder="Para Solusat, use: apiKey,apiToken"
                     />
+                    {provider.url.toLowerCase().includes('solusat') && (
+                      <p className="text-[10px] text-primary font-medium mt-1">
+                        Formato exigido: <strong>SuaApiKey,SeuApiToken</strong> (separados por vírgula)
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button

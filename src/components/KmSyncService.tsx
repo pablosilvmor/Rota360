@@ -109,9 +109,62 @@ export function KmSyncService() {
 
         for (const provider of providers) {
           try {
-            // MOCK: Simulação de delay de rede e processamento
-            await new Promise(r => setTimeout(r, 800));
-            // No futuro, aqui entra o fetch real para TicketLog, Omnilink, etc.
+            if (provider.url.toLowerCase().includes('solusat')) {
+              // Extract apiKey and apiToken if the user placed them in the token field
+              // e.g. "9daf6fce210cb...., ed052ea39c..."
+              let apiKey = "";
+              let apiToken = "";
+              
+              if (provider.token.includes(',')) {
+                [apiKey, apiToken] = provider.token.split(',').map(s => s.trim());
+              } else if (provider.token.includes(';')) {
+                [apiKey, apiToken] = provider.token.split(';').map(s => s.trim());
+              } else if (provider.token.includes(':')) {
+                [apiKey, apiToken] = provider.token.split(':').map(s => s.trim());
+              } else {
+                 // Fallback to expecting keys in format if they put it in token somehow
+                 // Or we might need to update the IntegrationsTab UI and wait for them to re-enter
+                 console.log("Formato do token Solusat inválido. Utilize apiKey,apiToken");
+              }
+
+              if (apiKey && apiToken) {
+                const response = await fetch("/api/proxy/solusat/vehicles", {
+                  method: 'GET',
+                  headers: {
+                    'apiKey': apiKey,
+                    'apiToken': apiToken
+                  }
+                });
+                
+                if (response.ok) {
+                   const data = await response.json();
+                   if (data.status && data.data) {
+                      Object.values(data.data).forEach((apiVehicles: any) => {
+                        if (Array.isArray(apiVehicles)) {
+                          apiVehicles.forEach((av: any) => {
+                             const plate = av.ras_vei_placa;
+                             const currentKmApi = Number(av.ras_eve_hodometro) || 0;
+                             
+                             const matchedVehicle = vehiclesToSync.find(v => (v.plate || '').replace(/\s/g, '').toUpperCase() === (plate || '').replace(/\s/g, '').toUpperCase());
+                             if (matchedVehicle && currentKmApi > (matchedVehicle.currentKM || 0)) {
+                               const vRef = doc(db, 'vehicles', matchedVehicle.id);
+                               batch.update(vRef, {
+                                 currentKM: currentKmApi,
+                                 lastKmUpdate: new Date().toISOString()
+                               });
+                               updatesCount++;
+                             }
+                          });
+                        }
+                      });
+                   }
+                }
+              }
+            } else {
+              // MOCK: Simulação de delay de rede e processamento para os outros
+              await new Promise(r => setTimeout(r, 800));
+              // No futuro, aqui entra o fetch real para TicketLog, Omnilink, etc.
+            }
           } catch (apiError) {
             console.error(`Erro ao sincronizar com ${provider.name}:`, apiError);
             hasError = true;

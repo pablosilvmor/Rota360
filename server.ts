@@ -18,6 +18,32 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Solusat Proxy Route
+  app.get("/api/proxy/solusat/vehicles", async (req, res) => {
+    try {
+      const apiKey = req.headers['apikey'] as string;
+      const apiToken = req.headers['apitoken'] as string;
+
+      if (!apiKey || !apiToken) {
+        return res.status(400).json({ error: "apiKey and apiToken headers are required" });
+      }
+
+      const response = await fetch("https://ws.solusat.com.br/espelho/full/vehicles", {
+        method: "GET",
+        headers: {
+          "apiKey": apiKey,
+          "apiToken": apiToken
+        }
+      });
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error proxying to Solusat:", error);
+      res.status(500).json({ error: "Failed to fetch from Solusat" });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
