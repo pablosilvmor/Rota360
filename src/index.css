@@ -54,6 +54,19 @@
   .spin {
     animation: spin-anim 1s linear infinite;
   }
+  .pulse-marker {
+    animation: pulse-marker 2s infinite;
+    border-radius: 50%;
+    width: 12px;
+    height: 12px;
+    border: 2px solid white;
+  }
+}
+
+@keyframes pulse-marker {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
 
 @keyframes spin-anim {

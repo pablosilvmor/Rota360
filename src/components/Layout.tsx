@@ -175,7 +175,10 @@ export function Layout({ children }: LayoutProps) {
             <div className="flex justify-center items-center gap-4 mt-2">
               <div className="relative" ref={notificationsRef}>
                 <button
-                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsNotificationsOpen(!isNotificationsOpen);
+                  }}
                   className="p-2 text-on-primary-container hover:text-white transition-colors relative"
                   title="Notificações"
                 >

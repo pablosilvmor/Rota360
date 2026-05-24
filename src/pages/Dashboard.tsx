@@ -25,9 +25,9 @@ import { calculateProgress } from "../lib/progressUtils";
 // Custom icons based on status
 const createCustomIcon = (color: string) => L.divIcon({
   className: 'custom-div-icon',
-  html: `<div style="background-color: ${color}; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
-  iconSize: [14, 14],
-  iconAnchor: [7, 7]
+  html: `<div class="pulse-marker" style="background-color: ${color}; box-shadow: 0 0 10px ${color}; margin: 9px;"></div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15]
 });
 
 // Base coordinates for Belo Horizonte, MG
@@ -265,6 +265,14 @@ export function Dashboard() {
   }, [vehicles, allRecords, itemsMap]);
 
   console.log("Rendering Dashboard. Vehicles count:", vehicles.length);
+
+  // Calculate center of vehicles
+  const mapCenter: [number, number] = vehicles.length > 0
+    ? [
+        vehicles.reduce((acc, v) => acc + (v.location?.lat || 0), 0) / vehicles.length,
+        vehicles.reduce((acc, v) => acc + (v.location?.lng || 0), 0) / vehicles.length
+      ]
+    : [BASE_LAT, BASE_LNG];
 
   return (
     <motion.div
@@ -701,9 +709,9 @@ export function Dashboard() {
             {vehicles.length > 0 && typeof window !== 'undefined' ? (
               <MapContainer 
                 key="dashboard-fleet-map-instance"
-                center={[BASE_LAT, BASE_LNG]} 
+                center={mapCenter} 
                 zoom={12} 
-                style={{ width: '100%', height: '100%' }}
+                style={{ width: '100%', height: '100%', backgroundColor: '#0a1a3a' }}
                 zoomControl={false}
                 attributionControl={false}
                 scrollWheelZoom={false}
@@ -732,6 +740,7 @@ export function Dashboard() {
                     >
                       <Popup>
                         <div className="text-xs">
+                          {v.imageUrl && <img src={v.imageUrl} alt={v.plate} className="w-16 h-10 object-cover rounded mb-1" />}
                           <strong className="text-primary">{v.plate}</strong><br/>
                           {v.model}
                         </div>

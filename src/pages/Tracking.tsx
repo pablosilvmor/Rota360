@@ -8,9 +8,9 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 // Custom icons based on status
 const createCustomIcon = (color: string) => L.divIcon({
   className: 'custom-div-icon',
-  html: `<div style="background-color: ${color}; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
-  iconSize: [16, 16],
-  iconAnchor: [8, 8]
+  html: `<div class="pulse-marker" style="background-color: ${color}; box-shadow: 0 0 10px ${color}; margin: 9px;"></div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15]
 });
 
 // Helper component to center map on selection
@@ -34,9 +34,9 @@ const itemVariants = {
   visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 300, damping: 24 } }
 };
 
-// Base coordinates for Sao Paulo
-const BASE_LAT = -23.5505;
-const BASE_LNG = -46.6333;
+// Base coordinates for Belo Horizonte, MG
+const BASE_LAT = -19.9167;
+const BASE_LNG = -43.9345;
 
 export function Tracking() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -101,6 +101,14 @@ export function Tracking() {
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
   const selectedVehicleDriver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(selectedVehicle?.plate) : d.vehicleAssigned === selectedVehicle?.plate);
 
+  // Calculate center of vehicles
+  const mapCenter: [number, number] = vehicles.length > 0
+    ? [
+        vehicles.reduce((acc, v) => acc + (v.location?.lat || 0), 0) / vehicles.length,
+        vehicles.reduce((acc, v) => acc + (v.location?.lng || 0), 0) / vehicles.length
+      ]
+    : [BASE_LAT, BASE_LNG];
+
   return (
     <motion.div 
       className="pb-12 h-[calc(100vh-80px)]"
@@ -121,9 +129,9 @@ export function Tracking() {
             {vehicles.length > 0 && typeof window !== 'undefined' ? (
               <MapContainer 
                 key="tracking-live-map-instance"
-                center={[BASE_LAT, BASE_LNG]} 
+                center={mapCenter} 
                 zoom={12} 
-                style={{ width: '100%', height: '100%' }}
+                style={{ width: '100%', height: '100%', backgroundColor: '#0a1a3a' }}
                 zoomControl={true}
                 attributionControl={false}
               >
@@ -131,8 +139,10 @@ export function Tracking() {
                   url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
                 
-                {selectedVehicle && selectedVehicle.location && (
+                {selectedVehicle && selectedVehicle.location ? (
                   <MapFollow center={[selectedVehicle.location.lat, selectedVehicle.location.lng]} />
+                ) : (
+                  <MapFollow center={mapCenter} />
                 )}
 
                 {vehicles.map(v => {
@@ -153,6 +163,7 @@ export function Tracking() {
                     >
                       <Popup>
                         <div className="text-xs font-sans">
+                          {v.imageUrl && <img src={v.imageUrl} alt={v.plate} className="w-16 h-10 object-cover rounded mb-1" />}
                           <strong className="text-primary">{v.plate}</strong><br/>
                           {v.model}<br/>
                           <span className="font-bold">{status}</span>
