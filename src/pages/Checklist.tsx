@@ -382,6 +382,30 @@ export function Checklist() {
         }
       }
 
+      // Generate OS if there are non-conforming items
+      const nonConformingItems = items.filter(i => i.conformidade === "Não conforme");
+      if (nonConformingItems.length > 0) {
+        await addDoc(collection(db, 'maintenance'), {
+          plate: vehicle?.plate || "",
+          vehicleId: vehicleId,
+          title: `OS Automática: Checklist ${checklistDate.split('-').reverse().join('-')}`,
+          status: 'Agendado',
+          priority: 'Alta',
+          provider: 'A Definir',
+          description: `Gerado a partir do checklist diário.\nItens:\n${nonConformingItems.map(i => `- ${i.item} (${i.service || 'Sem ação'})`).join('\n')}`,
+          icon: 'build',
+          color: 'error',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          source: 'checklist',
+          inspectionItems: nonConformingItems.map(i => ({ 
+            id: i.id, 
+            itemTitle: i.item, 
+            periodicityKM: i.periodicityKM || 0 
+          }))
+        });
+      }
+
       setUploadProgress(100);
       setTimeout(() => {
         setIsUploading(false);

@@ -125,6 +125,15 @@ service cloud.firestore {
       allow read, write, delete: if isSignedIn();
     }
 
+    match /maintenance_history/{allHistory=**} {
+      allow read, write, delete: if isSignedIn();
+    }
+
+    match /signatures/{allSignatures=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
     match /maintenances/{allMaintenances=**} {
       allow read, write, delete: if isSignedIn();
     }
@@ -134,6 +143,18 @@ service cloud.firestore {
       match /{allChildren=**} {
         allow read, write: if isSignedIn();
       }
+    }
+    match /{path=**}/maintenances/{doc} {
+      allow read: if isSignedIn();
+    }
+    match /{path=**}/records/{record} {
+      allow read: if true;
+    }
+    match /{path=**}/items/{item} {
+      allow read: if true;
+    }
+    match /{path=**}/signatures/{sig} {
+      allow read: if true;
     }
     match /checklist_history/{allChecklists=**} {
       allow read, write: if isSignedIn();

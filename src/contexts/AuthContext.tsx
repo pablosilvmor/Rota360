@@ -33,11 +33,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let unsubscribeSnapshot: () => void;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      console.log("Auth State Changed. User:", currentUser?.email);
       setUser(currentUser);
       if (currentUser) {
         const userRef = doc(db, 'users', currentUser.uid);
           let userDoc;
           try {
+            console.log("Fetching user doc for:", currentUser.uid);
             userDoc = await getDoc(userRef);
           } catch (error) {
             console.error('getDoc error:', error);
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         
           if (!userDoc.exists()) {
+            console.log("User doc does not exist, creating...");
             const isAdmin = currentUser.email === 'bemongv@gmail.com';
             const newUserData = {
               email: currentUser.email || '',
@@ -61,12 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
             try {
               await setDoc(userRef, newUserData);
+              console.log("User doc created successfully");
             } catch (error) {
-              console.error('setDoc error for user:', error, JSON.stringify(newUserData));
+              console.error('setDoc error for user:', error);
             }
           }
 
+        console.log("Starting user snapshot listener");
         unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+          console.log("User Snapshot received. Exists:", docSnap.exists());
           if (docSnap.exists()) {
             const data = docSnap.data();
             // Sync photoURL if it changed or is missing in firestore
@@ -77,12 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else {
             setUserData(null);
           }
+          console.log("Setting Auth loading to false");
           setLoading(false);
         }, (error) => {
           console.error('Firestore Error on Auth:', error);
           setLoading(false);
         });
       } else {
+        console.log("No user session found. Setting loading to false");
         setUserData(null);
         setLoading(false);
       }

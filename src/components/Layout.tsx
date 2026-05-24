@@ -133,7 +133,7 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Side Navigation Bar */}
       <aside
-        className={`w-[280px] h-screen fixed left-0 top-0 bg-primary-container border-r border-outline-variant/20 shadow-sm flex flex-col pt-1 pb-8 z-50 transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`w-[280px] h-screen fixed left-0 top-0 bg-primary-container border-r border-outline-variant/20 shadow-sm flex flex-col pt-1 pb-8 z-[1000] transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <ConfirmModal
           isOpen={showNotImplemented}
@@ -185,7 +185,7 @@ export function Layout({ children }: LayoutProps) {
                   <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
                 </button>
                 {isNotificationsOpen && (
-                  <div className="absolute left-0 mt-2 w-80 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 text-on-surface">
+                  <div className="absolute left-0 mt-2 w-80 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-[2000] animate-in fade-in zoom-in-95 duration-200 text-on-surface">
                     <div className="p-4 border-b border-outline-variant flex justify-between items-center">
                       <h4 className="font-semibold text-on-surface">
                         Notificações
@@ -247,7 +247,7 @@ export function Layout({ children }: LayoutProps) {
                 </button>
 
                 {isSettingsOpen && (
-                  <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 text-on-surface">
+                  <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-[2000] animate-in fade-in zoom-in-95 duration-200 text-on-surface">
                     <div className="py-2">
                       {userData?.role?.toLowerCase() === "admin" && (
                         <Link
@@ -331,7 +331,7 @@ export function Layout({ children }: LayoutProps) {
               </button>
 
               {isMoreMenuOpen && (
-                <div className="absolute left-full bottom-0 pl-2 w-56 z-[100] animate-in fade-in slide-in-from-left-2 duration-200">
+                <div className="absolute left-full bottom-0 pl-2 w-56 z-[2000] animate-in fade-in slide-in-from-left-2 duration-200">
                   <div className="bg-primary-container rounded-2xl p-2 shadow-2xl border border-white/10">
                     <NavLink
                       to="/maintenance"

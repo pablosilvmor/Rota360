@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MaintenanceAlertsConfig } from '../components/MaintenanceAlertsConfig';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, getDoc, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 const containerVariants = {
@@ -24,6 +24,8 @@ const itemVariants = {
   }
 };
 
+import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
+
 export function Maintenance() {
   const [isGenerateOSOpen, setIsGenerateOSOpen] = useState(false);
   const [isScheduleMaintenanceOpen, setIsScheduleMaintenanceOpen] = useState(false);
@@ -32,6 +34,8 @@ export function Maintenance() {
 
   const [osData, setOsData] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [itemsMap, setItemsMap] = useState<Record<string, any>>({});
   const [statusFilter, setStatusFilter] = useLocalStorageState('maintenance_statusFilter', 'Todos os Status');
   const [newOS, setNewOS] = useState({ plate: '', priority: 'Média', description: '', provider: '', title: '', cost: '', obra: '' });
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -65,9 +69,27 @@ export function Maintenance() {
       handleFirestoreError(error, OperationType.LIST, 'works');
     });
 
+    const qVehicles = query(collection(db, 'vehicles'));
+    const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
+      setVehicles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'vehicles');
+    });
+
+    const fetchItems = async () => {
+      try {
+        const querySnapshot = await getDocs(collectionGroup(db, 'items'));
+        const mapping: Record<string, any> = {};
+        querySnapshot.forEach((doc) => { mapping[doc.id] = doc.data(); });
+        setItemsMap(mapping);
+      } catch (err) { console.error(err); }
+    };
+    fetchItems();
+
     return () => {
       unsubscribe();
       unsubscribeWorks();
+      unsubscribeVehicles();
     };
   }, []);
 
@@ -110,6 +132,384 @@ export function Maintenance() {
       setScheduleData({ date: '', time: '', vehicle: '', type: 'Troca de Óleo e Filtros' });
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'maintenance');
+    }
+  };
+
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [selectedOS, setSelectedOS] = useState<any | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    
+    const days = [];
+    for (let i = firstDay - 1; i >= 0; i--) {
+      days.push({ day: prevMonthDays - i, isCurrentMonth: false, date: new Date(year, month - 1, prevMonthDays - i) });
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({ day: i, isCurrentMonth: true, date: new Date(year, month, i) });
+    }
+    return days;
+  };
+
+  const calendarDays = getDaysInMonth(calendarDate);
+  const formattedMonthYear = calendarDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+  const getTasksForDate = (date: Date) => {
+    return osData.filter(os => {
+      const osDate = new Date(os.createdAt);
+      return osDate.getDate() === date.getDate() && 
+             osDate.getMonth() === date.getMonth() && 
+             osDate.getFullYear() === date.getFullYear() &&
+             os.status !== 'Concluído';
+    });
+  };
+
+  const handleUpdateOSProvider = async (osId: string, provider: string) => {
+    try {
+      if (selectedOS && selectedOS.id === osId) {
+        setSelectedOS((prev: any) => ({ ...prev, provider }));
+      }
+      await updateDoc(doc(db, 'maintenance', osId), { provider, updatedAt: Date.now() });
+    } catch (e) {
+      console.error('Error updating provider', e);
+    }
+  };
+
+  const exportOsPDF = async (os: any) => {
+    setIsExporting(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default;
+
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Get vehicle logo if available
+      const vehicle = vehicles.find((v) => v.id === os.vehicleId || v.plate === os.plate);
+      let vehicleLogoDataUrl = "";
+
+      if (vehicle?.imageUrl) {
+        try {
+          const imgUrl = vehicle.imageUrl;
+          // Try fetching directly first
+          let resp = await fetch(imgUrl).catch(() => null);
+          
+          // If direct fetch fails or is opaque, try proxy
+          if (!resp || !resp.ok) {
+            const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}&w=400&output=jpeg`;
+            resp = await fetch(proxyUrl);
+          }
+
+          if (resp && resp.ok) {
+            const blob = await resp.blob();
+            vehicleLogoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+          }
+        } catch (e) {
+          console.warn("Could not load vehicle image for OS PDF:", e);
+        }
+      }
+
+      // Generate items array
+      // Se houver items no selectedOS (do checklist) com títulos válidos, listamos. 
+      // Caso contrário (se forem apenas IDs em registros antigos), usamos a description que já contém os nomes.
+      const tableData: any[][] = [];
+      let totalItems = 0;
+      let nonCompliantItems = 0;
+      
+      // Helper function to check if a string is likely a Firestore ID (20-28 chars alphanumeric)
+      const isFirestoreId = (str: string) => typeof str === 'string' && str.length >= 20 && /^[a-zA-Z0-9]+$/.test(str);
+
+      const itemsWithValidTitles = os.inspectionItems?.filter((i: any) => {
+        const label = i.itemTitle || i.description || i.title || i.item || itemsMap[i.itemId]?.name;
+        return label && !isFirestoreId(label);
+      }) || [];
+
+      if (itemsWithValidTitles.length > 0) {
+        itemsWithValidTitles.forEach((i: any) => {
+          const itemLabel = i.itemTitle || i.description || i.title || i.item || itemsMap[i.itemId]?.name || "Item Indefinido";
+          tableData.push([
+            itemLabel,
+            "Manutenção Solicitada", 
+            os.status,
+            ""
+          ]);
+          totalItems++;
+          nonCompliantItems++;
+        });
+      } else {
+        const descItems = os.description?.split('\n') || [os.description];
+        descItems.forEach((itemLine: string) => {
+          // Filtra linhas de cabeçalho e linhas vazias
+          const trimmed = itemLine.trim();
+          if (trimmed !== '' && 
+              trimmed !== 'Gerado a partir do checklist diário.' && 
+              trimmed !== 'Itens:' && 
+              !trimmed.match(/^[a-zA-Z0-9]{20}$/)) { // Evita IDs puros de 20 caracteres se possível
+            
+            // Try resolving if it is somehow just an ID
+            let label = trimmed.replace(/^- /, '');
+            if (isFirestoreId(label) && itemsMap[label]) {
+              label = itemsMap[label].name;
+            }
+
+            tableData.push([
+              label,
+              "Manutenção Solicitada",
+              os.status,
+              ""
+            ]);
+            totalItems++;
+            nonCompliantItems++;
+          }
+        });
+      }
+
+      autoTable(pdf, {
+        startY: 55,
+        margin: { top: 55, bottom: 20, left: 14, right: 14 },
+        head: [["ITEM / SERVIÇO", "CATEGORIA", "STATUS", "OBSERVAÇÕES"]],
+        body: tableData,
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 8,
+          cellPadding: { top: 4, right: 4, bottom: 4, left: 4 },
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: [248, 250, 252],
+          textColor: [100, 116, 139],
+          fontStyle: "bold",
+          fontSize: 7,
+          halign: "left",
+          lineColor: [226, 232, 240],
+          lineWidth: 0.1,
+        },
+        bodyStyles: {
+          lineColor: [226, 232, 240],
+          lineWidth: 0.1,
+        },
+        didDrawPage: function (data) {
+          let startY = 15;
+
+          if (vehicleLogoDataUrl) {
+            pdf.addImage(vehicleLogoDataUrl, "JPEG", 14, startY, 35, 20);
+            pdf.setFontSize(16);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(0, 0, 0);
+            pdf.text(`OS: ${os.plate}`, 54, startY + 8);
+            pdf.setFontSize(10);
+            pdf.setFont("helvetica", "normal");
+            pdf.setTextColor(100, 100, 100);
+            pdf.text(vehicle ? `${vehicle.brand} ${vehicle.model}` : "Veículo", 54, startY + 14);
+          } else {
+            pdf.setFontSize(16);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(0, 0, 0);
+            pdf.text(`OS: ${os.plate}`, 14, startY + 8);
+            pdf.setFontSize(10);
+            pdf.setFont("helvetica", "normal");
+            pdf.setTextColor(100, 100, 100);
+            pdf.text(vehicle ? `${vehicle.brand} ${vehicle.model}` : "Veículo", 14, startY + 14);
+          }
+
+          // Resumo no cabeçalho
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(30, 41, 59);
+          pdf.text(`TOTAL ITENS: ${totalItems}`, 14, startY + 22);
+
+          // Box informativos (Data)
+          pdf.setFillColor(241, 245, 249);
+          pdf.roundedRect(pageWidth - 94, startY, 80, 20, 2, 2, "F");
+
+          pdf.setFontSize(7);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(100, 116, 139);
+          pdf.text("DATA DE CRIAÇÃO", pageWidth - 90, startY + 6);
+
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(30, 41, 59);
+          
+          const createdDateFormatted = new Date(os.createdAt).toLocaleDateString();
+          const cleanDate = createdDateFormatted.replace(/(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1");
+
+          pdf.text(cleanDate, pageWidth - 90, startY + 11);
+          pdf.text(`Prestador: ${os.provider}`, pageWidth - 90, startY + 16);
+        },
+      });
+
+      const totalPages = (pdf as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(150);
+        pdf.setFont("helvetica", "normal");
+        pdf.text("ROTA 360 - Gestão de Frota", 14, pageHeight - 10);
+        const pageStr = `Pág. ${i}/${totalPages}`;
+        pdf.text(
+          pageStr,
+          pageWidth - 14 - pdf.getTextWidth(pageStr),
+          pageHeight - 10,
+        );
+      }
+
+      pdf.setPage(totalPages);
+      const finalY = (pdf as any).lastAutoTable.finalY || 40;
+      let signatureY = finalY + 20;
+      let signatureHeight = 40;
+
+      if (signatureY + signatureHeight > pageHeight - 20) {
+        pdf.addPage();
+        signatureY = 30;
+      }
+
+      // Generate digital signature
+      const signatureId = await createSignature({
+         documentType: 'Ordem de Serviço (Manutenção)',
+         documentTitle: os.title || `OS ${os.plate}`
+      });
+
+      if (signatureId) {
+        const verifyUrl = generateVerificationUrl(signatureId);
+        const qrCodeDataUrl = await getQRCodeDataUrl(verifyUrl);
+        
+        pdf.setFillColor(248, 250, 252);
+        pdf.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "F");
+        pdf.setDrawColor(226, 232, 240);
+        pdf.setLineWidth(0.1);
+        pdf.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "S");
+        
+        if (qrCodeDataUrl) {
+           pdf.addImage(qrCodeDataUrl, "JPEG", 20, signatureY + 5, 30, 30);
+        }
+        
+        pdf.setFontSize(10);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("DOCUMENTO ASSINADO DIGITALMENTE", 56, signatureY + 12);
+        
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`Para verificar a autenticidade deste documento, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, signatureY + 18);
+        
+        pdf.setTextColor(37, 99, 235);
+        pdf.text(verifyUrl, 56, signatureY + 26);
+        
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFontSize(7);
+        pdf.text(`Código de Validação: ${signatureId}`, 56, signatureY + 34);
+      } else {
+        pdf.setLineWidth(0.5);
+        pdf.setDrawColor(200);
+        pdf.line(pageWidth / 2 - 45, signatureY + 20, pageWidth / 2 + 45, signatureY + 20);
+        pdf.setFontSize(10);
+        pdf.setTextColor(50);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Assinatura do Responsável", pageWidth / 2, signatureY + 26, {
+          align: "center",
+        });
+      }
+
+      const dateStr = new Date(os.createdAt).toLocaleDateString('pt-BR').split('/').join('-');
+      pdf.save(`${dateStr}_${os.plate}_manutencao.pdf`);
+    } catch (error) {
+      console.error("Erro ao exportar PDF:", error);
+      alert("Houve um problema ao gerar o PDF.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleCompleteOS = async (os: any) => {
+    setCompletingId(os.id);
+    try {
+      // Atualizar status da OS
+      await updateDoc(doc(db, 'maintenance', os.id), {
+        status: 'Concluído',
+        updatedAt: Date.now()
+      });
+
+      // Arquivamento inteligente - salvar no historico
+      await addDoc(collection(db, 'maintenance_history'), {
+        ...os,
+        originalOsId: os.id,
+        status: 'Concluído',
+        completedAt: Date.now()
+      });
+
+      // Lógica Automática de Atualização de Inspeções de Mesma Periodicidade
+      if (os.vehicleId && os.inspectionItems && os.inspectionItems.length > 0) {
+        // Encontrar as periodicidades únicas (geralmente uma OS pode ter várias, agrupamos todas)
+        const periodicities = Array.from(new Set(os.inspectionItems.map((i: any) => i.periodicityKM).filter((p: number) => p > 0)));
+        
+        if (periodicities.length > 0) {
+          // Capturar KM atual da telemetria (veículo)
+          const vehicleSnap = await getDoc(doc(db, 'vehicles', os.vehicleId));
+          if (vehicleSnap.exists()) {
+            const vehicleData = vehicleSnap.data();
+            const currentKM = vehicleData.currentKM || vehicleData.odometer || 0;
+
+            if (currentKM > 0) {
+              // Buscar todos os itens de inspeção do veículo para verificar periodicidades
+              const itemsSnap = await getDocs(collection(db, `inspections/${os.vehicleId}/items`));
+              const itemsFilter = itemsSnap.docs
+                .map(d => ({ id: d.id, ...d.data() as any }))
+                .filter(item => periodicities.includes(item.periodicityKM));
+
+              if (itemsFilter.length > 0) {
+                // Atualizar records
+                const recordsSnap = await getDocs(collection(db, `inspections/${os.vehicleId}/records`));
+                const recordsMap = new Map();
+                recordsSnap.forEach(d => recordsMap.set(d.data().itemId, { id: d.id, ...d.data() }));
+
+                for (const item of itemsFilter) {
+                  const rec = recordsMap.get(item.id);
+                  const nextKM = currentKM + (item.periodicityKM || 0);
+                  
+                  if (rec) {
+                    await updateDoc(doc(db, `inspections/${os.vehicleId}/records`, rec.id), {
+                      lastMaintenanceKM: currentKM,
+                      nextMaintenanceKM: nextKM,
+                      conformity: 'SIM',
+                      serviceExecuted: 'SIM',
+                      updatedAt: serverTimestamp()
+                    });
+                  } else {
+                    await addDoc(collection(db, `inspections/${os.vehicleId}/records`), {
+                      itemId: item.id,
+                      lastMaintenanceKM: currentKM,
+                      nextMaintenanceKM: nextKM,
+                      conformity: 'SIM',
+                      serviceExecuted: 'SIM',
+                      updatedAt: serverTimestamp()
+                    });
+                  }
+                }
+                console.log(`Updated ${itemsFilter.length} inspection items for periodicities: ${periodicities.join(', ')}`);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error completing OS:", e);
+      handleFirestoreError(e as any, OperationType.UPDATE, 'maintenance');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -400,42 +800,76 @@ export function Maintenance() {
             <div className="p-5 border-b border-outline-variant flex justify-between items-center">
               <h4 className="text-[18px] font-semibold text-primary">Calendário de Serviços</h4>
               <div className="flex gap-2">
-                <button className="p-1 hover:bg-surface-container-high rounded"><span className="material-symbols-outlined">chevron_left</span></button>
-                <button className="p-1 hover:bg-surface-container-high rounded"><span className="material-symbols-outlined">chevron_right</span></button>
+                <button 
+                  onClick={() => {
+                    const newDate = new Date(calendarDate);
+                    newDate.setMonth(newDate.getMonth() - 1);
+                    setCalendarDate(newDate);
+                  }}
+                  className="p-1 hover:bg-surface-container-high rounded transition-colors"
+                >
+                  <span className="material-symbols-outlined">chevron_left</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const newDate = new Date(calendarDate);
+                    newDate.setMonth(newDate.getMonth() + 1);
+                    setCalendarDate(newDate);
+                  }}
+                  className="p-1 hover:bg-surface-container-high rounded transition-colors"
+                >
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
               </div>
             </div>
             <div className="p-6">
-              <div className="text-center font-bold text-sm mb-4">OUTUBRO 2023</div>
+              <div className="text-center font-bold text-sm mb-4">{formattedMonthYear}</div>
               <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold mb-2">
                 <div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div>
               </div>
               <div className="grid grid-cols-7 gap-2">
                 {/* Day Cells */}
-                <div className="h-10 flex items-center justify-center text-on-surface-variant opacity-30">27</div>
-                <div className="h-10 flex items-center justify-center text-on-surface-variant opacity-30">28</div>
-                <div className="h-10 flex items-center justify-center text-on-surface-variant opacity-30">29</div>
-                <div className="h-10 flex items-center justify-center text-on-surface-variant opacity-30">30</div>
-                <div className="h-10 flex items-center justify-center relative bg-surface-container-high rounded-full">1 <span className="absolute bottom-1 w-1 h-1 bg-secondary rounded-full"></span></div>
-                <div className="h-10 flex items-center justify-center">2</div>
-                <div className="h-10 flex items-center justify-center">3</div>
-                <div className="h-10 flex items-center justify-center">4</div>
-                <div className="h-10 flex items-center justify-center bg-primary-container text-on-primary rounded-full font-bold">5</div>
-                <div className="h-10 flex items-center justify-center relative">6 <span className="absolute bottom-1 w-1 h-1 bg-error rounded-full"></span></div>
-                <div className="h-10 flex items-center justify-center">7</div>
-                <div className="h-10 flex items-center justify-center">8</div>
-                <div className="h-10 flex items-center justify-center relative">9 <span className="absolute bottom-1 w-1 h-1 bg-secondary rounded-full"></span></div>
-                <div className="h-10 flex items-center justify-center">10</div>
+                {calendarDays.map((calDay, idx) => {
+                  const tasksForDay = getTasksForDate(calDay.date);
+                  const isSelected = selectedCalendarDate.getDate() === calDay.date.getDate() && 
+                                     selectedCalendarDate.getMonth() === calDay.date.getMonth() && 
+                                     selectedCalendarDate.getFullYear() === calDay.date.getFullYear();
+                  const hasTasks = tasksForDay.length > 0;
+                  const isCritical = tasksForDay.some(t => t.priority === 'Alta' || t.priority === 'Crítica');
+
+                  return (
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        if (calDay.isCurrentMonth) {
+                          setSelectedCalendarDate(calDay.date);
+                        }
+                      }}
+                      className={`h-10 flex items-center justify-center relative rounded-full text-sm transition-colors cursor-pointer 
+                        ${!calDay.isCurrentMonth ? 'text-on-surface-variant opacity-30 cursor-default' : 'hover:bg-surface-container-high'}
+                        ${isSelected && calDay.isCurrentMonth ? 'bg-primary-container text-on-primary font-bold' : ''}
+                      `}
+                    >
+                      {calDay.day}
+                      {hasTasks && calDay.isCurrentMonth && !isSelected && (
+                        <span className={`absolute bottom-1 w-1 h-1 rounded-full ${isCritical ? 'bg-error' : 'bg-secondary'}`}></span>
+                      )}
+                    </div>
+                  );
+                })}
 
                 <div className="col-span-7 pt-4 mt-4 border-t border-outline-variant">
-                  <p className="text-sm font-semibold mb-3">Foco de Hoje</p>
-                  {osData.filter(os => os.status !== 'Concluído').slice(0, 2).map((os, index) => (
-                    <div key={os.id} className={`bg-surface-container-low p-3 rounded-lg mb-2 border-l-4 ${index === 0 ? 'border-secondary' : 'border-primary'}`}>
+                  <p className="text-sm font-semibold mb-3">
+                    Foco de: {selectedCalendarDate.toLocaleDateString('pt-BR')}
+                  </p>
+                  {getTasksForDate(selectedCalendarDate).map((os, index) => (
+                    <div key={os.id} className={`bg-surface-container-low p-3 rounded-lg mb-2 border-l-4 ${os.priority === 'Alta' || os.priority === 'Crítica' ? 'border-error' : index === 0 ? 'border-secondary' : 'border-primary'}`}>
                       <p className="font-semibold text-sm truncate">{os.title}: {os.plate}</p>
-                      <p className="text-xs text-on-surface-variant truncate">{os.provider}</p>
+                      <p className="text-xs text-on-surface-variant truncate">{os.provider || 'A Definir'}</p>
                     </div>
                   ))}
-                  {osData.filter(os => os.status !== 'Concluído').length === 0 && (
-                    <div className="text-xs text-on-surface-variant py-2">Nenhum serviço pendente.</div>
+                  {getTasksForDate(selectedCalendarDate).length === 0 && (
+                    <div className="text-xs text-on-surface-variant py-2">Nenhum serviço pendente nesta data.</div>
                   )}
                 </div>
               </div>
@@ -488,7 +922,11 @@ export function Maintenance() {
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
                   {filteredOsData.map(os => (
-                    <tr key={os.id} className="hover:bg-surface-container-lowest transition-colors group bg-white">
+                    <tr 
+                      key={os.id} 
+                      className="hover:bg-surface-container-lowest transition-colors group bg-white cursor-pointer"
+                      onClick={() => setSelectedOS(os)}
+                    >
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 bg-surface-container-high rounded-lg flex items-center justify-center`}>
@@ -515,17 +953,18 @@ export function Maintenance() {
                           <span className="text-sm font-semibold">{os.status}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-right">
+                      <td className="px-6 py-5 text-right w-32">
                         {deletingId === os.id ? (
                           <div className="flex items-center gap-2 justify-end animate-in fade-in zoom-in duration-200">
                             <button 
-                              onClick={() => setDeletingId(null)}
+                              onClick={(e) => { e.stopPropagation(); setDeletingId(null); }}
                               className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all"
                             >
                               Cancelar
                             </button>
                             <button 
-                              onClick={async () => {
+                              onClick={async (e) => {
+                                e.stopPropagation();
                                 await deleteDoc(doc(db, 'maintenance', os.id));
                                 setDeletingId(null);
                               }}
@@ -534,13 +973,29 @@ export function Maintenance() {
                               Confirmar
                             </button>
                           </div>
+                        ) : completingId === os.id ? (
+                           <div className="flex justify-end">
+                             <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                           </div>
                         ) : (
-                          <button 
-                            onClick={() => setDeletingId(os.id)}
-                            className="p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error-container hover:text-error rounded-full"
-                          >
-                            <span className="material-symbols-outlined">delete</span>
-                          </button>
+                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {os.status !== 'Concluído' && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleCompleteOS(os); }}
+                                title="Marcar como Concluído"
+                                className="p-2 hover:bg-primary-container hover:text-primary rounded-full transition-colors"
+                              >
+                                <span className="material-symbols-outlined">check_circle</span>
+                              </button>
+                            )}
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setDeletingId(os.id); }}
+                              title="Excluir OS"
+                              className="p-2 hover:bg-error-container hover:text-error rounded-full transition-colors"
+                            >
+                              <span className="material-symbols-outlined">delete</span>
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -583,6 +1038,145 @@ export function Maintenance() {
           </button>
         </div>
       </motion.div>
+
+      {/* OS Details Modal */}
+      <AnimatePresence>
+        {selectedOS && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedOS(null)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-surface w-full max-w-2xl rounded-3xl shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-6 sm:p-8 border-b border-outline-variant/30 flex justify-between items-start bg-surface-container-lowest">
+                <div>
+                  <h2 className="text-[28px] font-bold text-on-surface tracking-tight mb-2 flex items-center gap-3">
+                    <div className={`w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center`}>
+                      <span className={`material-symbols-outlined text-${selectedOS.color} text-[24px]`}>{selectedOS.icon}</span>
+                    </div>
+                    {selectedOS.title?.replace(/(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1")}
+                  </h2>
+                  <div className="flex gap-4 items-center mt-4">
+                    {vehicles.find(v => v.id === selectedOS.vehicleId || v.plate === selectedOS.plate)?.imageUrl && (
+                      <div className="w-16 h-16 rounded-xl border border-outline-variant/50 bg-white overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
+                        <img 
+                          src={vehicles.find(v => v.id === selectedOS.vehicleId || v.plate === selectedOS.plate)?.imageUrl} 
+                          alt="Veículo" 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
+                    <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[18px]">directions_car</span>
+                      {selectedOS.plate || 'N/A'}
+                    </span>
+                    <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[18px]">calendar_today</span>
+                      {new Date(selectedOS.createdAt).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedOS(null)}
+                  className="w-10 h-10 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-error transition-colors"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              
+              <div className="p-6 sm:p-8 overflow-y-auto bg-surface-container-lowest/50">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+                  <div className="bg-surface-container-lowest border border-outline-variant/30 p-4 rounded-2xl">
+                    <span className="text-xs font-semibold text-on-surface-variant block mb-1 uppercase tracking-wider">Status</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full bg-${selectedOS.color}`}></span>
+                      <span className="font-bold text-on-surface">{selectedOS.status}</span>
+                    </div>
+                  </div>
+                  <div className="bg-surface-container-lowest border border-outline-variant/30 p-4 rounded-2xl">
+                    <span className="text-xs font-semibold text-on-surface-variant block mb-1 uppercase tracking-wider">Prioridade</span>
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${selectedOS.priority === 'Alta' ? 'bg-error-container text-error' : selectedOS.priority === 'Media' ? 'bg-orange-100 text-orange-800' : 'bg-surface-container text-on-surface'}`}>
+                      {selectedOS.priority}
+                    </span>
+                  </div>
+                  <div className="bg-surface-container-lowest border border-outline-variant/30 p-4 rounded-2xl col-span-2 sm:col-span-2">
+                    <span className="text-xs font-semibold text-on-surface-variant block mb-1 uppercase tracking-wider">Fornecedor</span>
+                    {selectedOS.status !== 'Concluído' ? (
+                      <input
+                        type="text"
+                        value={selectedOS.provider}
+                        onChange={(e) => setSelectedOS({ ...selectedOS, provider: e.target.value })}
+                        onBlur={(e) => handleUpdateOSProvider(selectedOS.id, e.target.value)}
+                        className="w-full bg-white border border-outline-variant rounded px-2 py-1 text-sm font-medium text-on-surface focus:outline-none focus:border-primary"
+                        placeholder="Nome do Fornecedor..."
+                      />
+                    ) : (
+                      <span className="font-medium text-on-surface">{selectedOS.provider}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-outline-variant/50 rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-on-surface mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">build_circle</span>
+                    Itens para Manutenção
+                  </h3>
+                  
+                  <div className="whitespace-pre-wrap text-sm text-on-surface-variant leading-relaxed">
+                    {selectedOS.description}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-outline-variant/30 bg-surface flex flex-wrap justify-end gap-3 mt-auto">
+                <button
+                  onClick={() => exportOsPDF(selectedOS)}
+                  disabled={isExporting}
+                  className="px-6 py-3 font-semibold border border-outline-variant rounded-xl hover:bg-surface-container-low transition-colors flex items-center gap-2"
+                >
+                  {isExporting ? (
+                    <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                  )}
+                  Exportar PDF
+                </button>
+                <button 
+                  onClick={() => setSelectedOS(null)}
+                  className="px-6 py-3 font-semibold text-on-surface-variant hover:bg-surface-container-low rounded-xl transition-colors"
+                >
+                  Fechar
+                </button>
+                {selectedOS.status !== 'Concluído' ? (
+                  <button 
+                    onClick={() => {
+                      handleCompleteOS(selectedOS);
+                      setSelectedOS(null);
+                    }}
+                    className="px-6 py-3 font-bold bg-primary text-on-primary rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2 shadow-md"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                    Concluir Manutenção
+                  </button>
+                ) : (
+                  <div className="px-6 py-3 font-bold bg-surface-container-highest text-on-surface-variant rounded-xl flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[20px]">verified</span>
+                    Concluída em {new Date(selectedOS.updatedAt).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

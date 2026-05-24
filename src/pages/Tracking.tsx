@@ -1,15 +1,28 @@
 import { motion } from 'framer-motion';
-import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { useState, useEffect } from 'react';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
-const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
+// Custom icons based on status
+const createCustomIcon = (color: string) => L.divIcon({
+  className: 'custom-div-icon',
+  html: `<div style="background-color: ${color}; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8]
+});
+
+// Helper component to center map on selection
+function MapFollow({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map]);
+  return null;
+}
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -88,29 +101,6 @@ export function Tracking() {
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
   const selectedVehicleDriver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(selectedVehicle?.plate) : d.vehicleAssigned === selectedVehicle?.plate);
 
-  if (!hasValidKey) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[80vh] text-center font-sans px-4">
-        <div className="max-w-2xl bg-surface-container-lowest border border-outline-variant p-8 rounded-2xl shadow-sm">
-          <span className="material-symbols-outlined text-[64px] text-primary mb-4">map</span>
-          <h2 className="text-2xl font-bold mb-4">Chave da Google Maps API Requerida</h2>
-          <p className="mb-6 text-on-surface-variant">Para visualizar o rastreamento em tempo real da frota, é necessário configurar a integração com o Google Maps Platform.</p>
-          <div className="text-left bg-surface-container-low p-6 rounded-xl border border-outline-variant">
-            <p className="font-semibold mb-2"><strong>Passo 1:</strong> <a href="https://console.cloud.google.com/google/maps-apis/start" target="_blank" rel="noopener" className="text-primary hover:underline">Obter uma API Key</a></p>
-            <p className="font-semibold mb-2"><strong>Passo 2:</strong> Adicionar como segredo no AI Studio:</p>
-            <ul className="list-disc pl-6 space-y-1 text-sm">
-              <li>Abra as <strong>Configurações</strong> (⚙️ ícone de engrenagem, <strong>canto superior direito</strong>)</li>
-              <li>Selecione <strong>Secrets</strong></li>
-              <li>Digite <code>GOOGLE_MAPS_PLATFORM_KEY</code> como o nome do segredo e pressione <strong>Enter</strong></li>
-              <li>Cole a sua chave de API como o valor e pressione <strong>Enter</strong></li>
-            </ul>
-          </div>
-          <p className="mt-6 text-sm text-on-surface-variant">O aplicativo será reconstruído automaticamente após a adição do segredo.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <motion.div 
       className="pb-12 h-[calc(100vh-80px)]"
@@ -127,34 +117,57 @@ export function Tracking() {
 
       <motion.div className="grid grid-cols-12 gap-6 h-[70vh]" variants={containerVariants}>
         <motion.div className="col-span-12 lg:col-span-8 h-full rounded-2xl overflow-hidden border border-outline-variant relative shadow-sm" variants={itemVariants}>
-          <APIProvider apiKey={API_KEY} version="weekly">
-            <Map
-              defaultCenter={{lat: BASE_LAT, lng: BASE_LNG}}
-              defaultZoom={12}
-              mapId="FLEET_TRACKING_MAP"
-              internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-              style={{width: '100%', height: '100%'}}
-            >
-              {vehicles.map(v => {
-                const driver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
-                const status = driver ? driver.status : 'Inativo';
+          <div className="relative h-full">
+            {vehicles.length > 0 && typeof window !== 'undefined' ? (
+              <MapContainer 
+                key="tracking-live-map-instance"
+                center={[BASE_LAT, BASE_LNG]} 
+                zoom={12} 
+                style={{ width: '100%', height: '100%' }}
+                zoomControl={true}
+                attributionControl={false}
+              >
+                <TileLayer
+                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                />
                 
-                return (
-                  <AdvancedMarker 
-                    key={v.id} 
-                    position={v.location} 
-                    onClick={() => setSelectedVehicleId(v.id)}
-                  >
-                    <Pin 
-                      background={status === 'Em Rota' ? '#34d399' : status === 'Disponível' ? '#60a5fa' : '#f87171'} 
-                      glyphColor="#fff" 
-                      borderColor={status === 'Em Rota' ? '#059669' : status === 'Disponível' ? '#2563eb' : '#dc2626'}
-                    />
-                  </AdvancedMarker>
-                );
-              })}
-            </Map>
-          </APIProvider>
+                {selectedVehicle && selectedVehicle.location && (
+                  <MapFollow center={[selectedVehicle.location.lat, selectedVehicle.location.lng]} />
+                )}
+
+                {vehicles.map(v => {
+                  const driver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
+                  const status = driver ? driver.status : 'Inativo';
+                  const color = status === 'Em Rota' ? '#34d399' : status === 'Disponível' ? '#60a5fa' : '#f87171';
+                  
+                  if (!v.location || typeof v.location.lat !== 'number') return null;
+
+                  return (
+                    <Marker 
+                      key={v.id} 
+                      position={[v.location.lat, v.location.lng]}
+                      icon={createCustomIcon(color)}
+                      eventHandlers={{
+                        click: () => setSelectedVehicleId(v.id)
+                      }}
+                    >
+                      <Popup>
+                        <div className="text-xs font-sans">
+                          <strong className="text-primary">{v.plate}</strong><br/>
+                          {v.model}<br/>
+                          <span className="font-bold">{status}</span>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </MapContainer>
+            ) : (
+              <div className="w-full h-full bg-surface-container flex items-center justify-center text-on-surface-variant text-sm">
+                Carregando mapa...
+              </div>
+            )}
+          </div>
           {selectedVehicle && (
             <div className="absolute top-4 right-4 bg-white p-4 rounded-xl shadow-lg border border-outline-variant w-64 animate-in fade-in slide-in-from-right-4 duration-300 z-10">
               <div className="flex justify-between items-start mb-2">

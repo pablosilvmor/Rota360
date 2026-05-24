@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
 
 type ModuleData = {
   id: string;
@@ -601,7 +602,7 @@ export function Reports() {
           doc.addImage(footerLogo.src, 'PNG', (pageWidth - w) / 2, pageHeight - 15, w, h, '', 'FAST');
         }
         
-        const byText = "By Pablo Moreira";
+        const byText = "ROTA 360 - Gestão de Frota";
         const byWidth = doc.getTextWidth(byText);
         doc.text(byText, pageWidth - marginX - byWidth, pageHeight - 10);
       }
@@ -610,6 +611,66 @@ export function Reports() {
     // @ts-ignore
     if (typeof doc.putTotalPages === 'function') {
       doc.putTotalPages('{total_pages_count_string}');
+    }
+
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    doc.setPage(totalPages);
+    const finalY = (doc as any).lastAutoTable?.finalY || 40;
+    
+    let signatureY = finalY + 20;
+    let signatureHeight = 40;
+
+    if (signatureY + signatureHeight > pageHeight - 20) {
+      doc.addPage();
+      signatureY = 30;
+    }
+
+    // Generate digital signature
+    const signatureId = await createSignature({
+       documentType: `Relatório de ${title}`,
+       documentTitle: title
+    });
+
+    if (signatureId) {
+      const verifyUrl = generateVerificationUrl(signatureId);
+      const qrCodeDataUrl = await getQRCodeDataUrl(verifyUrl);
+      
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "F");
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.1);
+      doc.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "S");
+      
+      if (qrCodeDataUrl) {
+         doc.addImage(qrCodeDataUrl, "JPEG", 20, signatureY + 5, 30, 30);
+      }
+      
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.text("DOCUMENTO ASSINADO DIGITALMENTE", 56, signatureY + 12);
+      
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Para verificar a autenticidade deste documento, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, signatureY + 18);
+      
+      doc.setTextColor(37, 99, 235);
+      doc.text(verifyUrl, 56, signatureY + 26);
+      
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(7);
+      doc.text(`Código de Validação: ${signatureId}`, 56, signatureY + 34);
+    } else {
+      doc.setLineWidth(0.5);
+      doc.setDrawColor(200);
+      doc.line(pageWidth / 2 - 45, signatureY + 20, pageWidth / 2 + 45, signatureY + 20);
+      doc.setFontSize(10);
+      doc.setTextColor(50);
+      doc.setFont("helvetica", "bold");
+      doc.text("Assinatura do Responsável", pageWidth / 2, signatureY + 26, {
+        align: "center",
+      });
     }
 
     doc.save(`${title.replace(/\s+/g, '_').toLowerCase()}.pdf`);

@@ -18,6 +18,8 @@ import { Works } from './pages/Works';
 import { Inspections } from './pages/Inspections';
 import { Reports } from './pages/Reports';
 import { Checklist } from './pages/Checklist';
+import { VerifySignature } from './pages/VerifySignature';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function ProtectedRoute({ children, path }: { children: ReactNode, path: string }) {
   const { user, userData, loading, logout } = useAuth();
@@ -75,8 +77,10 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/checklist" element={<Checklist />} />
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/checklist" element={<Checklist />} />
+            <Route path="/verify/:id" element={<VerifySignature />} />
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute path="/"><Dashboard /></ProtectedRoute>} />
             <Route path="/fleet" element={<ProtectedRoute path="/fleet"><Fleet /></ProtectedRoute>} />
@@ -96,6 +100,7 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+        </ErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   );

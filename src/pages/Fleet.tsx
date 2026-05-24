@@ -41,8 +41,8 @@ export function Fleet() {
   const [loading, setLoading] = useState(true);
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useLocalStorageState('fleet_searchTerm', '');
-  const [filterWork, setFilterWork] = useLocalStorageState('fleet_filterWork', '');
-  const [filterStatus, setFilterStatus] = useLocalStorageState('fleet_filterStatus', '');
+  const [filterWork, setFilterWork] = useLocalStorageState<string[]>('fleet_filterWorkArr', []);
+  const [filterStatus, setFilterStatus] = useLocalStorageState<string[]>('fleet_filterStatusArr', []);
   const [viewMode, setViewMode] = useLocalStorageState<'grid' | 'list'>('fleet_viewMode', 'grid');
 
   const editingVehicle = vehicles.find(v => v.id === editingVehicleId) || null;
@@ -147,8 +147,8 @@ export function Fleet() {
       (v.bodywork || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (v.observations || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesWork = filterWork === '' || filterWork === 'Todas as Obras' || (Array.isArray(v.costCenter) ? v.costCenter.includes(filterWork) : v.costCenter === filterWork);
-    const matchesStatus = filterStatus === '' || filterStatus === 'Todos os Status' || v.status === filterStatus;
+    const matchesWork = !filterWork || filterWork.length === 0 || filterWork.includes('') || filterWork.includes('Todas as Obras') || (Array.isArray(v.costCenter) ? v.costCenter.some((cc: string) => filterWork.includes(cc)) : filterWork.includes(v.costCenter));
+    const matchesStatus = !filterStatus || filterStatus.length === 0 || filterStatus.includes('') || filterStatus.includes('Todos os Status') || filterStatus.includes(v.status);
 
     return matchesSearch && matchesWork && matchesStatus;
   });
@@ -229,8 +229,8 @@ export function Fleet() {
           <SearchableSelect 
             label="Obra"
             placeholder="Todas as Obras"
+            multiple={true}
             options={[
-              { value: '', label: 'Todas as Obras' },
               ...works.map(work => ({ value: work.name, label: work.name }))
             ]}
             value={filterWork}
@@ -241,8 +241,8 @@ export function Fleet() {
           <SearchableSelect 
             label="Status"
             placeholder="Todos os Status"
+            multiple={true}
             options={[
-              { value: '', label: 'Todos os Status' },
               { value: 'Ativo', label: 'Ativo' },
               { value: 'Inativo', label: 'Inativo' },
               { value: 'Em Manutenção', label: 'Em Manutenção' },
@@ -276,9 +276,9 @@ export function Fleet() {
         </div>
         
         <div className="flex items-center gap-4 pt-6">
-          {(searchTerm || filterWork || filterStatus) && (
+          {(searchTerm || filterWork.length > 0 || filterStatus.length > 0) && (
             <button 
-              onClick={() => { setSearchTerm(''); setFilterWork(''); setFilterStatus(''); }}
+              onClick={() => { setSearchTerm(''); setFilterWork([]); setFilterStatus([]); }}
               className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-surface-container-low"
             >
               LIMPAR FILTRO

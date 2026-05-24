@@ -18,6 +18,21 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import { calculateProgress } from "../lib/progressUtils";
+
+// Custom icons based on status
+const createCustomIcon = (color: string) => L.divIcon({
+  className: 'custom-div-icon',
+  html: `<div style="background-color: ${color}; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
+  iconSize: [14, 14],
+  iconAnchor: [7, 7]
+});
+
+// Base coordinates for Belo Horizonte, MG
+const BASE_LAT = -19.9167;
+const BASE_LNG = -43.9345;
 
 const CHART_COLORS = [
   "#0ea5e9",
@@ -61,137 +76,102 @@ export function Dashboard() {
 
   const [expiredInspections, setExpiredInspections] = useState<any[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(true);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [itemsMap, setItemsMap] = useState<Record<string, any>>({});
+  const [allRecords, setAllRecords] = useState<any[]>([]);
 
   const [nextServices, setNextServices] = useState<any[]>([]);
   const [costCenterStats, setCostCenterStats] = useState<any[]>([]);
 
+  // 1. Fetch static or high-volume data periodically or on mount
   useEffect(() => {
-    // Create listeners
+    const fetchData = async () => {
+      try {
+        const [recordsSnap, itemsSnap] = await Promise.all([
+          getDocs(collectionGroup(db, "records")),
+          getDocs(collectionGroup(db, "items"))
+        ]);
+        
+        const iMap: Record<string, any> = {};
+        itemsSnap.forEach((doc) => {
+          const data = doc.data();
+          iMap[doc.id] = { ...data, id: doc.id };
+        });
+        setItemsMap(iMap);
+
+        const rList: any[] = [];
+        recordsSnap.forEach((doc) => {
+          rList.push({ ...doc.data(), id: doc.id, path: doc.ref.path });
+        });
+        setAllRecords(rList);
+      } catch (error) {
+        console.error("Error fetching background data:", error);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // 2. Main Logic Effect
+  useEffect(() => {
+    const vehicleLookup = new Map();
+    
+    // Vehicles listener
     const unsubscribeVehicles = onSnapshot(
       collection(db, "vehicles"),
-      async (snapshot) => {
-        const vehicles = snapshot.docs.map((d) => ({
-          ...d.data(),
-          id: d.id,
-        })) as any[];
+      (snapshot) => {
+        const fetchedVehicles: any[] = snapshot.docs.map((d) => {
+          const data = d.data();
+          const hash = (data.plate || d.id).split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+          const latOffset = (hash % 100) / 1000;
+          const lngOffset = ((hash * 7) % 100) / 1000;
+          
+          const vehicle = {
+            ...data,
+            id: d.id,
+            location: {
+              lat: BASE_LAT + latOffset,
+              lng: BASE_LNG + lngOffset
+            }
+          };
+          
+          vehicleLookup.set(d.id, vehicle);
+          if (data.plate) vehicleLookup.set(data.plate, vehicle);
+          
+          return vehicle;
+        });
+        
+        setVehicles(fetchedVehicles);
 
         const stats = {
-          total: vehicles.length,
-          active: vehicles.filter((v) => v.status === "Ativo").length,
-          maintenance: vehicles.filter((v) => v.status === "Em Manutenção")
-            .length,
+          total: fetchedVehicles.length,
+          active: fetchedVehicles.filter((v) => v.status === "Ativo").length,
+          maintenance: fetchedVehicles.filter((v) => v.status === "Em Manutenção").length,
         };
         setVehicleStats(stats);
 
-        // Calculate Cost Center Stats for Chart
+        // Chart stats
         const ccMap: Record<string, number> = {};
-        vehicles.forEach((v) => {
-          const ccs = Array.isArray(v.costCenter)
-            ? v.costCenter
-            : [v.costCenter || "Não Definido"];
+        fetchedVehicles.forEach((v) => {
+          const ccs = Array.isArray(v.costCenter) ? v.costCenter : [v.costCenter || "Não Definido"];
           ccs.forEach((cc: any) => {
-            const ccName = String(cc || "")
-              .replace(/logística - região sul/gi, "")
-              .replace(/logístic a - região sul/gi, "")
-              .replace(/,? ?$/, "")
-              .trim();
-
-            if (ccName) {
-              ccMap[ccName] = (ccMap[ccName] || 0) + 1;
-            }
+            const ccName = String(cc || "").replace(/logística - região sul/gi, "").replace(/logístic a - região sul/gi, "").replace(/,? ?$/, "").trim();
+            if (ccName) ccMap[ccName] = (ccMap[ccName] || 0) + 1;
           });
         });
-
-        const ccData = Object.entries(ccMap)
-          .map(([name, value]) => ({ name, value }))
-          .sort((a, b) => b.value - a.value);
-        setCostCenterStats(ccData);
-
-        // Fetch expired inspections based on current vehicles
-        try {
-          const recordsSnap = await getDocs(collectionGroup(db, "records"));
-          const itemsSnap = await getDocs(collectionGroup(db, "items"));
-
-          const itemsMap = new Map();
-          itemsSnap.forEach((doc) => {
-            itemsMap.set(doc.id, { ...doc.data(), id: doc.id });
-          });
-
-          const expired: any[] = [];
-
-          recordsSnap.forEach((recordDoc) => {
-            const record = recordDoc.data();
-            const vehicleId = recordDoc.ref.parent.parent?.id;
-            const item = itemsMap.get(record.itemId);
-
-            if (vehicleId && item) {
-              const vehicle = vehicles.find((v) => v.id === vehicleId);
-              if (vehicle) {
-                const currentKM = vehicle.currentKM || vehicle.odometer || 0;
-                const nextKM = record.nextMaintenanceKM || 0;
-                const remaining = nextKM - currentKM;
-
-                // If it's expired or within 500km of expiring
-                if (remaining <= 0) {
-                  expired.push({
-                    vehicleId: vehicleId,
-                    vehiclePlate: vehicle.plate,
-                    vehicleModel: vehicle.model,
-                    vehicleBrand: vehicle.brand,
-                    vehicleImage: vehicle.imageUrl,
-                    itemName: item.name,
-                    remainingKM: remaining,
-                    type: "expired",
-                  });
-                } else if (remaining <= 1000) {
-                  expired.push({
-                    vehicleId: vehicleId,
-                    vehiclePlate: vehicle.plate,
-                    vehicleModel: vehicle.model,
-                    vehicleBrand: vehicle.brand,
-                    vehicleImage: vehicle.imageUrl,
-                    itemName: item.name,
-                    remainingKM: remaining,
-                    type: "warning",
-                  });
-                }
-              }
-            }
-          });
-
-          // Sort so expired is first, then warnings by lowest remaining KM
-          expired.sort((a, b) => a.remainingKM - b.remainingKM);
-
-          setExpiredInspections(expired);
-        } catch (error) {
-          console.error("Error fetching inspections:", error);
-        } finally {
-          setLoadingAlerts(false);
-        }
-      },
+        setCostCenterStats(Object.entries(ccMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value));
+      }
     );
 
-    const unsubscribeAlerts = onSnapshot(
-      collection(db, "alerts"),
-      (snapshot) => {
-        const alertsData = snapshot.docs.map((doc) => ({
-          ...doc.data(),
-          id: doc.id,
-        }));
-        setAlerts(alertsData);
-      },
-    );
+    // Alerts listener
+    const unsubscribeAlerts = onSnapshot(collection(db, "alerts"), (snapshot) => {
+      setAlerts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+    });
 
-    const unsubscribeMaintenance = onSnapshot(
-      collection(db, "maintenance"),
-      (snapshot) => {
-        const maintenanceData = snapshot.docs
-          .map((doc) => ({ ...doc.data(), id: doc.id }))
-          .filter((os: any) => os.status !== "Concluído")
-          .slice(0, 5);
-        setNextServices(maintenanceData);
-      },
-    );
+    // Maintenance listener
+    const unsubscribeMaintenance = onSnapshot(collectionGroup(db, "maintenances"), (snapshot) => {
+      const maintenanceData = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+      setNextServices(maintenanceData.filter((os: any) => os.status !== "Concluído").slice(0, 5));
+    });
 
     return () => {
       unsubscribeVehicles();
@@ -199,6 +179,92 @@ export function Dashboard() {
       unsubscribeMaintenance();
     };
   }, []);
+
+  // 3. Process expired inspections whenever vehicles or records change
+  useEffect(() => {
+    console.log("Processing alerts... Vehicles:", vehicles.length, "Records:", allRecords.length);
+    if (vehicles.length === 0 || allRecords.length === 0) {
+      if (vehicles.length > 0) setLoadingAlerts(false); // If we have vehicles but no records found yet, at least stop loading if we're sure
+      return;
+    }
+
+    setLoadingAlerts(true);
+    try {
+      const vehicleLookup = new Map();
+      vehicles.forEach(v => {
+        vehicleLookup.set(v.id, v);
+        if (v.plate) vehicleLookup.set(v.plate, v);
+      });
+
+      const expired: any[] = [];
+
+      // License expiration
+      vehicles.forEach(v => {
+        if (v.exerciceStatus === 'Vencido') {
+          expired.push({
+            vehicleId: v.id,
+            vehiclePlate: v.plate,
+            vehicleModel: v.model,
+            vehicleBrand: v.brand,
+            vehicleImage: v.imageUrl,
+            itemName: "Licenciamento",
+            remainingKM: 0,
+            type: "expired",
+            desc: `EXERCÍCIO ${v.exerciceYear} VENCIDO`
+          });
+        }
+      });
+
+      // Record-based expiration
+      allRecords.forEach((record) => {
+        const pathParts = record.path.split('/');
+        const vehicle = pathParts.reduce((found: any, part: string) => found || vehicleLookup.get(part), null);
+        const item = itemsMap[record.itemId];
+
+        if (vehicle && item) {
+          const currentVehicleKM = Number(vehicle.currentKM || vehicle.odometer || 0);
+          const { progressPercent, remainingNumber, isOutdated, descRemaining } = calculateProgress(item, record, currentVehicleKM);
+
+          if (isOutdated) {
+            expired.push({
+              vehicleId: vehicle.id,
+              vehiclePlate: vehicle.plate,
+              vehicleModel: vehicle.model,
+              vehicleBrand: vehicle.brand,
+              vehicleImage: vehicle.imageUrl,
+              itemName: item.name,
+              remainingKM: remainingNumber,
+              type: "expired",
+              desc: descRemaining
+            });
+          } else if (progressPercent >= 90 || remainingNumber <= 1000) {
+            expired.push({
+              vehicleId: vehicle.id,
+              vehiclePlate: vehicle.plate,
+              vehicleModel: vehicle.model,
+              vehicleBrand: vehicle.brand,
+              vehicleImage: vehicle.imageUrl,
+              itemName: item.name,
+              remainingKM: remainingNumber,
+              type: "warning",
+              desc: descRemaining
+            });
+          }
+        }
+      });
+
+      setExpiredInspections(expired.sort((a, b) => {
+        if (a.type === b.type) return a.remainingKM - b.remainingKM;
+        return a.type === 'expired' ? -1 : 1;
+      }));
+    } catch (err) {
+      console.error("Critical error in alert processing:", err);
+    } finally {
+      setLoadingAlerts(false);
+    }
+  }, [vehicles, allRecords, itemsMap]);
+
+  console.log("Rendering Dashboard. Vehicles count:", vehicles.length);
 
   return (
     <motion.div
@@ -423,7 +489,7 @@ export function Dashboard() {
             Alertas Ativos
           </h3>
           <p className="text-[48px] font-bold text-on-surface mt-1 leading-[1.2] tracking-[-0.02em]">
-            {alerts.length}
+            {alerts.length + expiredInspections.filter(i => i.type === 'expired').length}
           </p>
         </motion.div>
       </motion.div>
@@ -453,8 +519,7 @@ export function Dashboard() {
               >
                 <BarChart
                   data={costCenterStats}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                  margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -462,11 +527,13 @@ export function Dashboard() {
                     vertical={false}
                     stroke="#E2E8F0"
                   />
-                  <XAxis type="number" hide />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 10, fontWeight: 600, fill: "#64748B" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <YAxis
-                    dataKey="name"
-                    type="category"
-                    width={150}
                     tick={{ fontSize: 10, fontWeight: 600, fill: "#64748B" }}
                     axisLine={false}
                     tickLine={false}
@@ -482,8 +549,8 @@ export function Dashboard() {
                   />
                   <Bar
                     dataKey="value"
-                    radius={[0, 4, 4, 0]}
-                    barSize={24}
+                    radius={[4, 4, 0, 0]}
+                    barSize={40}
                     name="Veículos"
                   >
                     {costCenterStats.map((entry, index) => (
@@ -516,12 +583,54 @@ export function Dashboard() {
               </h3>
             </div>
             <div className="space-y-4">
-              {alerts.length === 0 ? (
+              {[
+                ...alerts.map(a => ({
+                  ...a,
+                  vehicleImage: vehicles.find(v => v.plate === a.plate || v.id === a.vehicleId)?.imageUrl
+                })),
+                ...nextServices.filter(os => os.priority === 'Crítica' || os.priority === 'Alta' || os.priority === 'Média').map(os => ({
+                  id: `os-${os.id}`,
+                  title: `OS ${os.priority}: ${os.plate}`,
+                  description: os.title,
+                  severity: os.priority === 'Crítica' || os.priority === 'Alta' ? 'critical' : 'normal',
+                  vehicleImage: vehicles.find(v => v.plate === os.plate || v.id === os.vehicleId)?.imageUrl,
+                  vehiclePlate: os.plate
+                })),
+                ...expiredInspections.filter(i => i.type === 'expired' || i.type === 'warning').map(i => ({
+                  id: `insp-${i.vehiclePlate}-${i.itemName}`,
+                  title: `VEÍCULO: ${i.vehiclePlate}`,
+                  description: i.desc.toUpperCase(),
+                  severity: 'critical',
+                  vehicleImage: i.vehicleImage,
+                  vehiclePlate: i.vehiclePlate
+                }))
+              ].length === 0 ? (
                 <div className="p-8 text-center text-white/50 italic text-xs">
                   Nenhum alerta ativo
                 </div>
               ) : (
-                alerts.slice(0, 3).map((alert) => (
+                [
+                  ...alerts.map(a => ({
+                    ...a,
+                    vehicleImage: vehicles.find(v => v.plate === a.plate || v.id === a.vehicleId)?.imageUrl
+                  })),
+                  ...nextServices.filter(os => os.priority === 'Crítica' || os.priority === 'Alta').map(os => ({
+                    id: `os-${os.id}`,
+                    title: `OS ${os.priority}: ${os.plate}`,
+                    description: os.title,
+                    severity: 'critical',
+                    vehicleImage: vehicles.find(v => v.plate === os.plate || v.id === os.vehicleId)?.imageUrl,
+                    vehiclePlate: os.plate
+                  })),
+                  ...expiredInspections.filter(i => i.type === 'expired').map(i => ({
+                    id: `insp-${i.vehiclePlate}-${i.itemName}`,
+                    title: `VEÍCULO: ${i.vehiclePlate}`,
+                    description: i.desc.toUpperCase(),
+                    severity: 'critical',
+                    vehicleImage: i.vehicleImage,
+                    vehiclePlate: i.vehiclePlate
+                  }))
+                ].slice(0, 3).map((alert) => (
                   <div
                     key={alert.id}
                     className="flex gap-4 p-4 bg-white/5 rounded-lg border border-white/10"
@@ -535,10 +644,22 @@ export function Dashboard() {
                     >
                       {alert.severity === "critical" ? "warning" : "info"}
                     </span>
+                      <div className="w-12 h-12 rounded-lg border border-white/20 bg-white overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
+                        <img 
+                          src={alert.vehicleImage} 
+                          alt="Veículo" 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
                     <div>
                       <p className="text-sm font-bold text-white">
                         {alert.title}
                       </p>
+                      {alert.vehiclePlate && (
+                        <p className="text-xs text-white/70 mt-0.5">
+                          Placa: {alert.vehiclePlate}
+                        </p>
+                      )}
                       <p className="text-xs text-white/70 mt-1">
                         {alert.description}
                       </p>
@@ -576,27 +697,58 @@ export function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="relative flex-1 bg-surface-variant min-h-[400px]">
-            <img
-              className="absolute inset-0 w-full h-full object-cover grayscale opacity-90"
-              alt="Map"
-              src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=1200"
-            />
-            <div className="absolute inset-0 bg-primary-container/80 mix-blend-multiply"></div>
+          <div className="relative flex-1 bg-[#1a1a1a] min-h-[400px]">
+            {vehicles.length > 0 && typeof window !== 'undefined' ? (
+              <MapContainer 
+                key="dashboard-fleet-map-instance"
+                center={[BASE_LAT, BASE_LNG]} 
+                zoom={12} 
+                style={{ width: '100%', height: '100%' }}
+                zoomControl={false}
+                attributionControl={false}
+                scrollWheelZoom={false}
+              >
+                <TileLayer
+                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                />
+                {vehicles.map(v => {
+                  const isExpired = expiredInspections.some(e => e.vehicleId === v.id && (e.type === 'expired' || e.type === 'warning'));
+                  const isNextService = nextServices.some(e => e.vehicleId === v.id);
+                  
+                  let color = "#94a3b8"; // Default color
+                  if (isExpired) {
+                    color = "#ef4444";
+                  } else if (isNextService) {
+                    color = "#3b82f6";
+                  }
 
-            {/* Map markers mock */}
-            <div className="absolute top-[30%] left-[20%] w-3 h-3 bg-error rounded-full shadow-[0_0_10px_rgba(255,0,0,0.8)] animate-pulse"></div>
-            <div className="absolute top-[45%] left-[60%] w-3 h-3 bg-error rounded-full shadow-[0_0_10px_rgba(255,0,0,0.8)] animate-pulse"></div>
-            <div className="absolute top-[60%] left-[40%] w-3 h-3 bg-error rounded-full shadow-[0_0_10px_rgba(255,0,0,0.8)] animate-pulse"></div>
+                  if (!v.location || typeof v.location.lat !== 'number') return null;
 
-            <div className="absolute top-[20%] left-[50%] w-2.5 h-2.5 bg-secondary rounded-full"></div>
-            <div className="absolute top-[70%] left-[30%] w-2.5 h-2.5 bg-secondary rounded-full"></div>
-            <div className="absolute top-[55%] left-[80%] w-2.5 h-2.5 bg-secondary rounded-full"></div>
-            <div className="absolute top-[80%] left-[65%] w-2.5 h-2.5 bg-secondary rounded-full"></div>
+                  return (
+                    <Marker 
+                      key={`marker-${v.id}`} 
+                      position={[v.location.lat, v.location.lng]}
+                      icon={createCustomIcon(color)}
+                    >
+                      <Popup>
+                        <div className="text-xs">
+                          <strong className="text-primary">{v.plate}</strong><br/>
+                          {v.model}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </MapContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white/50 text-sm">
+                Carregando mapa e veículos...
+              </div>
+            )}
 
             <div className="absolute top-6 left-6 p-4 bg-white/90 backdrop-blur border border-outline-variant rounded-xl shadow-lg">
               <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-error animate-pulse"></div>
+                <div className="w-3 h-3 rounded-full bg-primary animate-pulse"></div>
                 <p className="text-sm font-bold text-on-surface">
                   Rastreamento de Frota Ativo
                 </p>
@@ -653,7 +805,7 @@ export function Dashboard() {
                             {insp.vehiclePlate}
                           </p>
                           <p className="text-xs text-on-surface-variant line-clamp-1">
-                            {insp.itemName}
+                            {insp.itemName} • {insp.desc}
                           </p>
                         </div>
                       </div>

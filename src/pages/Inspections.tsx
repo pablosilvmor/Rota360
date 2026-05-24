@@ -23,6 +23,7 @@ import * as XLSX from "xlsx";
 import * as htmlToImage from "html-to-image";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
 
 import {
   InspectionItem,
@@ -566,7 +567,7 @@ function InspectionForm({
         pdf.setFontSize(8);
         pdf.setTextColor(150);
         pdf.setFont("helvetica", "normal");
-        pdf.text("By Pablo Moreira", 14, pageHeight - 10);
+        pdf.text("ROTA 360 - Gestão de Frota", 14, pageHeight - 10);
         const pageStr = `Pág. ${i}/${totalPages}`;
         pdf.text(
           pageStr,
@@ -578,22 +579,61 @@ function InspectionForm({
       // Campo de assinatura na última página
       pdf.setPage(totalPages);
       const finalY = (pdf as any).lastAutoTable.finalY || 40;
-      let signatureY = finalY + 30;
+      let signatureY = finalY + 20;
+      let signatureHeight = 40;
 
-      if (signatureY > pageHeight - 30) {
+      if (signatureY + signatureHeight > pageHeight - 20) {
         pdf.addPage();
-        signatureY = 40;
+        signatureY = 30;
       }
 
-      pdf.setLineWidth(0.5);
-      pdf.setDrawColor(200);
-      pdf.line(pageWidth / 2 - 45, signatureY, pageWidth / 2 + 45, signatureY);
-      pdf.setFontSize(10);
-      pdf.setTextColor(50);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Assinatura do Responsável", pageWidth / 2, signatureY + 6, {
-        align: "center",
+      // Generate digital signature
+      const signatureId = await createSignature({
+         documentType: 'Relatório de Inspeção',
+         documentTitle: `Inspeção - Veículo ${vehicle.plate}`
       });
+
+      if (signatureId) {
+        const verifyUrl = generateVerificationUrl(signatureId);
+        const qrCodeDataUrl = await getQRCodeDataUrl(verifyUrl);
+        
+        pdf.setFillColor(248, 250, 252);
+        pdf.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "F");
+        pdf.setDrawColor(226, 232, 240);
+        pdf.setLineWidth(0.1);
+        pdf.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "S");
+        
+        if (qrCodeDataUrl) {
+           pdf.addImage(qrCodeDataUrl, "JPEG", 20, signatureY + 5, 30, 30);
+        }
+        
+        pdf.setFontSize(10);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("DOCUMENTO ASSINADO DIGITALMENTE", 56, signatureY + 12);
+        
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`Para verificar a autenticidade deste documento, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, signatureY + 18);
+        
+        pdf.setTextColor(37, 99, 235);
+        pdf.text(verifyUrl, 56, signatureY + 26);
+        
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFontSize(7);
+        pdf.text(`Código de Validação: ${signatureId}`, 56, signatureY + 34);
+      } else {
+        pdf.setLineWidth(0.5);
+        pdf.setDrawColor(200);
+        pdf.line(pageWidth / 2 - 45, signatureY + 20, pageWidth / 2 + 45, signatureY + 20);
+        pdf.setFontSize(10);
+        pdf.setTextColor(50);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Assinatura do Responsável", pageWidth / 2, signatureY + 26, {
+          align: "center",
+        });
+      }
 
       pdf.save(`Relatorio_Inspecao_${vehicle.plate}.pdf`);
     } catch (error) {
@@ -2118,18 +2158,19 @@ export function Inspections() {
     "inspections_searchQuery",
     "",
   );
-  const [filterWork, setFilterWork] = useLocalStorageState(
-    "inspections_filterWork",
-    "",
+  const [filterWork, setFilterWork] = useLocalStorageState<string[]>(
+    "inspections_filterWorkArr",
+    [],
   );
-  const [filterStatus, setFilterStatus] = useLocalStorageState(
-    "inspections_filterStatus",
-    "",
+  const [filterStatus, setFilterStatus] = useLocalStorageState<string[]>(
+    "inspections_filterStatusArr",
+    [],
   );
   const [viewMode, setViewMode] = useLocalStorageState<"grid" | "list">(
     "inspections_viewMode",
     "grid",
   );
+  const [selectedChecklist, setSelectedChecklist] = useState<any | null>(null);
 
   useEffect(() => {
     // We fetch the vehicles list to show cards or if an ID is present, we just pass to the Form
@@ -2334,7 +2375,7 @@ export function Inspections() {
         pdf.setFontSize(8);
         pdf.setTextColor(150);
         pdf.setFont("helvetica", "normal");
-        pdf.text("By Pablo Moreira", 14, pageHeight - 10);
+        pdf.text("ROTA 360 - Gestão de Frota", 14, pageHeight - 10);
         const pageStr = `Pág. ${i}/${totalPages}`;
         pdf.text(
           pageStr,
@@ -2346,22 +2387,61 @@ export function Inspections() {
       // Campo de assinatura na última página
       pdf.setPage(totalPages);
       const finalY = (pdf as any).lastAutoTable.finalY || 40;
-      let signatureY = finalY + 30;
+      let signatureY = finalY + 20;
+      let signatureHeight = 40;
 
-      if (signatureY > pageHeight - 30) {
+      if (signatureY + signatureHeight > pageHeight - 20) {
         pdf.addPage();
-        signatureY = 40;
+        signatureY = 30;
       }
 
-      pdf.setLineWidth(0.5);
-      pdf.setDrawColor(200);
-      pdf.line(pageWidth / 2 - 45, signatureY, pageWidth / 2 + 45, signatureY);
-      pdf.setFontSize(10);
-      pdf.setTextColor(50);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Assinatura do Responsável", pageWidth / 2, signatureY + 6, {
-        align: "center",
+      // Generate digital signature
+      const signatureId = await createSignature({
+         documentType: 'Checklist Diário',
+         documentTitle: `Checklist - ${checklist.vehiclePlate}`
       });
+
+      if (signatureId) {
+        const verifyUrl = generateVerificationUrl(signatureId);
+        const qrCodeDataUrl = await getQRCodeDataUrl(verifyUrl);
+        
+        pdf.setFillColor(248, 250, 252);
+        pdf.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "F");
+        pdf.setDrawColor(226, 232, 240);
+        pdf.setLineWidth(0.1);
+        pdf.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "S");
+        
+        if (qrCodeDataUrl) {
+           pdf.addImage(qrCodeDataUrl, "JPEG", 20, signatureY + 5, 30, 30);
+        }
+        
+        pdf.setFontSize(10);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("DOCUMENTO ASSINADO DIGITALMENTE", 56, signatureY + 12);
+        
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`Para verificar a autenticidade deste documento, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, signatureY + 18);
+        
+        pdf.setTextColor(37, 99, 235);
+        pdf.text(verifyUrl, 56, signatureY + 26);
+        
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFontSize(7);
+        pdf.text(`Código de Validação: ${signatureId}`, 56, signatureY + 34);
+      } else {
+        pdf.setLineWidth(0.5);
+        pdf.setDrawColor(200);
+        pdf.line(pageWidth / 2 - 45, signatureY + 20, pageWidth / 2 + 45, signatureY + 20);
+        pdf.setFontSize(10);
+        pdf.setTextColor(50);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Assinatura do Responsável", pageWidth / 2, signatureY + 26, {
+          align: "center",
+        });
+      }
 
       pdf.save(`Checklist_${checklist.vehiclePlate}_${checklist.date}.pdf`);
     } catch (error) {
@@ -2379,15 +2459,13 @@ export function Inspections() {
       (v.brand || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesWork =
-      filterWork === "" ||
-      filterWork === "Todas as Obras" ||
+      !filterWork || filterWork.length === 0 || filterWork.includes("") || filterWork.includes("Todas as Obras") ||
       (Array.isArray(v.costCenter)
-        ? v.costCenter.includes(filterWork)
-        : v.costCenter === filterWork);
+        ? v.costCenter.some(cc => filterWork.includes(cc))
+        : filterWork.includes(v.costCenter));
     const matchesStatus =
-      filterStatus === "" ||
-      filterStatus === "Todos os Status" ||
-      v.status === filterStatus;
+      !filterStatus || filterStatus.length === 0 || filterStatus.includes("") || filterStatus.includes("Todos os Status") ||
+      filterStatus.includes(v.status);
 
     return matchesSearch && matchesWork && matchesStatus;
   });
@@ -2512,7 +2590,7 @@ export function Inspections() {
       </motion.div>
 
       <motion.div
-        className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-50"
+        className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-40"
         variants={itemVariants}
       >
         <div className="flex-1 min-w-[250px]">
@@ -2547,8 +2625,8 @@ export function Inspections() {
           <SearchableSelect
             label="Obra"
             placeholder="Todas as Obras"
+            multiple={true}
             options={[
-              { value: "", label: "Todas as Obras" },
               ...works.map((work) => ({ value: work.name, label: work.name })),
             ]}
             value={filterWork}
@@ -2559,8 +2637,8 @@ export function Inspections() {
           <SearchableSelect
             label="Status"
             placeholder="Todos os Status"
+            multiple={true}
             options={[
-              { value: "", label: "Todos os Status" },
               { value: "Ativo", label: "Ativo" },
               { value: "Inativo", label: "Inativo" },
               { value: "Em Manutenção", label: "Em Manutenção" },
@@ -2594,12 +2672,12 @@ export function Inspections() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4 pt-6 w-full md:w-auto">
-          {(searchQuery || filterWork || filterStatus) && (
+          {(searchQuery || filterWork.length > 0 || filterStatus.length > 0) && (
             <button
               onClick={() => {
                 setSearchQuery("");
-                setFilterWork("");
-                setFilterStatus("");
+                setFilterWork([]);
+                setFilterStatus([]);
               }}
               className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-surface-container-low"
             >
@@ -2785,10 +2863,11 @@ export function Inspections() {
                 {filteredHistory.map((item) => (
                   <tr
                     key={item.id}
-                    className="hover:bg-surface-container-low transition-colors group"
+                    className="hover:bg-surface-container-low transition-colors group cursor-pointer"
+                    onClick={() => setSelectedChecklist(item)}
                   >
                     <td className="px-6 py-4 text-sm font-medium">
-                      {item.date}
+                      {item.date?.includes('-') ? item.date.split('-').reverse().join('/') : item.date}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-bold">
@@ -2807,7 +2886,7 @@ export function Inspections() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => navigate(`/checklist?edit=${item.id}`)}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/checklist?edit=${item.id}`); }}
                           className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all"
                           title="Editar Checklist"
                         >
@@ -2816,7 +2895,7 @@ export function Inspections() {
                           </span>
                         </button>
                         <button
-                          onClick={() => handleExportChecklistPDF(item)}
+                          onClick={(e) => { e.stopPropagation(); handleExportChecklistPDF(item); }}
                           disabled={isExportingChecklist === item.id}
                           className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all"
                           title="Exportar PDF"
@@ -2845,6 +2924,101 @@ export function Inspections() {
           )}
         </motion.div>
       )}
+
+      {/* Checklist Details Modal */}
+      <AnimatePresence>
+        {selectedChecklist && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedChecklist(null)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-surface w-full max-w-2xl rounded-3xl shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-6 sm:p-8 border-b border-outline-variant/30 flex justify-between items-start bg-surface-container-lowest">
+                <div>
+                  <h2 className="text-[28px] font-bold text-on-surface tracking-tight mb-2 flex items-center gap-3">
+                    <div className={`w-12 h-12 bg-primary-container rounded-xl flex items-center justify-center`}>
+                      <span className={`material-symbols-outlined text-primary text-[24px]`}>fact_check</span>
+                    </div>
+                    {selectedChecklist.type || 'Checklist Diário'}
+                  </h2>
+                  <div className="flex gap-4 items-center mt-4">
+                    {vehicles.find(v => v.id === selectedChecklist.vehicleId || v.plate === selectedChecklist.vehiclePlate)?.imageUrl && (
+                      <div className="w-16 h-16 rounded-xl border border-outline-variant/50 bg-white overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
+                        <img 
+                          src={vehicles.find(v => v.id === selectedChecklist.vehicleId || v.plate === selectedChecklist.vehiclePlate)?.imageUrl} 
+                          alt="Veículo" 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
+                    <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[18px]">directions_car</span>
+                      {selectedChecklist.vehiclePlate || 'N/A'} - {selectedChecklist.vehicleModel}
+                    </span>
+                    <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[18px]">calendar_today</span>
+                      {selectedChecklist.date?.includes('-') ? selectedChecklist.date.split('-').reverse().join('/') : selectedChecklist.date}
+                    </span>
+                    <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[18px]">person</span>
+                      {selectedChecklist.driverName}
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedChecklist(null)}
+                  className="w-10 h-10 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-error transition-colors"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              
+              <div className="p-6 sm:p-8 overflow-y-auto bg-surface-container-lowest/50">
+                <div className="bg-white border border-outline-variant/50 rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-on-surface mb-6 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">checklist</span>
+                    Itens Inspecionados ({selectedChecklist.items?.length || 0})
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    {selectedChecklist.items?.map((it: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-start pb-3 border-b border-outline-variant/30 last:border-0 last:pb-0">
+                        <div>
+                          <p className="font-semibold text-sm text-on-surface">{it.item}</p>
+                          <p className="text-xs text-on-surface-variant mt-0.5">{it.category}</p>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${it.conformidade === 'Em conformidade' ? 'bg-emerald-100 text-emerald-800' : it.conformidade === 'Não conforme' ? 'bg-red-100 text-red-800' : 'bg-surface-container text-on-surface-variant'}`}>
+                          {it.conformidade === 'Em conformidade' && <span className="material-symbols-outlined text-[12px]">check</span>}
+                          {it.conformidade === 'Não conforme' && <span className="material-symbols-outlined text-[12px]">close</span>}
+                          {it.conformidade}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-outline-variant/30 bg-surface flex justify-end gap-3 mt-auto">
+                <button 
+                  onClick={() => setSelectedChecklist(null)}
+                  className="px-6 py-3 font-semibold text-on-surface-variant hover:bg-surface-container-low rounded-xl transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
