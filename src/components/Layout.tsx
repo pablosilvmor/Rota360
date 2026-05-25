@@ -105,7 +105,6 @@ export function Layout({ children }: LayoutProps) {
     { name: "Frota", path: "/fleet", icon: "local_shipping" },
     { name: "Inspeções", path: "/inspections", icon: "fact_check" },
     { name: "Motoristas", path: "/drivers", icon: "group" },
-    { name: "Relatórios", path: "/reports", icon: "analytics" },
     { name: "Checklist", path: "/checklist", icon: "checklist" },
   ];
 
@@ -380,6 +379,17 @@ export function Layout({ children }: LayoutProps) {
                         map
                       </span>
                       Rastreamento
+                    </NavLink>
+                    <NavLink
+                      to="/reports"
+                      onClick={() => setIsMoreMenuOpen(false)}
+                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                      title="Relatórios"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        analytics
+                      </span>
+                      Relatórios
                     </NavLink>
                   </div>
                 </div>
