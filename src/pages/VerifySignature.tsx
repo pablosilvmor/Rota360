@@ -89,8 +89,18 @@ export function VerifySignature() {
 
               <div className="bg-surface-container rounded-xl p-4 border border-outline-variant/50">
                 <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1">Assinatura</p>
-                <p className="font-bold text-on-surface">{signature.signerName}</p>
+                <p className="font-bold text-on-surface">{signature.signatureInfo?.fullName || signature.signerName}</p>
                 <p className="text-sm font-medium text-on-surface-variant">{signature.signerEmail}</p>
+                
+                {signature.signatureInfo && (
+                  <div className="mt-2 space-y-1 text-xs text-on-surface-variant">
+                    <p><span className="font-semibold text-on-surface">Matrícula:</span> {signature.signatureInfo.matricula}</p>
+                    <p><span className="font-semibold text-on-surface">CPF:</span> {signature.signatureInfo.cpf}</p>
+                    <p><span className="font-semibold text-on-surface">Cargo:</span> {signature.signatureInfo.role}</p>
+                    <p><span className="font-semibold text-on-surface">Empresa:</span> {signature.signatureInfo.company}</p>
+                  </div>
+                )}
+                
                 <div className="mt-4 pt-4 border-t border-outline-variant/30 text-xs text-on-surface-variant font-medium">
                   Validado por conta ROTA 360 autenticada.
                 </div>

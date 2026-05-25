@@ -1,5 +1,5 @@
 import { auth, db } from '../lib/firebase';
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc, getDoc } from 'firebase/firestore';
 
 export interface SignatureData {
   documentType: string;
@@ -11,6 +11,13 @@ export const createSignature = async (data: SignatureData): Promise<string | nul
     const user = auth.currentUser;
     if (!user) return null; // Only signed in users can create valid signatures
     
+    // Fetch userData to get signatureInfo
+    let signatureInfo = null;
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (userDoc.exists()) {
+      signatureInfo = userDoc.data()?.signatureInfo;
+    }
+    
     // We create a new doc ref manually to get the ID right away
     const signatureRef = doc(collection(db, 'signatures'));
     
@@ -21,7 +28,8 @@ export const createSignature = async (data: SignatureData): Promise<string | nul
       signerEmail: user.email,
       signerId: user.uid,
       timestamp: Date.now(),
-      companyName: 'ROTA 360'
+      companyName: signatureInfo?.company || 'ROTA 360',
+      signatureInfo: signatureInfo || null
     });
 
     return signatureRef.id;

@@ -29,6 +29,10 @@ export function Admin() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
+  
+  const [integrationPassword, setIntegrationPassword] = useState('');
+  const [integrationUnlocked, setIntegrationUnlocked] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
     if (userData?.role?.toLowerCase() !== 'admin') {
@@ -368,7 +372,38 @@ export function Admin() {
       </div>
 
       {(activeTab === 'integracoes') && (
-        <IntegrationsTab />
+        !integrationUnlocked ? (
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden p-6 max-w-sm mx-auto mt-8 animate-in fade-in zoom-in-95">
+            <h3 className="text-xl font-bold text-on-surface mb-4">Autenticação Necessária</h3>
+            <p className="text-sm text-on-surface-variant mb-6">Insira a senha de acesso para visualizar as integrações.</p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (integrationPassword === 'asd11224') {
+                setIntegrationUnlocked(true);
+                setAuthError('');
+              } else {
+                setAuthError('Senha incorreta.');
+              }
+            }}>
+              <input
+                type="password"
+                placeholder="Senha"
+                value={integrationPassword}
+                onChange={e => setIntegrationPassword(e.target.value)}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary outline-none mb-4"
+              />
+              {authError && <p className="text-error text-sm mb-4">{authError}</p>}
+              <button 
+                type="submit"
+                className="w-full px-4 py-2 bg-primary text-on-primary rounded-xl font-bold shadow-sm hover:opacity-90 transition-all text-sm"
+              >
+                Acessar
+              </button>
+            </form>
+          </div>
+        ) : (
+          <IntegrationsTab />
+        )
       )}
 
       {(activeTab === 'adm') && (

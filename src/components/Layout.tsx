@@ -252,6 +252,18 @@ export function Layout({ children }: LayoutProps) {
                 {isSettingsOpen && (
                   <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-[2000] animate-in fade-in zoom-in-95 duration-200 text-on-surface">
                     <div className="py-2">
+                      <Link
+                        to="/profile"
+                        onClick={() => setIsSettingsOpen(false)}
+                        className="flex items-center px-4 py-2 text-sm text-on-surface hover:bg-surface-container transition-colors"
+                        title="Meu Perfil"
+                      >
+                        <span className="material-symbols-outlined text-[20px] mr-3">
+                          person
+                        </span>
+                        Meu Perfil
+                      </Link>
+                      
                       {userData?.role?.toLowerCase() === "admin" && (
                         <Link
                           to="/admin"

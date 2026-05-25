@@ -12,6 +12,13 @@ export interface UserData {
   isActive: boolean;
   allowedScreens: string[];
   photoURL?: string;
+  signatureInfo?: {
+    fullName: string;
+    matricula: string;
+    cpf: string;
+    role: string;
+    company: string;
+  };
 }
 
 interface AuthContextType {

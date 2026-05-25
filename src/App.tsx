@@ -19,6 +19,7 @@ import { Inspections } from './pages/Inspections';
 import { Reports } from './pages/Reports';
 import { Checklist } from './pages/Checklist';
 import { VerifySignature } from './pages/VerifySignature';
+import { Profile } from './pages/Profile';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function ProtectedRoute({ children, path }: { children: ReactNode, path: string }) {
@@ -49,7 +50,7 @@ function ProtectedRoute({ children, path }: { children: ReactNode, path: string 
       </div>
     );
   }
-  if (userData && path !== '/' && !(userData.allowedScreens ?? []).includes(path) && userData.role?.toLowerCase() !== 'admin') {
+  if (userData && path !== '/' && path !== '/profile' && !(userData.allowedScreens ?? []).includes(path) && userData.role?.toLowerCase() !== 'admin') {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-full text-center">
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="/fuel" element={<ProtectedRoute path="/fuel"><Fuel /></ProtectedRoute>} />
             <Route path="/tracking" element={<ProtectedRoute path="/tracking"><Tracking /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute path="/admin"><Admin /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute path="/profile"><Profile /></ProtectedRoute>} />
             <Route path="/works" element={<ProtectedRoute path="/works"><Works /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute path="/reports"><Reports /></ProtectedRoute>} />
             
