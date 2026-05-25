@@ -431,8 +431,8 @@ export function Dashboard() {
             <div className="p-3 bg-secondary-fixed rounded-lg text-on-secondary-fixed group-hover:bg-primary-container group-hover:text-primary-fixed transition-colors">
               <span className="material-symbols-outlined">local_shipping</span>
             </div>
-            <span className="text-xs text-on-surface-variant font-bold">
-              +2.4%
+            <span className="text-xs text-on-surface-variant font-bold uppercase">
+              Frota Total
             </span>
           </div>
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
@@ -452,7 +452,7 @@ export function Dashboard() {
               <span className="material-symbols-outlined">bolt</span>
             </div>
             <span className="text-xs text-on-surface-variant font-bold">
-              92%
+              {vehicleStats.total > 0 ? ((vehicleStats.active / vehicleStats.total) * 100).toFixed(1) : 0}%
             </span>
           </div>
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
@@ -472,7 +472,7 @@ export function Dashboard() {
               <span className="material-symbols-outlined">build</span>
             </div>
             <span className="text-xs text-on-surface-variant font-bold">
-              5.8%
+              {vehicleStats.total > 0 ? ((vehicleStats.maintenance / vehicleStats.total) * 100).toFixed(1) : 0}%
             </span>
           </div>
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">

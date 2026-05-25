@@ -789,8 +789,22 @@ export function Reports() {
                     O relatório no PDF será ajustado automaticamente para {activeColumns.length > 5 ? 'paisagem' : 'retrato'}.
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-                  <div className="relative flex-1 min-w-[200px]">
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                  {(reportSearchTerm || filterWork.length > 0 || filterStatus.length > 0) && (
+                    <button
+                      onClick={() => {
+                        setReportSearchTerm('');
+                        setFilterWork([]);
+                        setFilterStatus([]);
+                      }}
+                      className="px-3 py-2 text-xs font-bold text-primary hover:bg-primary/5 rounded-lg flex items-center gap-1.5 transition-colors border border-primary/20"
+                      title="Limpar todos os filtros"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                      LIMPAR FILTROS
+                    </button>
+                  )}
+                  <div className="relative flex-1 min-w-[180px]">
                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
                     <input
                       type="text"
