@@ -9,19 +9,31 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
   const [showRawData, setShowRawData] = useState(false);
   const [rawOcrData, setRawOcrData] = useState<any>(null);
   const [works, setWorks] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
   const [vehicleData, setVehicleData] = useState(vehicleToEdit || {
     plate: '', renavam: '', brand: '', model: '', modelYear: '', chassis: '', fuelType: '', color: '', bodywork: '', costCenter: '', status: 'Ativo',
     exerciceYear: '', exerciceStatus: '', imageUrl: '', observation: '', capacity: '', grossWeight: '', ownerCnpj: ''
   });
 
   useEffect(() => {
-    const q = query(collection(db, 'works'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const qWorks = query(collection(db, 'works'), orderBy('name', 'asc'));
+    const unsubscribeWorks = onSnapshot(qWorks, (snapshot) => {
       setWorks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'works');
     });
-    return () => unsubscribe();
+
+    const qStatuses = query(collection(db, 'statuses'), orderBy('name', 'asc'));
+    const unsubscribeStatuses = onSnapshot(qStatuses, (snapshot) => {
+      setStatuses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'statuses');
+    });
+
+    return () => {
+      unsubscribeWorks();
+      unsubscribeStatuses();
+    };
   }, []);
 
   const [fileName, setFileName] = useState<string>('CRLV_ABC1234.pdf');
@@ -489,28 +501,41 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                   </div>
                   <div className="col-span-2 md:col-span-1">
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Status Operacional</label>
-                    <div className="flex items-center gap-2 p-1 bg-surface-container rounded-lg">
+                    <div className="flex flex-wrap items-center gap-2 p-1 bg-surface-container rounded-lg">
+                      {/* Fixed default options */}
                       <button 
-                        className={`flex-1 py-2 text-center rounded-md text-[11px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Ativo' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        className={`px-3 py-2 flex-1 text-center rounded-md text-[10px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Ativo' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant hover:text-on-surface'}`} 
                         type="button"
                         onClick={() => setVehicleData({ ...vehicleData, status: 'Ativo' })}
                       >
                         Ativo
                       </button>
                       <button 
-                        className={`flex-1 py-2 text-center rounded-md text-[11px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Em Manutenção' ? 'bg-white shadow-sm text-warning-dark' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        className={`px-3 py-2 flex-1 text-center rounded-md text-[10px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Em Manutenção' ? 'bg-white shadow-sm text-warning-dark' : 'text-on-surface-variant hover:text-on-surface'}`} 
                         type="button"
                         onClick={() => setVehicleData({ ...vehicleData, status: 'Em Manutenção' })}
                       >
                         Manutenção
                       </button>
                       <button 
-                        className={`flex-1 py-2 text-center rounded-md text-[11px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Inativo' ? 'bg-white shadow-sm text-error' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        className={`px-3 py-2 flex-1 text-center rounded-md text-[10px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Inativo' ? 'bg-white shadow-sm text-error' : 'text-on-surface-variant hover:text-on-surface'}`} 
                         type="button"
                         onClick={() => setVehicleData({ ...vehicleData, status: 'Inativo' })}
                       >
                         Inativo
                       </button>
+                      
+                      {/* Dynamic statuses from Admin */}
+                      {statuses.filter(s => !['Ativo', 'Inativo', 'Em Manutenção'].includes(s.name)).map(s => (
+                        <button 
+                          key={s.id}
+                          className={`px-3 py-2 flex-1 text-center rounded-md text-[10px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === s.name ? 'bg-white shadow-sm text-secondary' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                          type="button"
+                          onClick={() => setVehicleData({ ...vehicleData, status: s.name })}
+                        >
+                          {s.name}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <div className="col-span-2">

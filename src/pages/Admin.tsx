@@ -448,15 +448,17 @@ export function Admin() {
                             <img 
                               src={u.photoURL} 
                               alt={u.name || u.email} 
-                              className="w-8 h-8 rounded-full object-cover border border-outline-variant"
+                              className="w-8 h-8 rounded-full object-cover border border-outline-variant shadow-sm"
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm">
-                              {u.name?.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
+                            <div className="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center border border-outline-variant shadow-sm overflow-hidden">
+                              <span className="material-symbols-outlined text-[20px]">person</span>
                             </div>
                           )}
-                          <span className="font-semibold text-sm text-on-surface">{u.name}</span>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm text-on-surface leading-none">{u.name || 'Sem Nome'}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="p-4 text-sm text-on-surface-variant">{u.email}</td>
@@ -521,18 +523,30 @@ export function Admin() {
                                 onClick={() => deleteUser(u.uid)} 
                                 className="px-2 py-1 text-[10px] font-bold bg-error text-on-error rounded shadow-sm hover:opacity-90 transition-all"
                               >
-                                Excluir
+                                {u.isActive ? 'Confirmar' : 'Confirmar Recusa'}
                               </button>
                             </div>
                           ) : (
                             userData.uid !== u.uid && (
-                              <button 
-                                onClick={() => setDeletingId(u.uid)}
-                                className="text-error hover:bg-error/10 p-1.5 rounded-full transition-all"
-                                title="Excluir Usuário"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">delete</span>
-                              </button>
+                              <div className="flex items-center gap-1">
+                                {!u.isActive && (
+                                  <button 
+                                    onClick={() => setDeletingId(u.uid)}
+                                    className="px-2 py-1 text-[10px] font-bold text-error hover:bg-error/10 border border-error/20 rounded transition-all flex items-center gap-1"
+                                    title="Recusar Acesso"
+                                  >
+                                    <span className="material-symbols-outlined text-[14px]">person_remove</span>
+                                    RECUSAR
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={() => setDeletingId(u.uid)}
+                                  className="text-on-surface-variant hover:text-error hover:bg-error/10 p-1.5 rounded-full transition-all"
+                                  title="Excluir Usuário"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                                </button>
+                              </div>
                             )
                           )}
                         </div>
