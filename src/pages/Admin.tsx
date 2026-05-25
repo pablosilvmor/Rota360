@@ -119,6 +119,14 @@ export function Admin() {
     return <Navigate to="/" replace />;
   }
 
+  const deleteUser = async (uid: string) => {
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
+    }
+  };
+
   const toggleStatus = async (user: UserData) => {
     try {
       const userRef = doc(db, 'users', user.uid);
@@ -421,12 +429,13 @@ export function Admin() {
                   <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Status</th>
                   <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Função</th>
                   <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider min-w-[200px]">Acesso às Telas</th>
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-on-surface-variant">
+                    <td colSpan={6} className="p-8 text-center text-on-surface-variant">
                       Carregando usuários...
                     </td>
                   </tr>
@@ -435,9 +444,18 @@ export function Admin() {
                     <tr key={u.uid} className="hover:bg-surface-container-low/20 transition-colors">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm">
-                            {u.name?.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
-                          </div>
+                          {u.photoURL ? (
+                            <img 
+                              src={u.photoURL} 
+                              alt={u.name || u.email} 
+                              className="w-8 h-8 rounded-full object-cover border border-outline-variant"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm">
+                              {u.name?.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <span className="font-semibold text-sm text-on-surface">{u.name}</span>
                         </div>
                       </td>
@@ -486,6 +504,36 @@ export function Admin() {
                                 {screen.label}
                               </button>
                             ))
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          {deletingId === u.uid ? (
+                            <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
+                              <button 
+                                onClick={() => setDeletingId(null)} 
+                                className="px-2 py-1 text-[10px] font-bold text-on-surface-variant hover:bg-surface-container-low rounded transition-all"
+                              >
+                                Cancelar
+                              </button>
+                              <button 
+                                onClick={() => deleteUser(u.uid)} 
+                                className="px-2 py-1 text-[10px] font-bold bg-error text-on-error rounded shadow-sm hover:opacity-90 transition-all"
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          ) : (
+                            userData.uid !== u.uid && (
+                              <button 
+                                onClick={() => setDeletingId(u.uid)}
+                                className="text-error hover:bg-error/10 p-1.5 rounded-full transition-all"
+                                title="Excluir Usuário"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                              </button>
+                            )
                           )}
                         </div>
                       </td>
