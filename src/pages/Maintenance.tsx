@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MaintenanceAlertsConfig } from '../components/MaintenanceAlertsConfig';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, getDoc, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, getDoc, getDocs, updateDoc, serverTimestamp, collectionGroup } from 'firebase/firestore';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 const containerVariants = {
@@ -39,6 +39,13 @@ export function Maintenance() {
   const [statusFilter, setStatusFilter] = useLocalStorageState('maintenance_statusFilter', 'Todos os Status');
   const [newOS, setNewOS] = useState({ plate: '', priority: 'Média', description: '', provider: '', title: '', cost: '', obra: '' });
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [selectedOS, setSelectedOS] = useState<any | null>(null);
+  const [closingNotes, setClosingNotes] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
 
   const stats = {
     pending: osData.filter(os => os.status !== 'Concluído').length,
@@ -93,6 +100,14 @@ export function Maintenance() {
     };
   }, []);
 
+  useEffect(() => {
+    if (selectedOS) {
+      setClosingNotes(selectedOS.closingNotes || '');
+    } else {
+      setClosingNotes('');
+    }
+  }, [selectedOS]);
+
   const handleCreateOS = async () => {
     if(!newOS.plate || !newOS.title) return;
     try {
@@ -134,12 +149,6 @@ export function Maintenance() {
       handleFirestoreError(e, OperationType.CREATE, 'maintenance');
     }
   };
-
-  const [completingId, setCompletingId] = useState<string | null>(null);
-  const [selectedOS, setSelectedOS] = useState<any | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [calendarDate, setCalendarDate] = useState(new Date());
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -440,6 +449,7 @@ export function Maintenance() {
       // Atualizar status da OS
       await updateDoc(doc(db, 'maintenance', os.id), {
         status: 'Concluído',
+        closingNotes: closingNotes,
         updatedAt: Date.now()
       });
 
@@ -448,6 +458,7 @@ export function Maintenance() {
         ...os,
         originalOsId: os.id,
         status: 'Concluído',
+        closingNotes: closingNotes,
         completedAt: Date.now()
       });
 
@@ -1133,6 +1144,27 @@ export function Maintenance() {
                   <div className="whitespace-pre-wrap text-sm text-on-surface-variant leading-relaxed">
                     {selectedOS.description}
                   </div>
+                </div>
+
+                <div className="bg-white border border-outline-variant/50 rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-on-surface mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">notes</span>
+                    Observações de Fechamento
+                  </h3>
+                  
+                  {selectedOS.status !== 'Concluído' ? (
+                    <textarea 
+                      rows={3}
+                      value={closingNotes}
+                      onChange={(e) => setClosingNotes(e.target.value)}
+                      className="w-full bg-surface-container-low border border-outline-variant rounded-xl p-4 text-sm focus:ring-2 focus:ring-primary outline-none transition-all resize-none"
+                      placeholder="Adicione observações importantes sobre o fechamento desta OS..."
+                    />
+                  ) : (
+                    <div className="text-sm text-on-surface-variant italic">
+                      {selectedOS.closingNotes || 'Nenhuma observação informada.'}
+                    </div>
+                  )}
                 </div>
               </div>
 

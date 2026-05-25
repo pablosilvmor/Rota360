@@ -138,6 +138,8 @@ export function Admin() {
         screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist', '/works', '/suppliers', '/parts', '/fuel-stations'];
       } else if (newRole === 'gestor') {
         screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works'];
+      } else if (newRole === 'auditor') {
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/reports', '/checklist', '/suppliers', '/parts', '/fuel-stations'];
       } else if (newRole === 'operador') {
         screens = ['/', '/inspections', '/checklist'];
       }
@@ -167,6 +169,8 @@ export function Admin() {
       
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
+        role: user.role, // Maintain existing role
+        isActive: user.isActive,
         allowedScreens: currentScreens,
         updatedAt: Date.now()
       });
@@ -459,6 +463,7 @@ export function Admin() {
                           className="bg-surface-container-low border border-outline-variant rounded-md text-sm px-2 py-1 focus:ring-primary outline-none disabled:opacity-50"
                         >
                           <option value="operador">Operador</option>
+                          <option value="auditor">Auditor</option>
                           <option value="gestor">Gestor</option>
                           <option value="admin">Admin</option>
                         </select>
