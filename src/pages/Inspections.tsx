@@ -635,7 +635,13 @@ function InspectionForm({
         });
       }
 
-      pdf.save(`Relatorio_Inspecao_${vehicle.plate}.pdf`);
+      const today = new Date();
+      const day = String(today.getDate()).padStart(2, '0');
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const year = String(today.getFullYear()).slice(-2);
+      const dateStr = `${day}.${month}.${year}`;
+
+      pdf.save(`${dateStr}_${vehicle.plate}_INSPECAO.pdf`);
     } catch (error) {
       console.error("Erro ao exportar PDF:", error);
       alert(
@@ -2443,7 +2449,22 @@ export function Inspections() {
         });
       }
 
-      pdf.save(`Checklist_${checklist.vehiclePlate}_${checklist.date}.pdf`);
+      let dateStr = checklist.date;
+      if (dateStr?.includes('-')) {
+        const parts = dateStr.split('-'); // YYYY-MM-DD
+        const year = parts[0].slice(-2);
+        const month = parts[1];
+        const day = parts[2];
+        dateStr = `${day}.${month}.${year}`;
+      } else if (dateStr?.includes('/')) {
+        const parts = dateStr.split('/'); // DD/MM/YYYY
+        const year = parts[2].slice(-2);
+        const month = parts[1];
+        const day = parts[0];
+        dateStr = `${day}.${month}.${year}`;
+      }
+
+      pdf.save(`${dateStr}_${checklist.vehiclePlate}_INSPECAO.pdf`);
     } catch (error) {
       console.error("Erro ao exportar PDF:", error);
       alert("Houve um problema ao gerar o PDF.");

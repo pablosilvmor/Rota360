@@ -433,8 +433,13 @@ export function Maintenance() {
         });
       }
 
-      const dateStr = new Date(os.createdAt).toLocaleDateString('pt-BR').split('/').join('-');
-      pdf.save(`${dateStr}_${os.plate}_manutencao.pdf`);
+      const d = new Date(os.createdAt);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = String(d.getFullYear()).slice(-2);
+      const dateStr = `${day}.${month}.${year}`;
+
+      pdf.save(`${dateStr}_${os.plate}_MANUTENCAO.pdf`);
     } catch (error) {
       console.error("Erro ao exportar PDF:", error);
       alert("Houve um problema ao gerar o PDF.");

@@ -158,7 +158,8 @@ export function KmSyncService() {
                              const plate = (av.ras_vei_placa || av.ras_vei_veiculo || av.veiculo_placa || av.vei_placa || "").toString();
                              console.log(`[SYNC DEBUG] Placa recebida da API Solusat: ${plate}`);
                              const rawKm = av.ras_eve_hodometro || av.hodometro || av.ras_eve_odometro || 0;
-                             const currentKmApi = Math.floor(Number(rawKm)) || 0;
+                             // Solusat fornece o valor em metros, convertemos para quilômetros
+                             const currentKmApi = Math.floor(Number(rawKm) / 1000) || 0;
                              
                              const cleanApiPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
                              
