@@ -55,10 +55,15 @@ export function KmSyncService() {
 
       try {
         isSyncing.current = true;
-        setSyncStatus({ active: true, progress: 10, label: isManual ? (targetPlate ? `Sincronizando ${targetPlate}...` : "Sincronizando todos os veículos...") : "Sincronizando odômetros (GPS)..." });
+        setSyncStatus({ active: true, progress: 10, label: isManual ? (targetPlate ? `Sincronizando ${targetPlate}...` : "Sincronizando todos os veículos...") : "Iniciando comunicação GPS..." });
+
+        // Pequeno atraso para o usuário perceber o início
+        await new Promise(r => setTimeout(r, 600));
 
         const syncRef = doc(db, "settings", "integrations_sync");
         const syncSnap = await getDoc(syncRef);
+        
+        setSyncStatus(prev => ({ ...prev, progress: 20, label: "Carregando configurações..." }));
 
         const configDoc = await getDoc(doc(db, 'config', 'telemetry'));
         const telemetryConfig = configDoc.exists() ? configDoc.data() : {
@@ -84,7 +89,6 @@ export function KmSyncService() {
           const isPeak = nowMinutes >= startMinutes && nowMinutes <= endMinutes;
           const interval = isPeak ? (telemetryConfig.peakIntervalMinutes || 15) : (telemetryConfig.syncIntervalMinutes || 30);
           
-          // Slot de sincronização: baseia-se no intervalo arredondado para evitar múltiplas execuções no mesmo bloco de tempo
           const slotMinute = Math.floor(now.getMinutes() / interval) * interval;
           const currentSlotId = `${todayStr}_${now.getHours()}_${slotMinute}`;
           
@@ -94,6 +98,8 @@ export function KmSyncService() {
             return;
           }
         }
+
+        setSyncStatus(prev => ({ ...prev, progress: 35, label: "Consultando provedores..." }));
 
         const integrationsRef = doc(db, "settings", "integrations");
         const integrationsSnap = await getDoc(integrationsRef);
@@ -107,27 +113,21 @@ export function KmSyncService() {
         const integrationsData = integrationsSnap.data();
         const providers: IntegrationProvider[] = integrationsData.providers || [];
 
-        console.log(`[SYNC DEBUG] Providers encontrados: ${providers.length}`);
-
         if (providers.length === 0) {
           setSyncStatus({ active: false, progress: 0, label: "" });
           isSyncing.current = false;
           return;
         }
 
-        setSyncStatus(prev => ({ ...prev, progress: 30 }));
-
         // Pega veículos
         let vehiclesToSync: any[] = [];
         if (targetVehicleId) {
            const vDoc = await getDoc(doc(db, "vehicles", targetVehicleId));
            if (vDoc.exists()) vehiclesToSync = [{ id: vDoc.id, ...vDoc.data() }];
-           console.log(`[SYNC DEBUG] Alvo único ${targetPlate || ''}. Veículos: ${vehiclesToSync.length}`);
         } else {
            const vehiclesRef = collection(db, "vehicles");
            const vehiclesSnap = await getDocs(vehiclesRef);
            vehiclesToSync = vehiclesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-           console.log(`[SYNC DEBUG] Sincronização Geral. Veículos no Banco: ${vehiclesToSync.length}`);
         }
 
         if (vehiclesToSync.length === 0) {
@@ -136,7 +136,7 @@ export function KmSyncService() {
           return;
         }
 
-        setSyncStatus(prev => ({ ...prev, progress: 50 }));
+        setSyncStatus(prev => ({ ...prev, progress: 50, label: "Acessando API Solusat..." }));
 
         let hasError = false;
         const batch = writeBatch(db);
@@ -147,11 +147,9 @@ export function KmSyncService() {
         let updatedPlates: string[] = [];
         let processedIds = new Set<string>();
 
-        // Força timestamp de tentativa de sincronização geral
         const generalLastCheck = new Date().toISOString();
 
         for (const provider of providers) {
-          console.log(`[SYNC DEBUG] Consultando API: ${provider.name}`);
           try {
             if (provider.url.toLowerCase().includes('solusat')) {
               let apiKey = "";
@@ -168,7 +166,6 @@ export function KmSyncService() {
               }
 
               if (apiKey && apiToken) {
-                // Adicionamos um timestamp para evitar cache agressivo de navegadores
                 const response = await fetch(`/api/proxy/solusat/vehicles?t=${Date.now()}`, {
                   method: 'GET',
                   headers: { 
@@ -184,6 +181,10 @@ export function KmSyncService() {
                     if (data.status && data.data) {
                       const groupKeys = Object.keys(data.data);
                       
+                      setSyncStatus(prev => ({ ...prev, progress: 70, label: "Processando dados recebidos..." }));
+                      // Pequeno delay para percepção de atividade
+                      await new Promise(r => setTimeout(r, 400));
+
                       groupKeys.forEach(groupKey => {
                         const apiContent = data.data[groupKey];
                         const apiVehicles = Array.isArray(apiContent) ? apiContent : (apiContent ? Object.values(apiContent) : []);
@@ -200,7 +201,6 @@ export function KmSyncService() {
                              });
                              
                              if (matchingVehicles.length > 0) {
-                               // Calculamos o KM uma vez para os veículos correspondentes
                                let rawKm = 0;
                                let trackerTime = null;
 
@@ -210,9 +210,7 @@ export function KmSyncService() {
                                  rawKm = Number(av.ras_eve_hodometro || av.hodometro || av.vei_odometro || 0);
                                }
                                
-                               // Tenta capturar o timestamp real do GPS/Tracker
                                trackerTime = av.ras_eve_data_gps || av.ras_eve_data || av.data_gps || av.data_hora || av.data || null;
-
                                const currentKmApi = Math.floor(rawKm / 1000) || 0;
 
                                matchingVehicles.forEach(matchedVehicle => {
@@ -220,16 +218,12 @@ export function KmSyncService() {
                                  checksCount++;
                                  const currentInDb = Number(matchedVehicle.currentKM || 0);
                                  
-                                 // Log para debug em tempo real
-                                 console.log(`[SYNC SOLUSAT] Processando ${matchedVehicle.plate}: DB=${currentInDb}, API=${currentKmApi}, TrackerDate=${trackerTime}`);
-
                                  const isLikelyErrorValue = currentInDb > 1000000 || (currentInDb > (currentKmApi * 5) && currentInDb > 200000);
-                                 
                                  const vRef = doc(db, 'vehicles', matchedVehicle.id);
                                  
                                  const updateData: any = {
                                    lastSyncCheck: generalLastCheck,
-                                   lastTrackerUpdate: trackerTime, // Salva a hora reportada pelo GPS
+                                   lastTrackerUpdate: trackerTime,
                                    lastSyncStatus: 'success',
                                    lastSyncError: null
                                  };
@@ -237,13 +231,10 @@ export function KmSyncService() {
                                  if ((currentKmApi > currentInDb || currentInDb === 0 || isLikelyErrorValue) && currentKmApi > 0) {
                                    updateData.currentKM = currentKmApi;
                                    updateData.lastKmUpdate = generalLastCheck;
-                                   
-                                   console.log(`[SYNC SOLUSAT] >>> ATUALIZANDO KM de ${matchedVehicle.plate} para ${currentKmApi}`);
                                    updatesCount++;
                                    updatedPlates.push(matchedVehicle.plate);
                                  } else {
                                    if (currentKmApi === 0 && rawKm === 0) {
-                                      // Se KM veio zerado da API, pode ser um problema de leitura do tracker
                                       updateData.lastSyncStatus = 'warning';
                                       updateData.lastSyncError = 'KM retornado como zero pela API';
                                    }
@@ -255,7 +246,6 @@ export function KmSyncService() {
                              }
                           });
 
-                          // Identificar veículos que NÃO foram encontrados na API Solusat nesta rodada
                           vehiclesToSync.forEach(v => {
                             if (!processedIds.has(v.id)) {
                                const vRef = doc(db, 'vehicles', v.id);
@@ -277,8 +267,7 @@ export function KmSyncService() {
                 }
               }
             } else {
-              // Outros provedores (exemplo)
-              await new Promise(r => setTimeout(r, 400));
+              await new Promise(r => setTimeout(r, 600));
             }
           } catch (apiError) {
             console.error(`Erro ao sincronizar com ${provider.name}:`, apiError);
@@ -286,24 +275,15 @@ export function KmSyncService() {
           }
         }
 
-        // Verifica quem não foi encontrado na API
-        if (!targetVehicleId) {
-          vehiclesToSync.forEach(v => {
-            if (!processedIds.has(v.id)) {
-              notFoundInApi.push(v.plate);
-            }
-          });
-        }
+        setSyncStatus(prev => ({ ...prev, progress: 90, label: "Finalizando registros..." }));
 
-        setSyncStatus(prev => ({ ...prev, progress: 90 }));
-
-        // Sempre commita se houver checagens para salvar o lastSyncCheck
         if (checksCount > 0 || updatesCount > 0 || hasError) {
           await batch.commit();
+          // Pequeno delay para escrita no banco ser percebida
+          await new Promise(r => setTimeout(r, 500));
         }
 
         if (!isManual) {
-          // Re-calculamos o slot para salvar o valor correto na finalização
           const peakStart = (telemetryConfig.peakHoursStart || '08:00').split(':').map(Number);
           const peakEnd = (telemetryConfig.peakHoursEnd || '18:00').split(':').map(Number);
           const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -315,21 +295,17 @@ export function KmSyncService() {
           const slotMinute = Math.floor(now.getMinutes() / interval) * interval;
           const currentSlotId = `${todayStr}_${now.getHours()}_${slotMinute}`;
 
-          await setDoc(
-            syncRef,
-            {
-              lastSyncDate: todayStr,
-              lastSyncSlot: currentSlotId,
-              lastSyncTime: generalLastCheck,
-              status: hasError ? "partial_error" : "success",
-            },
-            { merge: true },
-          );
+          await setDoc(syncRef, {
+            lastSyncDate: todayStr,
+            lastSyncSlot: currentSlotId,
+            lastSyncTime: generalLastCheck,
+            status: hasError ? "partial_error" : "success",
+          }, { merge: true });
         }
 
         const summaryLabel = updatesCount > 0 
           ? `Sincronização concluída! ${updatesCount} veículos atualizados.` 
-          : `Sincronização concluída! ${processedIds.size} veículos verificados.`;
+          : `Frota verificada! ${processedIds.size} veículos processados sem alterações.`;
         
         setSyncStatus({ active: true, progress: 100, label: summaryLabel });
 
