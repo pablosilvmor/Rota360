@@ -159,6 +159,9 @@ service cloud.firestore {
     match /checklist_history/{allChecklists=**} {
       allow read, write: if isSignedIn();
     }
+    match /config/{allConfig=**} {
+      allow read, write: if isSignedIn();
+    }
     match /settings/{allSettings=**} {
       allow read, write: if isSignedIn();
     }
