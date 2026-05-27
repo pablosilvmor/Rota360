@@ -101,41 +101,41 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /vehicles/{allVehicles=**} {
-      allow read, write, delete: if isSignedIn();
+    match /vehicles/{vehicleId} {
+      allow read, write: if isSignedIn();
     }
 
-    match /drivers/{allDrivers=**} {
-      allow read, write, delete: if isSignedIn();
+    match /drivers/{driverId} {
+      allow read, write: if isSignedIn();
     }
 
-    match /alerts/{allAlerts=**} {
-      allow read, write, delete: if isSignedIn();
+    match /alerts/{alertId} {
+      allow read, write: if isSignedIn();
     }
 
-    match /works/{allWorks=**} {
-      allow read, write, delete: if isSignedIn();
+    match /works/{workId} {
+      allow read, write: if isSignedIn();
     }
 
-    match /statuses/{allStatuses=**} {
-      allow read, write, delete: if isSignedIn();
+    match /statuses/{statusId} {
+      allow read, write: if isSignedIn();
     }
 
-    match /maintenance/{allMaintenance=**} {
-      allow read, write, delete: if isSignedIn();
+    match /maintenance/{maintenanceId} {
+      allow read, write: if isSignedIn();
     }
 
-    match /maintenance_history/{allHistory=**} {
-      allow read, write, delete: if isSignedIn();
+    match /maintenance_history/{historyId} {
+      allow read, write: if isSignedIn();
     }
 
-    match /signatures/{allSignatures=**} {
+    match /signatures/{signatureId} {
       allow read: if true;
       allow write: if isSignedIn();
     }
 
-    match /maintenances/{allMaintenances=**} {
-      allow read, write, delete: if isSignedIn();
+    match /maintenances/{maintenanceId} {
+      allow read, write: if isSignedIn();
     }
 
     match /inspections/{docId} {
@@ -156,13 +156,16 @@ service cloud.firestore {
     match /{path=**}/signatures/{sig} {
       allow read: if true;
     }
-    match /checklist_history/{allChecklists=**} {
+
+    match /checklist_history/{checklistId} {
       allow read, write: if isSignedIn();
     }
-    match /config/{allConfig=**} {
+    
+    match /config/{configId} {
       allow read, write: if isSignedIn();
     }
-    match /settings/{allSettings=**} {
+    
+    match /settings/{settingId} {
       allow read, write: if isSignedIn();
     }
   }

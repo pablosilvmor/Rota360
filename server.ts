@@ -20,7 +20,14 @@ async function startServer() {
 
   // Solusat Proxy Route
   app.get("/api/proxy/solusat/vehicles", async (req, res) => {
-    const apiBase = "https://ws.solusat.com.br/espelho/full/vehicles";
+    let apiBase = "https://ws.solusat.com.br/espelho/full/vehicles";
+    
+    // Forward query params to avoid Solusat caching
+    const queryString = new URLSearchParams(req.query as Record<string, string>).toString();
+    if (queryString) {
+      apiBase += `?${queryString}`;
+    }
+
     try {
       const apiKey = req.headers['apikey'] as string;
       const apiToken = req.headers['apitoken'] as string;
@@ -35,7 +42,9 @@ async function startServer() {
         method: "GET",
         headers: {
           "apiKey": apiKey,
-          "apiToken": apiToken
+          "apiToken": apiToken,
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache"
         }
       });
 
