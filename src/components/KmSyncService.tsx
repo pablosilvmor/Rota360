@@ -60,11 +60,13 @@ export function KmSyncService() {
         // Pequeno atraso para o usuário perceber o início
         await new Promise(r => setTimeout(r, 600));
 
+        console.log("[SYNC DEBUG] Pegando integrations_sync");
         const syncRef = doc(db, "settings", "integrations_sync");
         const syncSnap = await getDoc(syncRef);
         
         setSyncStatus(prev => ({ ...prev, progress: 20, label: "Carregando configurações..." }));
 
+        console.log("[SYNC DEBUG] Pegando telemetry config");
         const configDoc = await getDoc(doc(db, 'config', 'telemetry'));
         const telemetryConfig = configDoc.exists() ? configDoc.data() : {
           syncIntervalMinutes: 30,
@@ -101,6 +103,7 @@ export function KmSyncService() {
 
         setSyncStatus(prev => ({ ...prev, progress: 35, label: "Consultando provedores..." }));
 
+        console.log("[SYNC DEBUG] Pegando settings/integrations");
         const integrationsRef = doc(db, "settings", "integrations");
         const integrationsSnap = await getDoc(integrationsRef);
 
@@ -122,9 +125,11 @@ export function KmSyncService() {
         // Pega veículos
         let vehiclesToSync: any[] = [];
         if (targetVehicleId) {
+           console.log(`[SYNC DEBUG] Pegando doc veículo: ${targetVehicleId}`);
            const vDoc = await getDoc(doc(db, "vehicles", targetVehicleId));
            if (vDoc.exists()) vehiclesToSync = [{ id: vDoc.id, ...vDoc.data() }];
         } else {
+           console.log(`[SYNC DEBUG] Pegando docs de todos os veículos`);
            const vehiclesRef = collection(db, "vehicles");
            const vehiclesSnap = await getDocs(vehiclesRef);
            vehiclesToSync = vehiclesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -211,12 +216,29 @@ export function KmSyncService() {
                                }
                                
                                trackerTime = av.ras_eve_data_gps || av.ras_eve_data || av.data_gps || av.data_hora || av.data || null;
-                               const currentKmApi = Math.floor(rawKm / 1000) || 0;
+
+                               const currentInDbBase = matchingVehicles.length > 0 ? Number(matchingVehicles[0].currentKM || 0) : 0;
+                               let currentKmApi = Math.floor(rawKm);
+                               
+                               // A telemetria pode retornar em metros ou quilômetros
+                               // Mais de 3.000.000 de km é irreal, assumimos que são metros
+                               if (rawKm > 3000000) {
+                                 currentKmApi = Math.floor(rawKm / 1000);
+                               } 
+                               // Se o pulo for massivo (100x+) em relação ao BD, provavelmente a API mandou em metros e o BD tem KM
+                               else if (rawKm > 0 && currentInDbBase > 0 && rawKm > (currentInDbBase * 500)) {
+                                 currentKmApi = Math.floor(rawKm / 1000);
+                               }
 
                                matchingVehicles.forEach(matchedVehicle => {
                                  processedIds.add(matchedVehicle.id);
                                  checksCount++;
                                  const currentInDb = Number(matchedVehicle.currentKM || 0);
+
+                                 if (targetVehicleId === matchedVehicle.id || true) { // Always log on this version to debug for user
+                                    console.log(`[SYNC SOLUSAT RAW] Placa: ${matchedVehicle.plate} | payload:`, JSON.stringify(av));
+                                    console.log(`[SYNC SOLUSAT PROC] DB: ${currentInDb} | API(Calc): ${currentKmApi} | TrackerTime: ${trackerTime}`);
+                                 }
                                  
                                  const isLikelyErrorValue = currentInDb > 1000000 || (currentInDb > (currentKmApi * 5) && currentInDb > 200000);
                                  const vRef = doc(db, 'vehicles', matchedVehicle.id);
@@ -278,12 +300,14 @@ export function KmSyncService() {
         setSyncStatus(prev => ({ ...prev, progress: 90, label: "Finalizando registros..." }));
 
         if (checksCount > 0 || updatesCount > 0 || hasError) {
+          console.log(`[SYNC DEBUG] Fazendo batch.commit() com ${checksCount} checks, ${updatesCount} updates, hasError: ${hasError}`);
           await batch.commit();
           // Pequeno delay para escrita no banco ser percebida
           await new Promise(r => setTimeout(r, 500));
         }
 
         if (!isManual) {
+          console.log(`[SYNC DEBUG] Salvando settings/integrations_sync (slot)`);
           const peakStart = (telemetryConfig.peakHoursStart || '08:00').split(':').map(Number);
           const peakEnd = (telemetryConfig.peakHoursEnd || '18:00').split(':').map(Number);
           const nowMinutes = now.getHours() * 60 + now.getMinutes();

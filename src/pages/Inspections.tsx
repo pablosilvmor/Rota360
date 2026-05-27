@@ -1206,7 +1206,7 @@ function InspectionForm({
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block">
                 KM Atual
               </label>
-              {vehicle.lastKmUpdate && (
+              {(vehicle.lastSyncCheck || vehicle.lastKmUpdate || vehicle.updatedAt) && (
                 <span
                   className="text-[10px] text-on-surface-variant/70 italic flex items-center gap-1"
                   title="Última atualização via telemetria"
@@ -1214,7 +1214,7 @@ function InspectionForm({
                   <span className="material-symbols-outlined text-[12px]">
                     sync
                   </span>
-                  {new Date(vehicle.lastKmUpdate).toLocaleString("pt-BR", {
+                  {new Date(vehicle.lastSyncCheck || vehicle.lastKmUpdate || vehicle.updatedAt).toLocaleString("pt-BR", {
                     dateStyle: "short",
                     timeStyle: "short",
                   })}

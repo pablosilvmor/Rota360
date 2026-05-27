@@ -101,8 +101,8 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /vehicles/{vehicleId} {
-      allow read, write: if isSignedIn();
+    match /vehicles/{allVehicles=**} {
+      allow read, write, delete: if isSignedIn();
     }
 
     match /drivers/{driverId} {
