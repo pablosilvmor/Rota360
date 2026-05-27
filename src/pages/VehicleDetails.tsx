@@ -235,6 +235,28 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
                 <span className="text-[48px] font-bold text-primary leading-none tracking-tight">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()}</span>
                 <span className="text-[20px] font-bold text-on-surface-variant">KM</span>
               </div>
+              {vehicle.lastSyncCheck && (
+                <div className="flex flex-col gap-1 mb-4">
+                  <p className="text-[10px] text-on-surface-variant/80 font-bold uppercase flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">sync</span>
+                    Última sincronização (GPS)
+                  </p>
+                  <p className="text-xs font-bold text-primary">
+                    {new Date(vehicle.lastSyncCheck).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+              )}
+              <button 
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { 
+                    detail: { vehicleId: vehicle.id, plate: vehicle.plate } 
+                  }));
+                }}
+                className="w-full py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">refresh</span>
+                Sincronizar Agora
+              </button>
             </div>
             <div className="space-y-2 mt-4">
               <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">

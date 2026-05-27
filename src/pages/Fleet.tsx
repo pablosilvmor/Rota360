@@ -380,7 +380,12 @@ export function Fleet() {
                             .join(', ') || 'N/D'}
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-mono text-primary font-bold">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()}</span>
+                          <div className="flex flex-col">
+                            <span className="font-mono text-primary font-bold">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()}</span>
+                            {vehicle.lastSyncCheck && (
+                              <span className="text-[9px] text-primary/60 font-medium">Atu: {new Date(vehicle.lastSyncCheck).toLocaleDateString('pt-BR')}</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm ${
@@ -461,6 +466,9 @@ export function Fleet() {
                     <div>
                       <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Odômetro Atual</p>
                       <p className="font-bold text-sm text-on-surface">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()} KM</p>
+                      {vehicle.lastSyncCheck && (
+                        <p className="text-[9px] text-primary/70 font-medium truncate">Atu: {new Date(vehicle.lastSyncCheck).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                      )}
                     </div>
                     <div>
                       <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Próximo Serviço</p>
