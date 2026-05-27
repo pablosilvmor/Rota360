@@ -255,10 +255,10 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
                 <div className="flex flex-col gap-1 mb-4">
                   <p className="text-[10px] text-on-surface-variant/80 font-bold uppercase flex items-center gap-1">
                     <span className="material-symbols-outlined text-[14px]">sync</span>
-                    Última sincronização (Sistema)
+                    Última atualização (Sist.)
                   </p>
                   <p className="text-xs font-bold text-primary">
-                    {new Date(vehicle.lastSyncCheck).toLocaleString('pt-BR')}
+                    {new Date(vehicle.lastKmUpdate || vehicle.lastSyncCheck).toLocaleString('pt-BR')}
                   </p>
                   
                   {vehicle.lastTrackerUpdate && (
