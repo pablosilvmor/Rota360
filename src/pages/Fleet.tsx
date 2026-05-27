@@ -383,7 +383,7 @@ export function Fleet() {
                           <div className="flex flex-col">
                             <span className="font-mono text-primary font-bold">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()}</span>
                             {vehicle.lastSyncCheck && (
-                              <span className="text-[9px] text-primary/60 font-medium">Atu: {new Date(vehicle.lastSyncCheck).toLocaleDateString('pt-BR')}</span>
+                              <span className="text-[9px] text-primary/60 font-medium">Atu: {new Date(vehicle.lastSyncCheck).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                             )}
                           </div>
                         </td>

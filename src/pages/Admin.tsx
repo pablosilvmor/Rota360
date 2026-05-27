@@ -6,6 +6,7 @@ import { Navigate } from 'react-router';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 
 import { IntegrationsTab } from '../components/IntegrationsTab';
+import { TelemetryTab } from '../components/TelemetryTab';
 
 interface Work {
   id: string;
@@ -347,6 +348,7 @@ export function Admin() {
     { id: 'status', label: 'Status' },
     { id: 'adm', label: 'ADM' },
     { id: 'integracoes', label: 'Integrações' },
+    { id: 'telemetria', label: 'Telemetria' },
   ];
 
   return (
@@ -416,6 +418,10 @@ export function Admin() {
         ) : (
           <IntegrationsTab />
         )
+      )}
+
+      {(activeTab === 'telemetria') && (
+        <TelemetryTab />
       )}
 
       {(activeTab === 'adm') && (

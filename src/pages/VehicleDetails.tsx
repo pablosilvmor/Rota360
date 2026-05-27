@@ -230,7 +230,23 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
           {/* Odômetro */}
           <div className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between flex-1">
             <div>
-              <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-4">Status do Odômetro</h3>
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Status do Odômetro</h3>
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                  vehicle.lastSyncStatus === 'success' 
+                    ? 'bg-success/5 text-success border-success/20' 
+                    : vehicle.lastSyncStatus === 'warning'
+                      ? 'bg-warning/5 text-warning border-warning/20'
+                      : vehicle.lastSyncStatus === 'failed'
+                        ? 'bg-error/5 text-error border-error/20'
+                        : 'bg-on-surface-variant/5 text-on-surface-variant border-on-surface-variant/20'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                    vehicle.lastSyncStatus === 'success' ? 'bg-success' : vehicle.lastSyncStatus === 'warning' ? 'bg-warning' : vehicle.lastSyncStatus === 'failed' ? 'bg-error' : 'bg-on-surface-variant'
+                  }`}></span>
+                  {vehicle.lastSyncStatus === 'success' ? 'CONECTADO' : vehicle.lastSyncStatus === 'warning' ? 'ATENÇÃO' : vehicle.lastSyncStatus === 'failed' ? 'ERRO SYNC' : 'OFFLINE'}
+                </div>
+              </div>
               <div className="flex justify-between items-baseline mb-2">
                 <span className="text-[48px] font-bold text-primary leading-none tracking-tight">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()}</span>
                 <span className="text-[20px] font-bold text-on-surface-variant">KM</span>
@@ -239,11 +255,23 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
                 <div className="flex flex-col gap-1 mb-4">
                   <p className="text-[10px] text-on-surface-variant/80 font-bold uppercase flex items-center gap-1">
                     <span className="material-symbols-outlined text-[14px]">sync</span>
-                    Última sincronização (GPS)
+                    Última sincronização (Sistema)
                   </p>
                   <p className="text-xs font-bold text-primary">
                     {new Date(vehicle.lastSyncCheck).toLocaleString('pt-BR')}
                   </p>
+                  
+                  {vehicle.lastTrackerUpdate && (
+                    <div className="mt-2 p-2 bg-primary/5 rounded-lg border border-primary/10">
+                      <p className="text-[9px] text-primary/70 font-bold uppercase flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">satellite_alt</span>
+                        Último sinal do GPS (Tracker)
+                      </p>
+                      <p className="text-[11px] font-bold text-on-surface">
+                        {vehicle.lastTrackerUpdate}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               <button 
