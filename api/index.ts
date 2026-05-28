@@ -1,4 +1,5 @@
 import express from "express";
+import { GoogleGenAI } from "@google/genai";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -6,6 +7,34 @@ app.use(express.json({ limit: "50mb" }));
 // API Routes
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// AI Chat Route
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    
+    // Configura o AI para atuar como assistente do Rota 360
+    const systemInstruction = "Você é um assistente virtual especialista no sistema Rota 360 (desenvolvido por Bemon Engenharia e Montagens Ltda). O Rota 360 é um sistema de Gestão de Frota, com funcionalidades de Painel, Frota (cadastro de veículos), Inspeções, Checklist, Combustível, Rastreamento, Relatórios, Motoristas, AutoAlerta e Central de Cadastros. Seja prestativo, educado, forneça respostas em português do Brasil e ajude o usuário com suas dúvidas de forma detalhada sobre os processos do sistema Rota 360. Seja minimalista mas claro.";
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: message,
+      config: {
+        systemInstruction,
+      }
+    });
+
+    res.json({ response: response.text });
+  } catch (error) {
+    console.error("[AI CHAT] Error:", error);
+    res.status(500).json({ error: "Falha ao comunicar com a inteligência artificial." });
+  }
 });
 
 // Solusat Proxy Route

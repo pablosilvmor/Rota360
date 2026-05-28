@@ -13,6 +13,8 @@ import {
   onSnapshot,
   getDoc,
   updateDoc,
+  where,
+  limit
 } from "firebase/firestore";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { useNavigate, useSearchParams } from "react-router";
@@ -58,17 +60,19 @@ const defaultItems = [
   },
 ];
 
-export function Checklist() {
+export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = false }: { preselectedVehicleId?: string, autoAlertaId?: string, hideHeader?: boolean } = {}) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get("edit");
+  const queryVehicleId = searchParams.get("vehicleId");
+  const queryAutoAlertaId = searchParams.get("autoAlertaId");
 
   const [step, setStep] = useState(1);
   const [driverName, setDriverName] = useState("");
   const [checklistDate, setChecklistDate] = useState(
     new Date().toISOString().split("T")[0],
   );
-  const [vehicleId, setVehicleId] = useState("");
+  const [vehicleId, setVehicleId] = useState(preselectedVehicleId || queryVehicleId || "");
   const [vehicles, setVehicles] = useState<any[]>([]);
 
   const [items, setItems] = useState<any[]>([]);
@@ -392,18 +396,43 @@ export function Checklist() {
           status: 'Agendado',
           priority: 'Alta',
           provider: 'A Definir',
-          description: `Gerado a partir do checklist diário.\nItens:\n${nonConformingItems.map(i => `- ${i.item} (${i.service || 'Sem ação'})`).join('\n')}`,
+          description: `Gerado a partir do checklist diário.${(autoAlertaId || queryAutoAlertaId) ? `\nAutoAlerta Ref: ${(autoAlertaId || queryAutoAlertaId)}` : ''}\nItens:\n${nonConformingItems.map(i => `- ${i.item} (${i.service || 'Sem ação'})`).join('\n')}`,
           icon: 'build',
           color: 'error',
           createdAt: Date.now(),
           updatedAt: Date.now(),
           source: 'checklist',
+          autoAlertaId: (autoAlertaId || queryAutoAlertaId) || null,
           inspectionItems: nonConformingItems.map(i => ({ 
             id: i.id, 
             itemTitle: i.item, 
             periodicityKM: i.periodicityKM || 0 
           }))
         });
+
+        const activeAlertId = autoAlertaId || queryAutoAlertaId;
+        if (activeAlertId) {
+           try {
+             const autoAlertsRef = collection(db, "auto_alertas");
+             const checkAlertDoc = async () => {
+                 let dRef = doc(db, "auto_alertas", activeAlertId);
+                 let snap = await getDoc(dRef);
+                 if (snap.exists()) {
+                     await updateDoc(dRef, { status: "os_generated" });
+                     return;
+                 }
+                 // try by number
+                 const q = query(autoAlertsRef, where("number", "==", activeAlertId), limit(1));
+                 const qSnap = await getDocs(q);
+                 if (!qSnap.empty) {
+                     await updateDoc(doc(db, "auto_alertas", qSnap.docs[0].id), { status: "os_generated" });
+                 }
+             };
+             await checkAlertDoc();
+           } catch(err) {
+             console.error("Erro updating auto_alerta", err);
+           }
+        }
       }
 
       setUploadProgress(100);
@@ -536,7 +565,7 @@ export function Checklist() {
               <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-outline-variant space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-on-surface-variant mb-2">
-                    Nome do Motorista
+                    Nome
                   </label>
                   <input
                     type="text"

@@ -144,13 +144,13 @@ export function Admin() {
     try {
       let screens = user.allowedScreens || ['/'];
       if (newRole === 'admin') {
-        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist', '/works'];
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist', '/works', '/autoalerta', '/autoalerta-admin'];
       } else if (newRole === 'gestor') {
-        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works'];
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/autoalerta', '/autoalerta-admin'];
       } else if (newRole === 'auditor') {
         screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/checklist'];
       } else if (newRole === 'operador') {
-        screens = ['/', '/inspections', '/checklist'];
+        screens = ['/', '/inspections', '/checklist', '/autoalerta'];
       }
       
       const userRef = doc(db, 'users', user.uid);
@@ -335,6 +335,8 @@ export function Admin() {
     { path: '/fuel', label: 'Combustível' },
     { path: '/tracking', label: 'Rastreamento' },
     { path: '/works', label: 'Obras' },
+    { path: '/autoalerta', label: 'AutoAlerta' },
+    { path: '/autoalerta-admin', label: 'Gestão AutoAlerta' },
     { path: '/admin', label: 'Central de Cadastros' },
     { path: '/profile', label: 'Meu Perfil' },
   ];

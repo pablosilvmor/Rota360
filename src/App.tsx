@@ -18,6 +18,8 @@ import { Works } from './pages/Works';
 import { Inspections } from './pages/Inspections';
 import { Reports } from './pages/Reports';
 import { Checklist } from './pages/Checklist';
+import { AutoAlerta } from './pages/AutoAlerta';
+import { AutoAlertaAdmin } from './pages/AutoAlertaAdmin';
 import { VerifySignature } from './pages/VerifySignature';
 import { Profile } from './pages/Profile';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -81,6 +83,8 @@ export default function App() {
         <ErrorBoundary>
           <Routes>
             <Route path="/checklist" element={<Checklist />} />
+            <Route path="/autoalerta" element={<ProtectedRoute path="/autoalerta"><AutoAlerta /></ProtectedRoute>} />
+            <Route path="/autoalerta-admin" element={<ProtectedRoute path="/autoalerta-admin"><AutoAlertaAdmin /></ProtectedRoute>} />
             <Route path="/verify/:id" element={<VerifySignature />} />
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute path="/"><Dashboard /></ProtectedRoute>} />

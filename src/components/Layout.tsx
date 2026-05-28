@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { LogOut } from "lucide-react";
 import { ConfirmModal } from "./ConfirmModal";
 import { KmSyncService } from "./KmSyncService";
+import { HelpModal } from "./HelpModal";
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,6 +18,7 @@ export function Layout({ children }: LayoutProps) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showNotImplemented, setShowNotImplemented] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -104,8 +106,8 @@ export function Layout({ children }: LayoutProps) {
     { name: "Painel", path: "/", icon: "dashboard" },
     { name: "Frota", path: "/fleet", icon: "local_shipping" },
     { name: "Inspeções", path: "/inspections", icon: "fact_check" },
-    { name: "Motoristas", path: "/drivers", icon: "group" },
     { name: "Checklist", path: "/checklist", icon: "checklist" },
+    { name: "AutoAlerta", path: "/autoalerta", icon: "campaign" },
   ];
 
   const allowedNavItems = navItems.filter(
@@ -293,6 +295,18 @@ export function Layout({ children }: LayoutProps) {
                   </div>
                 )}
               </div>
+
+              <div className="relative">
+                <button
+                  onClick={() => setIsHelpOpen(true)}
+                  className="p-2 transition-colors rounded-full text-on-primary-container hover:bg-white/10 hover:text-white"
+                  title="Central de Ajuda Inteligente"
+                >
+                  <span className="material-symbols-outlined text-[24px]">
+                    psychology
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -328,7 +342,7 @@ export function Layout({ children }: LayoutProps) {
           })}
 
           {(() => {
-            const hasMoreOptions = userData?.role?.toLowerCase() === 'admin' || ['/maintenance', '/fuel', '/tracking', '/reports'].some(path => (userData?.allowedScreens || []).includes(path));
+            const hasMoreOptions = userData?.role?.toLowerCase() === 'admin' || ['/maintenance', '/fuel', '/tracking', '/reports', '/works', '/autoalerta-admin', '/drivers'].some(path => (userData?.allowedScreens || []).includes(path));
             if (!hasMoreOptions) return null;
             return (
             <div className="px-2 pt-2">
@@ -351,6 +365,19 @@ export function Layout({ children }: LayoutProps) {
                 {isMoreMenuOpen && (
                   <div className="absolute left-full bottom-0 pl-2 w-56 z-[2000] animate-in fade-in slide-in-from-left-2 duration-200">
                     <div className="bg-primary-container rounded-2xl p-2 shadow-2xl border border-white/10">
+                    {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
+                    <NavLink
+                      to="/drivers"
+                      onClick={() => setIsMoreMenuOpen(false)}
+                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                      title="Motoristas"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        group
+                      </span>
+                      Motoristas
+                    </NavLink>
+                    )}
                     {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
                     <NavLink
                       to="/maintenance"
@@ -401,6 +428,19 @@ export function Layout({ children }: LayoutProps) {
                         analytics
                       </span>
                       Relatórios
+                    </NavLink>
+                    )}
+                    {((userData?.allowedScreens || []).includes('/autoalerta-admin') || userData?.role?.toLowerCase() === 'admin') && (
+                    <NavLink
+                      to="/autoalerta-admin"
+                      onClick={() => setIsMoreMenuOpen(false)}
+                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                      title="Gestão AutoAlerta"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        admin_panel_settings
+                      </span>
+                      Gestão AutoAlerta
                     </NavLink>
                     )}
                   </div>
@@ -580,6 +620,8 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
       )}
+
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
 
       {/* Logout Confirmation Modal */}
       {isLogoutModalOpen && (
