@@ -144,11 +144,11 @@ export function Admin() {
     try {
       let screens = user.allowedScreens || ['/'];
       if (newRole === 'admin') {
-        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist', '/works', '/suppliers', '/parts', '/fuel-stations'];
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist', '/works'];
       } else if (newRole === 'gestor') {
         screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works'];
       } else if (newRole === 'auditor') {
-        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/reports', '/checklist', '/suppliers', '/parts', '/fuel-stations'];
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/checklist'];
       } else if (newRole === 'operador') {
         screens = ['/', '/inspections', '/checklist'];
       }
@@ -335,10 +335,8 @@ export function Admin() {
     { path: '/fuel', label: 'Combustível' },
     { path: '/tracking', label: 'Rastreamento' },
     { path: '/works', label: 'Obras' },
-    { path: '/admin', label: 'Admin' },
-    { path: '/suppliers', label: 'Fornecedores' },
-    { path: '/parts', label: 'Peças/Estoque' },
-    { path: '/fuel-stations', label: 'Postos' },
+    { path: '/admin', label: 'Central de Cadastros' },
+    { path: '/profile', label: 'Meu Perfil' },
   ];
 
   const tabs = [

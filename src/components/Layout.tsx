@@ -263,17 +263,17 @@ export function Layout({ children }: LayoutProps) {
                         Meu Perfil
                       </Link>
                       
-                      {userData?.role?.toLowerCase() === "admin" && (
+                      {(userData?.role?.toLowerCase() === "admin" || (userData?.allowedScreens || []).includes('/admin')) && (
                         <Link
                           to="/admin"
                           onClick={() => setIsSettingsOpen(false)}
                           className="flex items-center px-4 py-2 text-sm text-on-surface hover:bg-surface-container transition-colors"
-                          title="Painel de Admin"
+                          title="Central de Cadastros"
                         >
                           <span className="material-symbols-outlined text-[20px] mr-3">
                             admin_panel_settings
                           </span>
-                          Painel de Admin
+                          Central de Cadastros
                         </Link>
                       )}
 
@@ -327,26 +327,31 @@ export function Layout({ children }: LayoutProps) {
             );
           })}
 
-          <div className="px-2 pt-2">
-            <div className="relative" ref={moreMenuRef}>
-              <button
-                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-                className={`w-full px-4 py-3 rounded-lg flex items-center justify-between transition-colors group ${isMoreMenuOpen ? "bg-white/10 text-white" : "text-on-primary-container hover:bg-white/5"}`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined">more_horiz</span>
-                  <span className="text-base font-medium">Mais Opções</span>
-                </div>
-                <span
-                  className={`material-symbols-outlined text-[18px] transition-transform ${isMoreMenuOpen ? "rotate-90" : ""}`}
+          {(() => {
+            const hasMoreOptions = userData?.role?.toLowerCase() === 'admin' || ['/maintenance', '/fuel', '/tracking', '/reports'].some(path => (userData?.allowedScreens || []).includes(path));
+            if (!hasMoreOptions) return null;
+            return (
+            <div className="px-2 pt-2">
+              <div className="relative" ref={moreMenuRef}>
+                <button
+                  onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                  className={`w-full px-4 py-3 rounded-lg flex items-center justify-between transition-colors group ${isMoreMenuOpen ? "bg-white/10 text-white" : "text-on-primary-container hover:bg-white/5"}`}
                 >
-                  chevron_right
-                </span>
-              </button>
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined">more_horiz</span>
+                    <span className="text-base font-medium">Mais Opções</span>
+                  </div>
+                  <span
+                    className={`material-symbols-outlined text-[18px] transition-transform ${isMoreMenuOpen ? "rotate-90" : ""}`}
+                  >
+                    chevron_right
+                  </span>
+                </button>
 
-              {isMoreMenuOpen && (
-                <div className="absolute left-full bottom-0 pl-2 w-56 z-[2000] animate-in fade-in slide-in-from-left-2 duration-200">
-                  <div className="bg-primary-container rounded-2xl p-2 shadow-2xl border border-white/10">
+                {isMoreMenuOpen && (
+                  <div className="absolute left-full bottom-0 pl-2 w-56 z-[2000] animate-in fade-in slide-in-from-left-2 duration-200">
+                    <div className="bg-primary-container rounded-2xl p-2 shadow-2xl border border-white/10">
+                    {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
                     <NavLink
                       to="/maintenance"
                       onClick={() => setIsMoreMenuOpen(false)}
@@ -358,6 +363,8 @@ export function Layout({ children }: LayoutProps) {
                       </span>
                       Manutenção
                     </NavLink>
+                    )}
+                    {((userData?.allowedScreens || []).includes('/fuel') || userData?.role?.toLowerCase() === 'admin') && (
                     <NavLink
                       to="/fuel"
                       onClick={() => setIsMoreMenuOpen(false)}
@@ -369,6 +376,8 @@ export function Layout({ children }: LayoutProps) {
                       </span>
                       Combustível
                     </NavLink>
+                    )}
+                    {((userData?.allowedScreens || []).includes('/tracking') || userData?.role?.toLowerCase() === 'admin') && (
                     <NavLink
                       to="/tracking"
                       onClick={() => setIsMoreMenuOpen(false)}
@@ -380,6 +389,8 @@ export function Layout({ children }: LayoutProps) {
                       </span>
                       Rastreamento
                     </NavLink>
+                    )}
+                    {((userData?.allowedScreens || []).includes('/reports') || userData?.role?.toLowerCase() === 'admin') && (
                     <NavLink
                       to="/reports"
                       onClick={() => setIsMoreMenuOpen(false)}
@@ -391,11 +402,14 @@ export function Layout({ children }: LayoutProps) {
                       </span>
                       Relatórios
                     </NavLink>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           </div>
+          );
+          })()}
         </nav>
 
         <div className="p-4 bg-black/30 mt-auto border-t border-white/5 flex flex-col gap-3">
