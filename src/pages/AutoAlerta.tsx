@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { collection, addDoc, getDocs, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
-import html2canvas from "html2canvas";
+import { toPng, toBlob } from "html-to-image";
 
 export function AutoAlerta() {
   const { user } = useAuth();
@@ -103,107 +103,115 @@ export function AutoAlerta() {
   if (successData) {
     return (
       <div className="max-w-2xl mx-auto">
-        <div id="autoalerta-receipt" className="bg-surface-container-lowest border border-outline-variant p-8 rounded-3xl shadow-sm space-y-6">
-          <div className="flex flex-col items-center justify-center text-center space-y-4 border-b border-outline-variant pb-6">
-            <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center">
-              <span className="material-symbols-outlined text-[32px]">campaign</span>
+        <div id="autoalerta-receipt" style={{ backgroundColor: '#ffffff', color: '#000000', borderColor: '#d1d5db', padding: '2rem', borderRadius: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', border: '1px solid #d1d5db', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '1.5rem', borderBottom: '1px solid #d1d5db', paddingBottom: '2rem' }}>
+            <img 
+              src="https://i.imgur.com/tIPJCgH.png" 
+              alt="Rota 360" 
+              style={{ 
+                height: '8rem', 
+                width: 'auto',
+                objectFit: 'contain', 
+                marginBottom: '0.5rem',
+                filter: 'drop-shadow(0 15px 30px rgba(0, 0, 0, 0.6))'
+              }} 
+            />
+            <div style={{ width: '5rem', height: '5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff', color: '#2563eb' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '2.5rem' }}>campaign</span>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-on-surface">AutoAlerta Emitido</h2>
-              <p className="text-on-surface-variant">Seu reporte foi enviado com sucesso.</p>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#000000', margin: 0 }}>AutoAlerta Emitido</h2>
+              <p style={{ color: '#666666', marginTop: '0.5rem' }}>Seu reporte foi enviado com sucesso.</p>
             </div>
-            <div className="bg-surface-container py-2 px-6 rounded-lg">
-              <span className="text-sm font-medium text-on-surface-variant">Nº do Pedido</span>
-              <p className="text-xl font-mono font-bold text-primary">{successData.number}</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-surface-container-low p-4 rounded-xl">
-                <span className="text-xs font-semibold text-on-surface-variant uppercase">Veículo</span>
-                <p className="font-medium text-on-surface mt-1">{successData.plate}</p>
-              </div>
-              <div className="bg-surface-container-low p-4 rounded-xl">
-                <span className="text-xs font-semibold text-on-surface-variant uppercase">Motorista</span>
-                <p className="font-medium text-on-surface mt-1">{successData.driverName}</p>
-              </div>
-            </div>
-            <div className="bg-surface-container-low p-4 rounded-xl">
-              <span className="text-xs font-semibold text-on-surface-variant uppercase">Observação</span>
-              <p className="text-sm text-on-surface mt-2 whitespace-pre-wrap">{successData.observation}</p>
+            <div style={{ padding: '0.75rem 2rem', borderRadius: '0.75rem', backgroundColor: '#f3f4f6' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#666666' }}>Nº do Pedido</span>
+              <p style={{ fontSize: '1.5rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#2563eb', margin: 0 }}>{successData.number}</p>
             </div>
           </div>
 
-          <div className="pt-4 flex flex-col sm:flex-row justify-between gap-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
+              <div style={{ padding: '1rem', borderRadius: '0.75rem', backgroundColor: '#f9fafb' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666666', textTransform: 'uppercase' }}>Veículo</span>
+                <p style={{ fontWeight: '500', color: '#000000', marginTop: '0.25rem' }}>{successData.plate}</p>
+              </div>
+              <div style={{ padding: '1rem', borderRadius: '0.75rem', backgroundColor: '#f9fafb' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666666', textTransform: 'uppercase' }}>Motorista</span>
+                <p style={{ fontWeight: '500', color: '#000000', marginTop: '0.25rem' }}>{successData.driverName}</p>
+              </div>
+            </div>
+            <div style={{ padding: '1rem', borderRadius: '0.75rem', backgroundColor: '#f9fafb' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666666', textTransform: 'uppercase' }}>Observação</span>
+              <p style={{ fontSize: '0.875rem', color: '#000000', marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>{successData.observation}</p>
+            </div>
+          </div>
+          <div className="pt-8 flex flex-col sm:flex-row justify-between gap-4">
             <button
-              onClick={() => window.print()}
-              className="flex-1 py-3 px-4 bg-surface-container text-on-surface rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors"
+              onClick={async () => {
+                const element = document.getElementById('autoalerta-receipt');
+                if (!element) return;
+                try {
+                  const dataUrl = await toPng(element, {
+                    quality: 0.95,
+                    backgroundColor: '#ffffff',
+                    filter: (node) => {
+                      if (node instanceof HTMLElement && node.classList.contains('material-symbols-outlined')) {
+                        return false;
+                      }
+                      return true;
+                    }
+                  });
+                  const link = document.createElement('a');
+                  link.download = `AutoAlerta_${successData.number}.png`;
+                  link.href = dataUrl;
+                  link.click();
+                } catch (err) {
+                  console.error(err);
+                  window.print();
+                }
+              }}
+              className="flex-1 py-3 px-4 bg-gray-100 text-gray-900 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
             >
               <span className="material-symbols-outlined">print</span>
-              Imprimir / PDF
+              Imprimir / PNG
             </button>
             <button
               onClick={async () => {
                 const element = document.getElementById('autoalerta-receipt');
                 if (!element) return;
                 try {
-                  const canvas = await html2canvas(element, { scale: 2, useCORS: true, allowTaint: true });
-                  canvas.toBlob(async (blob) => {
-                    if (!blob) return;
-                    
-                    const fallbackDownload = () => {
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `AutoAlerta_${successData.number}.png`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    };
-
-                    const file = new File([blob], `AutoAlerta_${successData.number}.png`, { type: 'image/png' });
-                    
-                    try {
-                      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                        await navigator.share({
-                          title: `AutoAlerta ${successData.number}`,
-                          text: `AutoAlerta emitido para o veículo ${successData.plate} pelo motorista ${successData.driverName}.`,
-                          files: [file]
-                        });
-                      } else if (navigator.clipboard && navigator.clipboard.write) {
-                        try {
-                           await navigator.clipboard.write([
-                             new ClipboardItem({ 'image/png': blob })
-                           ]);
-                           alert('Imagem copiada para a área de transferência!');
-                        } catch(clipErr) {
-                           fallbackDownload();
-                        }
-                      } else {
-                        fallbackDownload();
+                  const blob = await toBlob(element, {
+                    quality: 0.95,
+                    backgroundColor: '#ffffff',
+                    filter: (node) => {
+                      if (node instanceof HTMLElement && node.classList.contains('material-symbols-outlined')) {
+                        return false;
                       }
-                    } catch (shareErr: any) {
-                      if (shareErr.name === 'NotAllowedError' || shareErr.name === 'DataError') {
-                        // O usuário cancelou ou o iframe bloqueou, tenta a área de transferência
-                        try {
-                          await navigator.clipboard.write([
-                            new ClipboardItem({ 'image/png': blob })
-                          ]);
-                          alert('Imagem copiada para a área de transferência!');
-                        } catch(clipErr) {
-                           fallbackDownload();
-                        }
-                      } else {
-                        console.error('Erro no navigator.share:', shareErr);
-                      }
+                      return true;
                     }
-                  }, 'image/png');
+                  });
+                  if (!blob) return;
+                  const file = new File([blob], `AutoAlerta_${successData.number}.png`, { type: 'image/png' });
+                  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                      title: `AutoAlerta ${successData.number}`,
+                      text: `AutoAlerta emitido para o veículo ${successData.plate} pelo motorista ${successData.driverName}.`,
+                      files: [file]
+                    });
+                  } else {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `AutoAlerta_${successData.number}.png`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }
                 } catch (err) {
-                  console.error('Erro ao gerar imagem:', err);
-                  alert('Erro ao processar imagem para compartilhamento. Verifique se o navegador permite compartilhamento.');
+                  console.error(err);
+                  alert('Erro ao compartilhar.');
                 }
               }}
-              className="flex-1 py-3 px-4 bg-surface-container text-on-surface rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors text-sm sm:text-base"
+              className="flex-1 py-3 px-4 bg-gray-200 text-gray-900 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-300 transition-colors text-sm sm:text-base"
             >
               <span className="material-symbols-outlined">share</span>
               Compartilhar
