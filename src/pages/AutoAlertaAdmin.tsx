@@ -195,7 +195,7 @@ export function AutoAlertaAdmin() {
              {selectedAlerta.status !== 'os_generated' && (
                 <>
                   <button 
-                    onClick={() => navigate(`/inspections?vehicleId=${selectedAlerta.vehicleId || ''}&autoAlertaId=${selectedAlerta.id}`)}
+                    onClick={() => navigate(`/checklist?vehicleId=${selectedAlerta.vehicleId || ''}&autoAlertaId=${selectedAlerta.id}`)}
                     className="px-4 py-2 bg-primary-container text-on-primary-container font-bold rounded-lg hover:opacity-90 flex items-center gap-2"
                   >
                     <span className="material-symbols-outlined text-[20px]">fact_check</span>

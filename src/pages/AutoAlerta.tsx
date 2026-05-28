@@ -148,35 +148,59 @@ export function AutoAlerta() {
                 const element = document.getElementById('autoalerta-receipt');
                 if (!element) return;
                 try {
-                  const canvas = await html2canvas(element, { scale: 2 });
+                  const canvas = await html2canvas(element, { scale: 2, useCORS: true, allowTaint: true });
                   canvas.toBlob(async (blob) => {
                     if (!blob) return;
-                    const file = new File([blob], `AutoAlerta_${successData.number}.png`, { type: 'image/png' });
                     
-                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                      await navigator.share({
-                        title: `AutoAlerta ${successData.number}`,
-                        text: `AutoAlerta emitido para o veículo ${successData.plate} pelo motorista ${successData.driverName}.`,
-                        files: [file]
-                      });
-                    } else if (navigator.clipboard && navigator.clipboard.write) {
-                      await navigator.clipboard.write([
-                        new ClipboardItem({ 'image/png': blob })
-                      ]);
-                      alert('Imagem copiada para a área de transferência!');
-                    } else {
-                      // Fallback: download the image
+                    const fallbackDownload = () => {
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
                       a.download = `AutoAlerta_${successData.number}.png`;
                       a.click();
                       URL.revokeObjectURL(url);
+                    };
+
+                    const file = new File([blob], `AutoAlerta_${successData.number}.png`, { type: 'image/png' });
+                    
+                    try {
+                      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                          title: `AutoAlerta ${successData.number}`,
+                          text: `AutoAlerta emitido para o veículo ${successData.plate} pelo motorista ${successData.driverName}.`,
+                          files: [file]
+                        });
+                      } else if (navigator.clipboard && navigator.clipboard.write) {
+                        try {
+                           await navigator.clipboard.write([
+                             new ClipboardItem({ 'image/png': blob })
+                           ]);
+                           alert('Imagem copiada para a área de transferência!');
+                        } catch(clipErr) {
+                           fallbackDownload();
+                        }
+                      } else {
+                        fallbackDownload();
+                      }
+                    } catch (shareErr: any) {
+                      if (shareErr.name === 'NotAllowedError' || shareErr.name === 'DataError') {
+                        // O usuário cancelou ou o iframe bloqueou, tenta a área de transferência
+                        try {
+                          await navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': blob })
+                          ]);
+                          alert('Imagem copiada para a área de transferência!');
+                        } catch(clipErr) {
+                           fallbackDownload();
+                        }
+                      } else {
+                        console.error('Erro no navigator.share:', shareErr);
+                      }
                     }
                   }, 'image/png');
                 } catch (err) {
                   console.error('Erro ao gerar imagem:', err);
-                  alert('Erro ao tentar compartilhar a imagem.');
+                  alert('Erro ao processar imagem para compartilhamento. Verifique se o navegador permite compartilhamento.');
                 }
               }}
               className="flex-1 py-3 px-4 bg-surface-container text-on-surface rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors text-sm sm:text-base"
@@ -239,6 +263,23 @@ export function AutoAlerta() {
                   }}
                   required={!selectedVehicle}
                  />
+                 {searchTerm && (
+                   <button 
+                     type="button"
+                     onMouseDown={(e) => {
+                       // Evita que o onBlur do input seja disparado antes de limparmos o campo
+                       e.preventDefault();
+                       setSearchTerm("");
+                       setSelectedVehicle(null);
+                       setDriverName("");
+                       setIsDropdownOpen(true);
+                     }}
+                     className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer text-[20px]"
+                     title="Limpar campo"
+                   >
+                     close
+                   </button>
+                 )}
               </div>
 
               {isDropdownOpen && filteredVehicles.length > 0 && (
