@@ -47,18 +47,23 @@ export function Tracking() {
   useEffect(() => {
     const qVehicles = query(collection(db, 'vehicles'), orderBy('plate', 'asc'));
     const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
-      setVehicles(snapshot.docs.map(doc => {
+      setVehicles(snapshot.docs.map((doc, index) => {
         const data = doc.data();
-        const hash = (data.plate || doc.id).split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-        const latOffset = (hash % 100) / 1000;
-        const lngOffset = ((hash * 7) % 100) / 1000;
         
+        // Se não houver localização, usamos a base
+        let baseLocation = data.location || { lat: BASE_LAT, lng: BASE_LNG };
+        
+        // Adicionamos um pequeno deslocamento (jitter) baseado no índice para evitar sobreposição total
+        // Isso ajuda a ver veículos que estão no mesmo endereço exato
+        const jitterLat = (index % 10 - 5) * 0.00015;
+        const jitterLng = (index % 12 - 6) * 0.00015;
+
         return {
           id: doc.id,
           ...data,
           location: {
-            lat: BASE_LAT + latOffset,
-            lng: BASE_LNG + lngOffset
+            lat: baseLocation.lat + jitterLat,
+            lng: baseLocation.lng + jitterLng
           }
         };
       }));
@@ -74,27 +79,9 @@ export function Tracking() {
       handleFirestoreError(error, OperationType.LIST, 'drivers');
     });
 
-    // Subtle movement simulation for "In Route" vehicles
-    const interval = setInterval(() => {
-      setVehicles(prev => prev.map(v => {
-        const driver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
-        if (driver?.status === 'Em Rota') {
-          return {
-            ...v,
-            location: {
-              lat: v.location.lat + (Math.random() - 0.5) * 0.0001,
-              lng: v.location.lng + (Math.random() - 0.5) * 0.0001
-            }
-          };
-        }
-        return v;
-      }));
-    }, 5000);
-
     return () => {
       unsubscribeVehicles();
       unsubscribeDrivers();
-      clearInterval(interval);
     };
   }, [drivers]);
 

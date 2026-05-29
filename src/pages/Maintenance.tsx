@@ -83,19 +83,20 @@ export function Maintenance() {
       handleFirestoreError(error, OperationType.LIST, 'vehicles');
     });
 
-    const unsubItems = onSnapshot(collectionGroup(db, 'items'), (snapshot) => {
-      const mapping: Record<string, any> = {};
-      snapshot.forEach((doc) => { mapping[doc.id] = doc.data(); });
-      setItemsMap(mapping);
-    }, (error) => {
-      console.error("Error fetching items in real-time (Maintenance):", error);
-    });
+    const fetchItems = async () => {
+      try {
+        const querySnapshot = await getDocs(collectionGroup(db, 'items'));
+        const mapping: Record<string, any> = {};
+        querySnapshot.forEach((doc) => { mapping[doc.id] = doc.data(); });
+        setItemsMap(mapping);
+      } catch (err) { console.error(err); }
+    };
+    fetchItems();
 
     return () => {
       unsubscribe();
       unsubscribeWorks();
       unsubscribeVehicles();
-      unsubItems();
     };
   }, []);
 

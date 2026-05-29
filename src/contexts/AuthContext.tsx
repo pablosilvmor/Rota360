@@ -50,6 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             userDoc = await getDoc(userRef);
           } catch (error) {
             console.error('getDoc error:', error);
+            // Fallback for admin if quota is exceeded
+            if (currentUser.email === 'bemongv@gmail.com') {
+              console.log("Quota exceeded - Applying admin fallback permissions");
+              setUserData({
+                uid: currentUser.uid,
+                email: currentUser.email || '',
+                name: currentUser.displayName || 'Admin (Fallback)',
+                role: 'admin',
+                isActive: true,
+                allowedScreens: ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist']
+              });
+            }
             setLoading(false);
             return;
           }

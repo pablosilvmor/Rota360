@@ -19,33 +19,31 @@ export function AutoAlerta() {
   const [submitting, setSubmitting] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
 
-  useEffect(() => {
-    const unsubVehicles = onSnapshot(collection(db, "vehicles"), (snapshot) => {
-      const vData = snapshot.docs.map((doc) => ({
+  const fetchData = async () => {
+    try {
+      const vSnapshot = await getDocs(collection(db, "vehicles"));
+      const vData = vSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setVehicles(vData);
-    }, (error) => {
-      console.error("Erro ao ouvir veículos no AutoAlerta", error);
-    });
 
-    const unsubDrivers = onSnapshot(collection(db, "drivers"), (snapshot) => {
-      const dData = snapshot.docs.map((doc) => ({
+      const dSnapshot = await getDocs(collection(db, "drivers"));
+      const dData = dSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setDrivers(dData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Erro ao ouvir motoristas no AutoAlerta", error);
-      setLoading(false);
-    });
 
-    return () => {
-      unsubVehicles();
-      unsubDrivers();
-    };
+      setLoading(false);
+    } catch (e) {
+      console.error("Erro ao buscar dados", e);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
   const selectVehicleByRecord = (vehicle: any) => {

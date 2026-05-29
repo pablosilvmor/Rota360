@@ -224,19 +224,19 @@ export function Reports() {
   const [exportProgress, setExportProgress] = useState(0);
 
   useEffect(() => {
-    const qWorks = query(collection(db, 'works'), orderBy('name', 'asc'));
-    const unsubWorks = onSnapshot(qWorks, (snapshot) => {
-      setWorks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => {
-      console.error("Error listening to works in Reports", err);
-    });
-
-    const qStatuses = query(collection(db, 'statuses'), orderBy('name', 'asc'));
-    const unsubStatuses = onSnapshot(qStatuses, (snapshot) => {
-      setStatuses(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => {
-      console.error("Error listening to statuses in Reports", err);
-    });
+    const fetchFilters = async () => {
+      try {
+        const [wSnap, sSnap] = await Promise.all([
+          getDocs(query(collection(db, 'works'), orderBy('name', 'asc'))),
+          getDocs(query(collection(db, 'statuses'), orderBy('name', 'asc')))
+        ]);
+        setWorks(wSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setStatuses(sSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Error fetching filters", err);
+      }
+    };
+    fetchFilters();
 
     const loadImg = async (url: string, setter: (val: {src: string, ratio: number}) => void) => {
       try {
@@ -259,10 +259,7 @@ export function Reports() {
     const unsubImageHeader = loadImg('https://i.imgur.com/f2EH8ls.png', setHeaderLogo);
     const unsubImageFooter = loadImg('https://i.imgur.com/1DaE4Bm.png', setFooterLogo);
 
-    return () => {
-      unsubWorks();
-      unsubStatuses();
-    };
+    return () => {};
   }, []);
 
   const handleModuleSelect = async (mod: ModuleData) => {
@@ -281,11 +278,9 @@ export function Reports() {
       return; 
     }
 
-    // We use onSnapshot but handle it carefully for reports
-    const q = query(collection(db, mod.collectionId));
-    let unsubscribeDrivers: (() => void) | null = null;
-    
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    try {
+      const q = query(collection(db, mod.collectionId));
+      const snapshot = await getDocs(q);
       let docs = snapshot.docs.map(d => ({id: d.id, ...d.data() as any}));
 
       if (mod.id === 'vehicles') {
@@ -312,28 +307,17 @@ export function Reports() {
       });
 
       setData(preparedData);
-      setLoadingData(false);
-    }, (error) => {
+    } catch (error) {
       handleFirestoreError(error, OperationType.LIST, mod.collectionId);
+    } finally {
       setLoadingData(false);
-    });
-
-    return () => {
-      unsubscribe();
-      if (unsubscribeDrivers) unsubscribeDrivers();
-    };
+    }
   };
 
   useEffect(() => {
-    let cleanup: (() => void) | null = null;
     if (selectedModule) {
-      fetchModuleData(selectedModule).then(unsub => {
-        cleanup = unsub;
-      });
+      fetchModuleData(selectedModule);
     }
-    return () => {
-      if (cleanup) cleanup();
-    };
   }, [selectedModuleId]);
 
   const toggleColumn = (key: string) => {

@@ -14,20 +14,22 @@ export function AutoAlertaAdmin() {
   const [alertaToDelete, setAlertaToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, "auto_alertas"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const acts = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setAlertas(acts);
-      setLoading(false);
-    }, (error) => {
-      console.error("Erro ao buscar AutoAlertas", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    const fetchAlertas = async () => {
+      try {
+        const q = query(collection(db, "auto_alertas"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        const acts = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setAlertas(acts);
+        setLoading(false);
+      } catch (e) {
+        console.error("Erro ao buscar AutoAlertas", e);
+        setLoading(false);
+      }
+    };
+    fetchAlertas();
   }, []);
 
   const handleSelectAlerta = async (alerta: any) => {
