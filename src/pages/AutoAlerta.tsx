@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { toPng, toBlob } from "html-to-image";
 
 export function AutoAlerta() {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   
@@ -19,37 +19,40 @@ export function AutoAlerta() {
   const [submitting, setSubmitting] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
 
-  const fetchData = async () => {
-    try {
-      const vSnapshot = await getDocs(collection(db, "vehicles"));
-      const vData = vSnapshot.docs.map((doc) => ({
+  useEffect(() => {
+    if (!driverName && (userData?.name || user?.displayName)) {
+      setDriverName(userData?.name || user?.displayName || "");
+    }
+  }, [userData, user, driverName]);
+
+  useEffect(() => {
+    const unsubVehicles = onSnapshot(collection(db, "vehicles"), (snapshot) => {
+      const vData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setVehicles(vData);
+    }, (error) => {
+      console.error("Erro ao ouvir veículos no AutoAlerta", error);
+    });
 
-      const dSnapshot = await getDocs(collection(db, "drivers"));
-      const dData = dSnapshot.docs.map((doc) => ({
+    const unsubDrivers = onSnapshot(collection(db, "drivers"), (snapshot) => {
+      const dData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setDrivers(dData);
-
       setLoading(false);
-    } catch (e) {
-      console.error("Erro ao buscar dados", e);
+    }, (error) => {
+      console.error("Erro ao ouvir motoristas no AutoAlerta", error);
       setLoading(false);
-    }
-  };
+    });
 
-  useEffect(() => {
-    fetchData();
+    return () => {
+      unsubVehicles();
+      unsubDrivers();
+    };
   }, []);
-
-  const normalizePlate = (plate: string) => {
-    if (!plate) return "";
-    return plate.replace(/[^A-Z0-9]/gi, "").toUpperCase();
-  };
 
   const selectVehicleByRecord = (vehicle: any) => {
     setSelectedVehicle(vehicle);
@@ -57,19 +60,16 @@ export function AutoAlerta() {
     setIsDropdownOpen(false);
 
     // Encontra o motorista atribuído
-    const normalizedSelectedPlate = normalizePlate(vehicle.plate);
-    const assignedDriver = drivers.find(d => {
-      const assigned = d.vehicleAssigned;
-      if (Array.isArray(assigned)) {
-        return assigned.some(p => normalizePlate(p) === normalizedSelectedPlate);
-      }
-      return normalizePlate(assigned) === normalizedSelectedPlate;
-    });
+    const assignedDriver = drivers.find(d => 
+      Array.isArray(d.vehicleAssigned) 
+        ? d.vehicleAssigned.includes(vehicle.plate) 
+        : d.vehicleAssigned === vehicle.plate
+    );
 
     if (assignedDriver) {
       setDriverName(assignedDriver.name);
     } else {
-      setDriverName("");
+      setDriverName(userData?.name || user?.displayName || "");
     }
   };
 
@@ -277,7 +277,7 @@ export function AutoAlerta() {
                     if (!isDropdownOpen) setIsDropdownOpen(true);
                     if (selectedVehicle) {
                        setSelectedVehicle(null);
-                       setDriverName("");
+                       setDriverName(userData?.name || user?.displayName || "");
                     }
                   }}
                   onFocus={() => setIsDropdownOpen(true)}
@@ -295,7 +295,7 @@ export function AutoAlerta() {
                        e.preventDefault();
                        setSearchTerm("");
                        setSelectedVehicle(null);
-                       setDriverName("");
+                       setDriverName(userData?.name || user?.displayName || "");
                        setIsDropdownOpen(true);
                      }}
                      className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer text-[20px]"

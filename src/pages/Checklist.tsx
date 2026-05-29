@@ -19,6 +19,7 @@ import {
 import { SearchableSelect } from "../components/SearchableSelect";
 import { useNavigate, useSearchParams } from "react-router";
 import { calculateProgress } from "../lib/progressUtils";
+import { useAuth } from "../contexts/AuthContext";
 
 // Items default
 const defaultItems = [
@@ -66,34 +67,18 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
   const editId = searchParams.get("edit");
   const queryVehicleId = searchParams.get("vehicleId");
   const queryAutoAlertaId = searchParams.get("autoAlertaId");
+  const queryVehiclePlate = searchParams.get("vehiclePlate");
+  const queryDriverName = searchParams.get("driverName");
+
+  const { user, userData } = useAuth();
 
   const [step, setStep] = useState(1);
-  const [driverName, setDriverName] = useState("");
+  const [driverName, setDriverName] = useState(queryDriverName || "");
   const [checklistDate, setChecklistDate] = useState(
     new Date().toISOString().split("T")[0],
   );
   const [vehicleId, setVehicleId] = useState(preselectedVehicleId || queryVehicleId || "");
   const [vehicles, setVehicles] = useState<any[]>([]);
-
-  // Carregar AutoAlerta se houver ID
-  useEffect(() => {
-    const alertId = queryAutoAlertaId || autoAlertaId;
-    if (alertId) {
-      const fetchAlert = async () => {
-        try {
-          const alertDoc = await getDoc(doc(db, "auto_alertas", alertId));
-          if (alertDoc.exists()) {
-            const data = alertDoc.data();
-            if (data.driverName) setDriverName(data.driverName);
-            if (data.vehicleId) setVehicleId(data.vehicleId);
-          }
-        } catch (err) {
-          console.error("Error fetching alert for checklist", err);
-        }
-      };
-      fetchAlert();
-    }
-  }, [queryAutoAlertaId, autoAlertaId]);
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -103,16 +88,28 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
   const [records, setRecords] = useState<Record<string, any>>({});
 
   useEffect(() => {
+    if (!driverName && !queryDriverName && (userData?.name || user?.displayName)) {
+      setDriverName(userData?.name || user?.displayName || "");
+    }
+  }, [userData, user, driverName, queryDriverName]);
+
+  useEffect(() => {
     const fetchVehicles = async () => {
       try {
         const snap = await getDocs(collection(db, "vehicles"));
-        setVehicles(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        const vList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setVehicles(vList);
+
+        if (queryVehiclePlate && !vehicleId) {
+          const matched = vList.find(v => v.plate === queryVehiclePlate);
+          if (matched) setVehicleId(matched.id);
+        }
       } catch (e) {
         console.error(e);
       }
     };
     fetchVehicles();
-  }, []);
+  }, [queryVehiclePlate, vehicleId]);
 
   // Carregar checklist para edição se houver um ID
   useEffect(() => {

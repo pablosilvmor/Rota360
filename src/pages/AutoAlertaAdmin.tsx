@@ -14,22 +14,20 @@ export function AutoAlertaAdmin() {
   const [alertaToDelete, setAlertaToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchAlertas = async () => {
-      try {
-        const q = query(collection(db, "auto_alertas"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const acts = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setAlertas(acts);
-        setLoading(false);
-      } catch (e) {
-        console.error("Erro ao buscar AutoAlertas", e);
-        setLoading(false);
-      }
-    };
-    fetchAlertas();
+    const q = query(collection(db, "auto_alertas"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const acts = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAlertas(acts);
+      setLoading(false);
+    }, (error) => {
+      console.error("Erro ao buscar AutoAlertas", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleSelectAlerta = async (alerta: any) => {
@@ -191,7 +189,7 @@ export function AutoAlertaAdmin() {
              {selectedAlerta.status !== 'os_generated' && (
                 <>
                   <button 
-                    onClick={() => navigate(`/checklist?vehicleId=${selectedAlerta.vehicleId || ''}&autoAlertaId=${selectedAlerta.id}`)}
+                    onClick={() => navigate(`/checklist?vehicleId=${selectedAlerta.vehicleId || ''}&vehiclePlate=${encodeURIComponent(selectedAlerta.plate || '')}&autoAlertaId=${selectedAlerta.id}&driverName=${encodeURIComponent(selectedAlerta.driverName || '')}`)}
                     className="px-4 py-2 bg-primary-container text-on-primary-container font-bold rounded-lg hover:opacity-90 flex items-center gap-2"
                   >
                     <span className="material-symbols-outlined text-[20px]">fact_check</span>

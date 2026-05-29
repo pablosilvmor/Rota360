@@ -237,32 +237,18 @@ export function KmSyncService() {
 
                                  if (targetVehicleId === matchedVehicle.id || true) { // Always log on this version to debug for user
                                     console.log(`[SYNC SOLUSAT RAW] Placa: ${matchedVehicle.plate} | payload:`, JSON.stringify(av));
-                                    // Log for location debugging
-                                    console.log(`[SYNC SOLUSAT LOC DEBUG] Placa: ${matchedVehicle.plate} | lat: ${av.ras_eve_latitude || av.latitude}, lng: ${av.ras_eve_longitude || av.longitude}`);
                                     console.log(`[SYNC SOLUSAT PROC] DB: ${currentInDb} | API(Calc): ${currentKmApi} | TrackerTime: ${trackerTime}`);
                                  }
                                  
                                  const isLikelyErrorValue = currentInDb > 1000000 || (currentInDb > (currentKmApi * 5) && currentInDb > 200000);
                                  const vRef = doc(db, 'vehicles', matchedVehicle.id);
                                  
-                                 const trackerLat = Number(av.ras_eve_latitude || av.latitude || 0);
-                                 const trackerLng = Number(av.ras_eve_longitude || av.longitude || 0);
-
                                  const updateData: any = {
                                    lastSyncCheck: generalLastCheck,
                                    lastTrackerUpdate: trackerTime,
                                    lastSyncStatus: 'success',
                                    lastSyncError: null
                                  };
-
-                                 // Gravar localização se disponível
-                                 if (trackerLat !== 0 && trackerLng !== 0) {
-                                   updateData.location = {
-                                     lat: trackerLat,
-                                     lng: trackerLng,
-                                     updatedAt: generalLastCheck
-                                   };
-                                 }
 
                                  if ((currentKmApi > currentInDb || currentInDb === 0 || isLikelyErrorValue) && currentKmApi > 0) {
                                    updateData.currentKM = currentKmApi;
