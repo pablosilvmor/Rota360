@@ -46,17 +46,25 @@ export function AutoAlerta() {
     fetchData();
   }, []);
 
+  const normalizePlate = (plate: string) => {
+    if (!plate) return "";
+    return plate.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+  };
+
   const selectVehicleByRecord = (vehicle: any) => {
     setSelectedVehicle(vehicle);
     setSearchTerm(`${vehicle.plate} ${vehicle.model ? `- ${vehicle.model}` : ""}`);
     setIsDropdownOpen(false);
 
     // Encontra o motorista atribuído
-    const assignedDriver = drivers.find(d => 
-      Array.isArray(d.vehicleAssigned) 
-        ? d.vehicleAssigned.includes(vehicle.plate) 
-        : d.vehicleAssigned === vehicle.plate
-    );
+    const normalizedSelectedPlate = normalizePlate(vehicle.plate);
+    const assignedDriver = drivers.find(d => {
+      const assigned = d.vehicleAssigned;
+      if (Array.isArray(assigned)) {
+        return assigned.some(p => normalizePlate(p) === normalizedSelectedPlate);
+      }
+      return normalizePlate(assigned) === normalizedSelectedPlate;
+    });
 
     if (assignedDriver) {
       setDriverName(assignedDriver.name);

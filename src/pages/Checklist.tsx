@@ -75,6 +75,26 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
   const [vehicleId, setVehicleId] = useState(preselectedVehicleId || queryVehicleId || "");
   const [vehicles, setVehicles] = useState<any[]>([]);
 
+  // Carregar AutoAlerta se houver ID
+  useEffect(() => {
+    const alertId = queryAutoAlertaId || autoAlertaId;
+    if (alertId) {
+      const fetchAlert = async () => {
+        try {
+          const alertDoc = await getDoc(doc(db, "auto_alertas", alertId));
+          if (alertDoc.exists()) {
+            const data = alertDoc.data();
+            if (data.driverName) setDriverName(data.driverName);
+            if (data.vehicleId) setVehicleId(data.vehicleId);
+          }
+        } catch (err) {
+          console.error("Error fetching alert for checklist", err);
+        }
+      };
+      fetchAlert();
+    }
+  }, [queryAutoAlertaId, autoAlertaId]);
+
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
