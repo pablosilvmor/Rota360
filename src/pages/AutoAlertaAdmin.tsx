@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy, doc, updateDoc, deleteDoc, getDoc, where, limit } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, doc, updateDoc, deleteDoc, getDoc, where, limit, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { useNavigate } from "react-router";
@@ -14,24 +14,21 @@ export function AutoAlertaAdmin() {
   const [alertaToDelete, setAlertaToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAlertas();
-  }, []);
-
-  const fetchAlertas = async () => {
-    try {
-      const q = query(collection(db, "auto_alertas"), orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
-      const acts = querySnapshot.docs.map((doc) => ({
+    const q = query(collection(db, "auto_alertas"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const acts = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setAlertas(acts);
       setLoading(false);
-    } catch (e) {
-      console.error("Erro ao buscar AutoAlertas", e);
+    }, (error) => {
+      console.error("Erro ao buscar AutoAlertas", error);
       setLoading(false);
-    }
-  };
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleSelectAlerta = async (alerta: any) => {
     setSelectedAlerta(alerta);
@@ -63,7 +60,6 @@ export function AutoAlertaAdmin() {
   const handleUpdateStatus = async (id: string, status: string) => {
     try {
       await updateDoc(doc(db, "auto_alertas", id), { status });
-      fetchAlertas();
       if (selectedAlerta && selectedAlerta.id === id) {
         setSelectedAlerta({ ...selectedAlerta, status });
       }
@@ -79,10 +75,9 @@ export function AutoAlertaAdmin() {
         await deleteDoc(doc(db, "auto_alertas", alertaToDelete));
         setSelectedAlerta(null);
         setAlertaToDelete(null);
-        fetchAlertas();
       } catch (e) {
-         console.error(e);
-         alert("Erro ao excluir AutoAlerta");
+        console.error(e);
+        alert("Erro ao excluir AutoAlerta");
       }
     }
   };
@@ -101,7 +96,6 @@ export function AutoAlertaAdmin() {
           <button 
             onClick={() => {
               setSelectedAlerta(null);
-              fetchAlertas();
             }}
             className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors"
           >

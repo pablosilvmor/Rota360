@@ -83,32 +83,33 @@ export function Dashboard() {
   const [nextServices, setNextServices] = useState<any[]>([]);
   const [costCenterStats, setCostCenterStats] = useState<any[]>([]);
 
-  // 1. Fetch static or high-volume data periodically or on mount
+  // 1. Fetch dynamic data in real-time
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [recordsSnap, itemsSnap] = await Promise.all([
-          getDocs(collectionGroup(db, "records")),
-          getDocs(collectionGroup(db, "items"))
-        ]);
-        
-        const iMap: Record<string, any> = {};
-        itemsSnap.forEach((doc) => {
-          const data = doc.data();
-          iMap[doc.id] = { ...data, id: doc.id };
-        });
-        setItemsMap(iMap);
+    const unsubItems = onSnapshot(collectionGroup(db, "items"), (snapshot) => {
+      const iMap: Record<string, any> = {};
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        iMap[doc.id] = { ...data, id: doc.id };
+      });
+      setItemsMap(iMap);
+    }, (error) => {
+      console.error("Error fetching items in real-time:", error);
+    });
 
-        const rList: any[] = [];
-        recordsSnap.forEach((doc) => {
-          rList.push({ ...doc.data(), id: doc.id, path: doc.ref.path });
-        });
-        setAllRecords(rList);
-      } catch (error) {
-        console.error("Error fetching background data:", error);
-      }
+    const unsubRecords = onSnapshot(collectionGroup(db, "records"), (snapshot) => {
+      const rList: any[] = [];
+      snapshot.forEach((doc) => {
+        rList.push({ ...doc.data(), id: doc.id, path: doc.ref.path });
+      });
+      setAllRecords(rList);
+    }, (error) => {
+      console.error("Error fetching records in real-time:", error);
+    });
+
+    return () => {
+      unsubItems();
+      unsubRecords();
     };
-    fetchData();
   }, []);
 
   // 2. Main Logic Effect

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, addDoc, getDocs, doc, getDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, doc, getDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { toPng, toBlob } from "html-to-image";
@@ -20,31 +20,33 @@ export function AutoAlerta() {
   const [successData, setSuccessData] = useState<any>(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const vSnapshot = await getDocs(collection(db, "vehicles"));
-      const vData = vSnapshot.docs.map((doc) => ({
+    const unsubVehicles = onSnapshot(collection(db, "vehicles"), (snapshot) => {
+      const vData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setVehicles(vData);
+    }, (error) => {
+      console.error("Erro ao ouvir veículos no AutoAlerta", error);
+    });
 
-      const dSnapshot = await getDocs(collection(db, "drivers"));
-      const dData = dSnapshot.docs.map((doc) => ({
+    const unsubDrivers = onSnapshot(collection(db, "drivers"), (snapshot) => {
+      const dData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setDrivers(dData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Erro ao ouvir motoristas no AutoAlerta", error);
+      setLoading(false);
+    });
 
-      setLoading(false);
-    } catch (e) {
-      console.error("Erro ao buscar dados", e);
-      setLoading(false);
-    }
-  };
+    return () => {
+      unsubVehicles();
+      unsubDrivers();
+    };
+  }, []);
 
   const selectVehicleByRecord = (vehicle: any) => {
     setSelectedVehicle(vehicle);
@@ -109,11 +111,11 @@ export function AutoAlerta() {
               src="https://i.imgur.com/tIPJCgH.png" 
               alt="Rota 360" 
               style={{ 
-                height: '8rem', 
+                height: '10rem', 
                 width: 'auto',
                 objectFit: 'contain', 
-                marginBottom: '0.5rem',
-                filter: 'drop-shadow(0 15px 30px rgba(0, 0, 0, 0.6))'
+                marginBottom: '1rem',
+                filter: 'drop-shadow(0 20px 40px rgba(0, 0, 0, 0.7))'
               }} 
             />
             <div style={{ width: '5rem', height: '5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff', color: '#2563eb' }}>
@@ -152,7 +154,11 @@ export function AutoAlerta() {
                 if (!element) return;
                 try {
                   const dataUrl = await toPng(element, {
-                    quality: 0.95,
+                    cacheBust: true,
+                    style: {
+                      margin: '0',
+                      padding: '2rem'
+                    },
                     backgroundColor: '#ffffff',
                     filter: (node) => {
                       if (node instanceof HTMLElement && node.classList.contains('material-symbols-outlined')) {
@@ -164,7 +170,9 @@ export function AutoAlerta() {
                   const link = document.createElement('a');
                   link.download = `AutoAlerta_${successData.number}.png`;
                   link.href = dataUrl;
+                  document.body.appendChild(link);
                   link.click();
+                  document.body.removeChild(link);
                 } catch (err) {
                   console.error(err);
                   window.print();
@@ -181,7 +189,7 @@ export function AutoAlerta() {
                 if (!element) return;
                 try {
                   const blob = await toBlob(element, {
-                    quality: 0.95,
+                    cacheBust: true,
                     backgroundColor: '#ffffff',
                     filter: (node) => {
                       if (node instanceof HTMLElement && node.classList.contains('material-symbols-outlined')) {
@@ -203,12 +211,14 @@ export function AutoAlerta() {
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = `AutoAlerta_${successData.number}.png`;
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                   }
                 } catch (err) {
                   console.error(err);
-                  alert('Erro ao compartilhar.');
+                  alert('Erro ao compartilhar. A imagem foi baixada em vez disso.');
                 }
               }}
               className="flex-1 py-3 px-4 bg-gray-200 text-gray-900 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-300 transition-colors text-sm sm:text-base"
