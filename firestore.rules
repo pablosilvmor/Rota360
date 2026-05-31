@@ -169,6 +169,10 @@ service cloud.firestore {
       allow read, create, update, delete: if isSignedIn();
     }
     
+    match /preApprovedAccess/{accessId} {
+      allow read, write: if isAdmin();
+    }
+    
     match /config/{configId} {
       allow read, write: if isSignedIn();
     }
