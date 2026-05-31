@@ -8,6 +8,41 @@ import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { IntegrationsTab } from '../components/IntegrationsTab';
 import { TelemetryTab } from '../components/TelemetryTab';
 
+const Countdown = ({ expiresAt, onExtend }: { expiresAt: number, onExtend: () => void }) => {
+  const [timeLeft, setTimeLeft] = useState(expiresAt - Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeLeft(expiresAt - Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  const isExpired = timeLeft <= 0;
+  const hours = Math.floor(Math.max(0, timeLeft) / (1000 * 60 * 60));
+  const minutes = Math.floor((Math.max(0, timeLeft) % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((Math.max(0, timeLeft) % (1000 * 60)) / 1000);
+
+  return (
+    <div className="flex flex-col gap-1 mt-2 p-2 bg-surface-container-low border border-outline-variant rounded-lg">
+      <div className="flex items-center gap-1">
+        <span className="material-symbols-outlined text-[14px] text-secondary">timer</span>
+        <span className={`font-mono text-xs font-bold ${isExpired ? 'text-error' : 'text-secondary'}`}>
+          {isExpired ? 'Expirado' : `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`}
+        </span>
+      </div>
+      <button
+        onClick={onExtend}
+        title="Prolongar tempo"
+        className="text-[10px] bg-secondary-container text-on-secondary-container px-2 py-1 flex items-center justify-center gap-1 rounded font-bold hover:opacity-80 transition-opacity"
+      >
+        <span className="material-symbols-outlined text-[12px]">add</span>
+        Alterar Prazo (+24h)
+      </button>
+    </div>
+  );
+};
+
 interface Work {
   id: string;
   name: string;
@@ -155,6 +190,33 @@ export function Admin() {
     }
   };
 
+  const [expiredVisitor, setExpiredVisitor] = useState<UserData | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin || !users.length) return;
+
+    const checkInterval = setInterval(() => {
+      const now = Date.now();
+      const expired = users.find(u => u.role === 'visitante' && u.expiresAt && u.expiresAt <= now);
+      if (expired && expiredVisitor?.uid !== expired.uid) {
+        setExpiredVisitor(expired);
+      }
+    }, 5000);
+
+    return () => clearInterval(checkInterval);
+  }, [isAdmin, users, expiredVisitor]);
+
+  const handleExtendVisitor = async (user: UserData) => {
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, { expiresAt: Date.now() + 24 * 60 * 60 * 1000 });
+    setExpiredVisitor(null);
+  };
+
+  const handleDeleteVisitor = async (uid: string) => {
+    await deleteUser(uid);
+    setExpiredVisitor(null);
+  };
+
   const deletePreApproved = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'preApprovedAccess', id));
@@ -217,12 +279,20 @@ export function Admin() {
       }
       
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
+      const updateData: any = {
         role: newRole,
         isActive: true, // Automatically activate user when role is assigned
         allowedScreens: screens,
         updatedAt: Date.now()
-      });
+      };
+      
+      if (newRole === 'visitante') {
+        updateData.expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      } else {
+        updateData.expiresAt = null;
+      }
+      
+      await updateDoc(userRef, updateData);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     }
@@ -416,6 +486,32 @@ export function Admin() {
 
   return (
     <div className="space-y-6">
+      {expiredVisitor && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-surface-container border border-outline-variant rounded-2xl p-6 max-w-md w-full shadow-lg">
+            <h3 className="text-xl font-bold text-on-surface mb-2">Acesso de Visitante Expirado</h3>
+            <p className="text-on-surface-variant text-sm mb-6">
+              O tempo de acesso do visitante <strong className="text-on-surface">{expiredVisitor.name || expiredVisitor.email}</strong> expirou. Deseja prolongar o acesso por mais 24 horas? Caso negativo, a conta será excluída.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => handleDeleteVisitor(expiredVisitor.uid)}
+                className="px-4 py-2 bg-error text-on-error rounded-lg font-bold shadow-sm"
+              >
+                Não, Excluir
+              </button>
+              <button 
+                onClick={() => handleExtendVisitor(expiredVisitor)}
+                className="px-4 py-2 bg-primary text-on-primary rounded-lg font-bold shadow-sm flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                Sim, Prolongar (+24h)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">Central de Cadastros</h2>
@@ -618,6 +714,9 @@ export function Admin() {
                             <option value="gestor">Gestor</option>
                             <option value="admin">Admin</option>
                           </select>
+                          {u.role === 'visitante' && u.expiresAt && (
+                            <Countdown expiresAt={u.expiresAt} onExtend={() => handleExtendVisitor(u)} />
+                          )}
                         </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-2">

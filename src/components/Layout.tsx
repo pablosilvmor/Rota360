@@ -73,9 +73,9 @@ export function Layout({ children }: LayoutProps) {
 
     // Fetch real-time auto-alerts for notifications
     const alertsQuery = query(
-      collection(db, "autoAlerts"),
+      collection(db, "auto_alertas"),
       orderBy("createdAt", "desc"),
-      limit(10)
+      limit(50)
     );
 
     const unsubscribeAlerts = onSnapshot(alertsQuery, (snapshot) => {
@@ -83,7 +83,10 @@ export function Layout({ children }: LayoutProps) {
         id: doc.id,
         ...doc.data()
       }));
+      console.log("Notifications received:", alertsData.length, "Unread:", alertsData.filter(n => (n as any).status !== 'Lido').length);
       setNotifications(alertsData);
+    }, (error) => {
+      console.error("Error fetching notifications:", error);
     });
 
     return () => {
@@ -148,16 +151,19 @@ export function Layout({ children }: LayoutProps) {
       userData?.role?.toLowerCase() === "admin",
   );
 
-  const unreadCount = notifications.filter(n => n.status !== 'Lido').length;
+  const unreadNotifications = notifications.filter(n => n.status !== 'Lido');
+  const unreadCount = unreadNotifications.length;
 
   const markAllAsRead = async () => {
     try {
       const unreadItems = notifications.filter(n => n.status !== 'Lido');
       if (unreadItems.length === 0) return;
 
+      setNotifications(prev => prev.map(n => ({ ...n, status: 'Lido' })));
+
       const batch = writeBatch(db);
       unreadItems.forEach(item => {
-        const docRef = doc(db, "autoAlerts", item.id);
+        const docRef = doc(db, "auto_alertas", item.id);
         batch.update(docRef, { status: "Lido" });
       });
       await batch.commit();
@@ -168,7 +174,8 @@ export function Layout({ children }: LayoutProps) {
 
   const markAsRead = async (id: string) => {
     try {
-      await updateDoc(doc(db, "autoAlerts", id), { status: "Lido" });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: 'Lido' } : n));
+      await updateDoc(doc(db, "auto_alertas", id), { status: "Lido" });
     } catch (error) {
       console.error("Erro ao marcar notificação como lida:", error);
     }
@@ -232,29 +239,39 @@ export function Layout({ children }: LayoutProps) {
             </button>
             <div className="flex justify-center items-center gap-4 mt-2">
               <div className="relative" ref={notificationsRef}>
-                <motion.button
-                  animate={unreadCount > 0 ? {
-                    scale: [1, 1.1, 1],
-                    transition: { repeat: Infinity, duration: 1.5 }
-                  } : {}}
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsNotificationsOpen(!isNotificationsOpen);
                   }}
-                  className="p-2 text-on-primary-container hover:text-white transition-colors relative"
+                  className="p-2 text-on-primary-container hover:text-white transition-colors relative rounded-full flex items-center justify-center"
                   title="Notificações"
                 >
-                  <span className="material-symbols-outlined text-[24px]">
+                  {unreadCount > 0 && (
+                    <motion.span
+                      animate={{
+                        scale: [1, 2.5],
+                        opacity: [0.5, 0]
+                      }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 1.5,
+                        ease: "easeOut"
+                      }}
+                      className="absolute inset-0 bg-primary/40 rounded-full"
+                    />
+                  )}
+                  <span className="material-symbols-outlined text-[24px] relative z-10">
                     notifications
                   </span>
                   {unreadCount > 0 && (
                     <motion.span 
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="absolute top-2 right-2 w-2.5 h-2.5 bg-error rounded-full border-2 border-primary-container shadow-sm"
+                      className="absolute top-1 right-2 w-2.5 h-2.5 bg-error rounded-full border-2 border-primary-container shadow-sm z-20"
                     ></motion.span>
                   )}
-                </motion.button>
+                </button>
                 <AnimatePresence>
                   {isNotificationsOpen && (
                     <motion.div 
@@ -276,12 +293,12 @@ export function Layout({ children }: LayoutProps) {
                         </button>
                       </div>
                       <div className="max-h-80 overflow-y-auto">
-                        {notifications.length === 0 ? (
+                        {unreadNotifications.length === 0 ? (
                           <div className="p-8 text-center text-on-surface-variant italic text-sm">
-                            Nenhum alerta recente
+                            Nenhuma notificação nova
                           </div>
                         ) : (
-                          notifications.map((notif) => (
+                          unreadNotifications.map((notif) => (
                             <div
                               key={notif.id}
                               onClick={() => {
@@ -291,15 +308,18 @@ export function Layout({ children }: LayoutProps) {
                               }}
                               className={`p-4 border-b border-outline-variant/30 hover:bg-surface-container transition-colors cursor-pointer flex gap-3 ${notif.status !== 'Lido' ? 'bg-primary/5' : ''}`}
                             >
-                              <span className={`material-symbols-outlined mt-0.5 ${notif.type === 'OOD' ? 'text-error' : 'text-primary'}`}>
-                                {notif.type === 'OOD' ? 'warning' : 'campaign'}
+                              <span className="material-symbols-outlined mt-0.5 text-primary">
+                                warning
                               </span>
                               <div className="flex-1">
                                 <p className="text-sm font-semibold text-on-surface">
-                                  {notif.model} - {notif.plate}
+                                  {notif.number ? `${notif.number} - ` : ''}{notif.plate}
+                                </p>
+                                <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+                                  {notif.driverName || 'Motorista não informado'}
                                 </p>
                                 <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">
-                                  {notif.description || `Alerta tipo ${notif.type} detectado.`}
+                                  {notif.observation || 'Nenhuma observação informada.'}
                                 </p>
                                 <p className="text-[10px] text-on-surface-variant opacity-60 mt-2">
                                   {notif.createdAt?.toDate?.() ? notif.createdAt.toDate().toLocaleString('pt-BR') : 'Agora'}

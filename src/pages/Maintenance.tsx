@@ -13,7 +13,7 @@ const containerVariants = {
       staggerChildren: 0.1
     }
   }
-};
+} as const;
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
@@ -22,7 +22,7 @@ const itemVariants = {
     opacity: 1,
     transition: { type: 'spring', stiffness: 300, damping: 24 }
   }
-};
+} as const;
 
 import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
 

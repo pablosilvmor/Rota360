@@ -161,8 +161,12 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
     
+    match /autoAlerts/{alertaId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+    
     match /auto_alertas/{alertaId} {
-      allow read, write: if isSignedIn();
+      allow read, create, update, delete: if isSignedIn();
     }
     
     match /config/{configId} {

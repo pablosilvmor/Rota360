@@ -12,6 +12,7 @@ export interface UserData {
   isActive: boolean;
   allowedScreens: string[];
   photoURL?: string;
+  expiresAt?: number;
   signatureInfo?: {
     fullName: string;
     matricula: string;

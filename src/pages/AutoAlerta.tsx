@@ -20,10 +20,7 @@ export function AutoAlerta() {
   const [successData, setSuccessData] = useState<any>(null);
 
   useEffect(() => {
-    if (!driverName) {
-      if (userData?.name) setDriverName(userData.name);
-      else if (user?.displayName) setDriverName(user.displayName);
-    }
+    //
   }, [userData?.name, user?.displayName]);
 
   useEffect(() => {
@@ -67,11 +64,7 @@ export function AutoAlerta() {
         : d.vehicleAssigned === vehicle.plate
     );
 
-    if (assignedDriver) {
-      setDriverName(assignedDriver.name);
-    } else {
-      setDriverName(userData?.name || user?.displayName || "");
-    }
+    // Motorista deve ser preenchido manualmente conforme solicitado
   };
 
   const filteredVehicles = vehicles.filter(v => 
@@ -93,8 +86,8 @@ export function AutoAlerta() {
         plate: selectedVehicle.plate,
         driverName: driverName,
         observation: observation,
-        status: "pending", // pending, approved, rejected
-        createdAt: Date.now(),
+        status: "Pendente",
+        createdAt: serverTimestamp(),
         createdBy: user?.uid || "unknown",
       };
 
@@ -278,7 +271,6 @@ export function AutoAlerta() {
                     if (!isDropdownOpen) setIsDropdownOpen(true);
                     if (selectedVehicle) {
                        setSelectedVehicle(null);
-                       setDriverName(userData?.name || user?.displayName || "");
                     }
                   }}
                   onFocus={() => setIsDropdownOpen(true)}
@@ -296,7 +288,7 @@ export function AutoAlerta() {
                        e.preventDefault();
                        setSearchTerm("");
                        setSelectedVehicle(null);
-                       setDriverName(userData?.name || user?.displayName || "");
+                       // remover linha
                        setIsDropdownOpen(true);
                      }}
                      className="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer text-[20px]"
@@ -312,7 +304,10 @@ export function AutoAlerta() {
                    {filteredVehicles.map(v => (
                       <div 
                         key={v.id} 
-                        onClick={() => selectVehicleByRecord(v)}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          selectVehicleByRecord(v);
+                        }}
                         className="px-4 py-3 hover:bg-surface-container flex items-center gap-4 cursor-pointer transition-colors border-b border-outline-variant/30 last:border-0"
                       >
                          <div className="w-16 h-16 rounded bg-white border border-outline-variant flex items-center justify-center overflow-hidden flex-shrink-0 p-1">
