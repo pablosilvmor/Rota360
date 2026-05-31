@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { Preloader } from '../components/Preloader';
 
 export interface UserData {
@@ -27,14 +27,38 @@ interface AuthContextType {
   loading: boolean;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  cachedVehicles: any[];
+  refreshVehiclesCache: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+let globalVehiclesCache: any[] = [];
+let lastVehiclesFetch = 0;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cachedVehicles, setCachedVehicles] = useState<any[]>(globalVehiclesCache);
+
+  const refreshVehiclesCache = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'vehicles'));
+      const fetched = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      globalVehiclesCache = fetched;
+      lastVehiclesFetch = Date.now();
+      setCachedVehicles(fetched);
+    } catch (error) {
+      console.error("Error fetching vehicles cache:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (globalVehiclesCache.length === 0 || Date.now() - lastVehiclesFetch > 1000 * 60 * 5) {
+      refreshVehiclesCache();
+    }
+  }, []);
 
   useEffect(() => {
     let unsubscribeSnapshot: () => void;
@@ -55,16 +79,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         
           if (!userDoc.exists()) {
-            console.log("User doc does not exist, creating...");
-            const isAdmin = currentUser.email === 'bemongv@gmail.com';
+            console.log("User doc does not exist, checking pre-approved...");
+            let initialRole = 'operador';
+            let initialActive = false;
+            let initialScreens: string[] = [];
+
+            try {
+              const preAppQ = query(collection(db, 'preApprovedAccess'), where('email', '==', currentUser.email));
+              const preAppSnap = await getDocs(preAppQ);
+              
+              if (!preAppSnap.empty) {
+                const preData = preAppSnap.docs[0].data();
+                initialRole = preData.role || 'visitante';
+                initialActive = true;
+              } else if (currentUser.email === 'bemongv@gmail.com') {
+                initialRole = 'admin';
+                initialActive = true;
+              }
+            } catch (err) {
+              console.error("Error checking pre-approved:", err);
+            }
+
+            if (initialRole === 'admin') {
+              initialScreens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist', '/works', '/autoalerta', '/autoalerta-admin'];
+            } else if (initialRole === 'gestor') {
+              initialScreens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/autoalerta', '/autoalerta-admin'];
+            } else if (initialRole === 'auditor') {
+              initialScreens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/checklist'];
+            } else if (initialRole === 'operador') {
+              initialScreens = ['/', '/inspections', '/checklist', '/autoalerta'];
+            } else if (initialRole === 'visitante') {
+              initialScreens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/checklist'];
+            }
+
             const newUserData = {
               email: currentUser.email || '',
               name: currentUser.displayName || '',
-              role: isAdmin ? 'admin' : 'operador',
-              isActive: isAdmin,
-              allowedScreens: isAdmin 
-                ? ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/settings', '/admin', '/fuel', '/tracking', '/reports', '/checklist']
-                : [],
+              role: initialRole,
+              isActive: initialActive,
+              allowedScreens: initialScreens,
               photoURL: currentUser.photoURL || '',
               createdAt: Date.now(),
               updatedAt: Date.now()
@@ -119,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, userData, loading, loginWithGoogle, logout, cachedVehicles, refreshVehiclesCache }}>
       {loading ? <Preloader /> : children}
     </AuthContext.Provider>
   );

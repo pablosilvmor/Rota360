@@ -5,6 +5,19 @@ import { LogOut } from "lucide-react";
 import { ConfirmModal } from "./ConfirmModal";
 import { KmSyncService } from "./KmSyncService";
 import { HelpModal } from "./HelpModal";
+import { motion, AnimatePresence } from "motion/react";
+import { 
+  collection, 
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  updateDoc, 
+  doc, 
+  writeBatch 
+} from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 interface LayoutProps {
   children: ReactNode;
@@ -25,6 +38,7 @@ export function Layout({ children }: LayoutProps) {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -56,9 +70,26 @@ export function Layout({ children }: LayoutProps) {
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
+
+    // Fetch real-time auto-alerts for notifications
+    const alertsQuery = query(
+      collection(db, "autoAlerts"),
+      orderBy("createdAt", "desc"),
+      limit(10)
+    );
+
+    const unsubscribeAlerts = onSnapshot(alertsQuery, (snapshot) => {
+      const alertsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setNotifications(alertsData);
+    });
+
     return () => {
       window.removeEventListener("scroll", handleScroll);
       document.removeEventListener("mousedown", handleClickOutside);
+      unsubscribeAlerts();
     };
   }, []);
 
@@ -116,6 +147,32 @@ export function Layout({ children }: LayoutProps) {
       (userData?.allowedScreens || []).includes(item.path) ||
       userData?.role?.toLowerCase() === "admin",
   );
+
+  const unreadCount = notifications.filter(n => n.status !== 'Lido').length;
+
+  const markAllAsRead = async () => {
+    try {
+      const unreadItems = notifications.filter(n => n.status !== 'Lido');
+      if (unreadItems.length === 0) return;
+
+      const batch = writeBatch(db);
+      unreadItems.forEach(item => {
+        const docRef = doc(db, "autoAlerts", item.id);
+        batch.update(docRef, { status: "Lido" });
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error("Erro ao marcar como lido:", error);
+    }
+  };
+
+  const markAsRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "autoAlerts", id), { status: "Lido" });
+    } catch (error) {
+      console.error("Erro ao marcar notificação como lida:", error);
+    }
+  };
 
   if (!user) {
     return <>{children}</>;
@@ -175,7 +232,11 @@ export function Layout({ children }: LayoutProps) {
             </button>
             <div className="flex justify-center items-center gap-4 mt-2">
               <div className="relative" ref={notificationsRef}>
-                <button
+                <motion.button
+                  animate={unreadCount > 0 ? {
+                    scale: [1, 1.1, 1],
+                    transition: { repeat: Infinity, duration: 1.5 }
+                  } : {}}
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsNotificationsOpen(!isNotificationsOpen);
@@ -186,57 +247,94 @@ export function Layout({ children }: LayoutProps) {
                   <span className="material-symbols-outlined text-[24px]">
                     notifications
                   </span>
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
-                </button>
-                {isNotificationsOpen && (
-                  <div className="absolute left-0 mt-2 w-80 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-[2000] animate-in fade-in zoom-in-95 duration-200 text-on-surface">
-                    <div className="p-4 border-b border-outline-variant flex justify-between items-center">
-                      <h4 className="font-semibold text-on-surface">
-                        Notificações
-                      </h4>
-                      <span
-                        className="text-xs text-primary font-bold cursor-pointer"
-                        title="Marcar como lido"
-                      >
-                        Marcar como lido
-                      </span>
-                    </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      <div
-                        className="p-4 border-b border-outline-variant/30 hover:bg-surface-container transition-colors cursor-pointer flex gap-3"
-                        title="Detalhes da notificação"
-                      >
-                        <span className="material-symbols-outlined text-error mt-0.5">
-                          warning
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold text-on-surface">
-                            Falha no motor (TRK-019)
-                          </p>
-                          <p className="text-xs text-on-surface-variant mt-1">
-                            Alerta gerado há 10 min. Manutenção necessária.
-                          </p>
-                        </div>
+                  {unreadCount > 0 && (
+                    <motion.span 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-2 right-2 w-2.5 h-2.5 bg-error rounded-full border-2 border-primary-container shadow-sm"
+                    ></motion.span>
+                  )}
+                </motion.button>
+                <AnimatePresence>
+                  {isNotificationsOpen && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute left-0 mt-2 w-80 bg-surface-container-lowest border border-outline-variant shadow-lg rounded-xl overflow-hidden z-[2000] text-on-surface"
+                    >
+                      <div className="p-4 border-b border-outline-variant flex justify-between items-center">
+                        <h4 className="font-semibold text-on-surface">
+                          Notificações ({unreadCount})
+                        </h4>
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-xs text-primary font-bold hover:underline"
+                          title="Marcar todas como lidas"
+                        >
+                          Marcar tudo lido
+                        </button>
                       </div>
-                      <div
-                        className="p-4 hover:bg-surface-container transition-colors cursor-pointer flex gap-3"
-                        title="Detalhes da notificação"
-                      >
-                        <span className="material-symbols-outlined text-primary mt-0.5">
-                          check_circle
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold text-on-surface">
-                            Documento aprovado
-                          </p>
-                          <p className="text-xs text-on-surface-variant mt-1">
-                            O CRLV do veículo ABC-1234 foi validado pelo OCR.
-                          </p>
-                        </div>
+                      <div className="max-h-80 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center text-on-surface-variant italic text-sm">
+                            Nenhum alerta recente
+                          </div>
+                        ) : (
+                          notifications.map((notif) => (
+                            <div
+                              key={notif.id}
+                              onClick={() => {
+                                markAsRead(notif.id);
+                                setIsNotificationsOpen(false);
+                                navigate("/autoalerta-admin");
+                              }}
+                              className={`p-4 border-b border-outline-variant/30 hover:bg-surface-container transition-colors cursor-pointer flex gap-3 ${notif.status !== 'Lido' ? 'bg-primary/5' : ''}`}
+                            >
+                              <span className={`material-symbols-outlined mt-0.5 ${notif.type === 'OOD' ? 'text-error' : 'text-primary'}`}>
+                                {notif.type === 'OOD' ? 'warning' : 'campaign'}
+                              </span>
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-on-surface">
+                                  {notif.model} - {notif.plate}
+                                </p>
+                                <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">
+                                  {notif.description || `Alerta tipo ${notif.type} detectado.`}
+                                </p>
+                                <p className="text-[10px] text-on-surface-variant opacity-60 mt-2">
+                                  {notif.createdAt?.toDate?.() ? notif.createdAt.toDate().toLocaleString('pt-BR') : 'Agora'}
+                                </p>
+                              </div>
+                              {notif.status !== 'Lido' && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markAsRead(notif.id);
+                                  }}
+                                  className="w-2 h-2 bg-primary rounded-full mt-2" 
+                                  title="Marcar como lido"
+                                />
+                              )}
+                            </div>
+                          ))
+                        )}
                       </div>
-                    </div>
-                  </div>
-                )}
+                      {notifications.length > 0 && (
+                        <div className="p-2 border-t border-outline-variant bg-surface-container-low text-center">
+                          <button 
+                            onClick={() => {
+                              setIsNotificationsOpen(false);
+                              navigate("/autoalerta-admin");
+                            }}
+                            className="text-[11px] font-bold text-primary uppercase tracking-widest hover:underline"
+                          >
+                            Ver todos os alertas
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="relative" ref={settingsMenuRef}>
@@ -362,90 +460,98 @@ export function Layout({ children }: LayoutProps) {
                   </span>
                 </button>
 
-                {isMoreMenuOpen && (
-                  <div className="absolute left-full bottom-0 pl-2 w-56 z-[2000] animate-in fade-in slide-in-from-left-2 duration-200">
-                    <div className="bg-primary-container rounded-2xl p-2 shadow-2xl border border-white/10">
-                    {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
-                    <NavLink
-                      to="/drivers"
-                      onClick={() => setIsMoreMenuOpen(false)}
-                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
-                      title="Motoristas"
+                <AnimatePresence>
+                  {isMoreMenuOpen && (
+                    <motion.div 
+                      initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: -10, scale: 0.95 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                      className="absolute left-full bottom-0 pl-2 w-56 z-[2000]"
                     >
-                      <span className="material-symbols-outlined text-[20px]">
-                        group
-                      </span>
-                      Motoristas
-                    </NavLink>
-                    )}
-                    {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
-                    <NavLink
-                      to="/maintenance"
-                      onClick={() => setIsMoreMenuOpen(false)}
-                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
-                      title="Manutenção"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        build
-                      </span>
-                      Manutenção
-                    </NavLink>
-                    )}
-                    {((userData?.allowedScreens || []).includes('/fuel') || userData?.role?.toLowerCase() === 'admin') && (
-                    <NavLink
-                      to="/fuel"
-                      onClick={() => setIsMoreMenuOpen(false)}
-                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
-                      title="Combustível"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        local_gas_station
-                      </span>
-                      Combustível
-                    </NavLink>
-                    )}
-                    {((userData?.allowedScreens || []).includes('/tracking') || userData?.role?.toLowerCase() === 'admin') && (
-                    <NavLink
-                      to="/tracking"
-                      onClick={() => setIsMoreMenuOpen(false)}
-                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
-                      title="Rastreamento"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        map
-                      </span>
-                      Rastreamento
-                    </NavLink>
-                    )}
-                    {((userData?.allowedScreens || []).includes('/reports') || userData?.role?.toLowerCase() === 'admin') && (
-                    <NavLink
-                      to="/reports"
-                      onClick={() => setIsMoreMenuOpen(false)}
-                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
-                      title="Relatórios"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        analytics
-                      </span>
-                      Relatórios
-                    </NavLink>
-                    )}
-                    {((userData?.allowedScreens || []).includes('/autoalerta-admin') || userData?.role?.toLowerCase() === 'admin') && (
-                    <NavLink
-                      to="/autoalerta-admin"
-                      onClick={() => setIsMoreMenuOpen(false)}
-                      className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
-                      title="Gestão AutoAlerta"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        admin_panel_settings
-                      </span>
-                      Gestão AutoAlerta
-                    </NavLink>
-                    )}
-                  </div>
-                </div>
-              )}
+                      <div className="bg-primary-container rounded-2xl p-2 shadow-2xl border border-white/10">
+                      {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
+                      <NavLink
+                        to="/drivers"
+                        onClick={() => setIsMoreMenuOpen(false)}
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        title="Motoristas"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          group
+                        </span>
+                        Motoristas
+                      </NavLink>
+                      )}
+                      {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
+                      <NavLink
+                        to="/maintenance"
+                        onClick={() => setIsMoreMenuOpen(false)}
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        title="Manutenção"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          build
+                        </span>
+                        Manutenção
+                      </NavLink>
+                      )}
+                      {((userData?.allowedScreens || []).includes('/fuel') || userData?.role?.toLowerCase() === 'admin') && (
+                      <NavLink
+                        to="/fuel"
+                        onClick={() => setIsMoreMenuOpen(false)}
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        title="Combustível"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          local_gas_station
+                        </span>
+                        Combustível
+                      </NavLink>
+                      )}
+                      {((userData?.allowedScreens || []).includes('/tracking') || userData?.role?.toLowerCase() === 'admin') && (
+                      <NavLink
+                        to="/tracking"
+                        onClick={() => setIsMoreMenuOpen(false)}
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        title="Rastreamento"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          map
+                        </span>
+                        Rastreamento
+                      </NavLink>
+                      )}
+                      {((userData?.allowedScreens || []).includes('/reports') || userData?.role?.toLowerCase() === 'admin') && (
+                      <NavLink
+                        to="/reports"
+                        onClick={() => setIsMoreMenuOpen(false)}
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        title="Relatórios"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          analytics
+                        </span>
+                        Relatórios
+                      </NavLink>
+                      )}
+                      {((userData?.allowedScreens || []).includes('/autoalerta-admin') || userData?.role?.toLowerCase() === 'admin') && (
+                      <NavLink
+                        to="/autoalerta-admin"
+                        onClick={() => setIsMoreMenuOpen(false)}
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        title="Gestão AutoAlerta"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          admin_panel_settings
+                        </span>
+                        Gestão AutoAlerta
+                      </NavLink>
+                      )}
+                    </div>
+                  </motion.div>
+                  )}
+                </AnimatePresence>
             </div>
           </div>
           );

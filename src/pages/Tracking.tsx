@@ -45,58 +45,47 @@ export function Tracking() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const qVehicles = query(collection(db, 'vehicles'), orderBy('plate', 'asc'));
-    const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
-      setVehicles(snapshot.docs.map(doc => {
-        const data = doc.data();
-        const hash = (data.plate || doc.id).split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-        const latOffset = (hash % 100) / 1000;
-        const lngOffset = ((hash * 7) % 100) / 1000;
+    let isMounted = true;
+    const fetchTrackingData = async () => {
+      try {
+        const [vehiclesSnap, driversSnap] = await Promise.all([
+          getDocs(query(collection(db, 'vehicles'), orderBy('plate', 'asc'))),
+          getDocs(query(collection(db, 'drivers')))
+        ]);
         
-        return {
-          id: doc.id,
-          ...data,
-          location: {
-            lat: BASE_LAT + latOffset,
-            lng: BASE_LNG + lngOffset
-          }
-        };
-      }));
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'vehicles');
-    });
+        if (!isMounted) return;
 
-    const qDrivers = query(collection(db, 'drivers'));
-    const unsubscribeDrivers = onSnapshot(qDrivers, (snapshot) => {
-      setDrivers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, error => {
-      handleFirestoreError(error, OperationType.LIST, 'drivers');
-    });
-
-    // Subtle movement simulation for "In Route" vehicles
-    const interval = setInterval(() => {
-      setVehicles(prev => prev.map(v => {
-        const driver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(v.plate) : d.vehicleAssigned === v.plate);
-        if (driver?.status === 'Em Rota') {
+        setDrivers(driversSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        
+        setVehicles(vehiclesSnap.docs.map(doc => {
+          const data = doc.data();
+          const hash = (data.plate || doc.id).split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+          const latOffset = (hash % 100) / 1000;
+          const lngOffset = ((hash * 7) % 100) / 1000;
+          
           return {
-            ...v,
+            id: doc.id,
+            ...data,
             location: {
-              lat: v.location.lat + (Math.random() - 0.5) * 0.0001,
-              lng: v.location.lng + (Math.random() - 0.5) * 0.0001
+              lat: BASE_LAT + latOffset,
+              lng: BASE_LNG + lngOffset
             }
           };
-        }
-        return v;
-      }));
-    }, 5000);
-
-    return () => {
-      unsubscribeVehicles();
-      unsubscribeDrivers();
-      clearInterval(interval);
+        }));
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching tracking data:", error);
+        setLoading(false);
+      }
     };
-  }, [drivers]);
+    
+    fetchTrackingData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
   const selectedVehicleDriver = drivers.find(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(selectedVehicle?.plate) : d.vehicleAssigned === selectedVehicle?.plate);

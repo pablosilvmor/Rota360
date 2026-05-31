@@ -17,6 +17,7 @@ interface Work {
 export function Admin() {
   const { userData } = useAuth();
   const [users, setUsers] = useState<UserData[]>([]);
+  const [preApproved, setPreApproved] = useState<any[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useLocalStorageState('admin_activeTab', 'obras');
@@ -35,8 +36,14 @@ export function Admin() {
   const [integrationUnlocked, setIntegrationUnlocked] = useState(false);
   const [authError, setAuthError] = useState('');
 
+  const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState('operador');
+
+  const isAdmin = userData?.role?.toLowerCase() === 'admin';
+  const canAccessAdmin = isAdmin || (userData?.allowedScreens || []).includes('/admin');
+
   useEffect(() => {
-    if (userData?.role?.toLowerCase() !== 'admin') {
+    if (!canAccessAdmin) {
       return;
     }
 
@@ -53,6 +60,20 @@ export function Admin() {
         setLoading(false);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, 'users')
+    );
+
+    // Listen to preApproved
+    const qPre = query(collection(db, 'preApprovedAccess'));
+    const unsubscribePre = onSnapshot(
+      qPre,
+      (snapshot) => {
+        const preData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setPreApproved(preData);
+      },
+      (error) => console.error("Error loading pre-approved:", error)
     );
 
     // Listen to works
@@ -109,6 +130,7 @@ export function Admin() {
 
     return () => {
       unsubscribeUsers();
+      unsubscribePre();
       unsubscribeWorks();
       unsubscribeVehicles();
       unsubscribeDrivers();
@@ -116,8 +138,13 @@ export function Admin() {
     };
   }, [userData]);
 
-  if (userData?.role?.toLowerCase() !== 'admin') {
+  if (!canAccessAdmin) {
     return <Navigate to="/" replace />;
+  }
+
+  // Se não for admin, não deve acessar a aba adm (Central de Cadastros -> adm)
+  if (!isAdmin && activeTab === 'adm') {
+    setActiveTab('obras');
   }
 
   const deleteUser = async (uid: string) => {
@@ -125,6 +152,40 @@ export function Admin() {
       await deleteDoc(doc(db, 'users', uid));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
+    }
+  };
+
+  const deletePreApproved = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'preApprovedAccess', id));
+    } catch (error) {
+      console.error('Error deleting pre-approved:', error);
+    }
+  };
+
+  const addPreApproved = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      alert('Endereço de e-mail inválido ou fora dos padrões corretos.');
+      return;
+    }
+    
+    // Check if email already exists in users or preApproved
+    if (preApproved.some(p => p.email.toLowerCase() === newEmail.trim().toLowerCase())) {
+      alert('Este e-mail já está na lista de acessos prévios.');
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'preApprovedAccess'), {
+        email: newEmail.trim().toLowerCase(),
+        role: newRole,
+        createdAt: Date.now()
+      });
+      setNewEmail('');
+      setNewRole('operador');
+    } catch (error) {
+      console.error('Error adding pre-approved:', error);
     }
   };
 
@@ -151,6 +212,8 @@ export function Admin() {
         screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/checklist'];
       } else if (newRole === 'operador') {
         screens = ['/', '/inspections', '/checklist', '/autoalerta'];
+      } else if (newRole === 'visitante') {
+        screens = ['/', '/fleet', '/maintenance', '/inspections', '/drivers', '/reports', '/fuel', '/tracking', '/works', '/checklist'];
       }
       
       const userRef = doc(db, 'users', user.uid);
@@ -346,7 +409,7 @@ export function Admin() {
     { id: 'veiculos', label: 'Veículos' },
     { id: 'motoristas', label: 'Motoristas' },
     { id: 'status', label: 'Status' },
-    { id: 'adm', label: 'ADM' },
+    ...(isAdmin ? [{ id: 'adm', label: 'ADM' }] : []),
     { id: 'integracoes', label: 'Integrações' },
     { id: 'telemetria', label: 'Telemetria' },
   ];
@@ -424,76 +487,138 @@ export function Admin() {
         <TelemetryTab />
       )}
 
-      {(activeTab === 'adm') && (
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-surface-container-low/50 border-b border-outline-variant max-w-full">
-                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Usuário</th>
-                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">E-mail</th>
-                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Status</th>
-                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Função</th>
-                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider min-w-[200px]">Acesso às Telas</th>
-                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant">
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-on-surface-variant">
-                      Carregando usuários...
-                    </td>
+      {(activeTab === 'adm' && isAdmin) && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          
+          {/* Acessos Prévios Section */}
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-6">
+            <h3 className="text-[20px] font-bold text-on-surface mb-2">Liberação de Acesso Prévia</h3>
+            <p className="text-sm text-on-surface-variant mb-6">Cadastre e-mails para garantir acesso automático quando os usuários fizerem login pela primeira vez.</p>
+            
+            <div className="flex flex-col md:flex-row gap-4 mb-8">
+              <input 
+                type="email" 
+                placeholder="Digite o e-mail para conceder acesso..."
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                className="flex-1 bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary outline-none"
+              />
+              <select
+                value={newRole}
+                onChange={e => setNewRole(e.target.value)}
+                className="bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary outline-none w-full md:w-48"
+              >
+                <option value="visitante">Visitante</option>
+                <option value="operador">Operador</option>
+                <option value="auditor">Auditor</option>
+                <option value="gestor">Gestor</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button 
+                onClick={addPreApproved}
+                disabled={!newEmail}
+                className="px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-md hover:bg-primary/90 disabled:opacity-50 whitespace-nowrap"
+              >
+                + Adicionar Acesso
+              </button>
+            </div>
+
+            {preApproved.length > 0 && (
+              <div>
+                <h4 className="text-sm font-bold text-on-surface-variant uppercase tracking-wider mb-4">Usuários com Acesso Prévio</h4>
+                <div className="flex flex-col gap-2">
+                  {preApproved.map(p => (
+                    <div key={p.id} className="flex justify-between items-center p-4 bg-surface-container-low rounded-xl border border-outline-variant">
+                      <div className="flex items-center gap-4">
+                        <span className="font-medium text-on-surface">{p.email}</span>
+                        <span className="text-[10px] uppercase font-bold px-2 py-1 bg-secondary-container text-on-secondary-container rounded">
+                          {p.role}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => deletePreApproved(p.id)}
+                        className="text-on-surface-variant hover:text-error transition-colors p-2"
+                        title="Remover acesso"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-surface-container-low/50 border-b border-outline-variant max-w-full">
+                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Usuário</th>
+                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">E-mail</th>
+                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Status</th>
+                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Função</th>
+                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider min-w-[200px]">Acesso às Telas</th>
+                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
                   </tr>
-                ) : (
-                  users.map(u => (
-                    <tr key={u.uid} className="hover:bg-surface-container-low/20 transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          {u.photoURL ? (
-                            <img 
-                              src={u.photoURL} 
-                              alt={u.name || u.email} 
-                              className="w-8 h-8 rounded-full object-cover border border-outline-variant shadow-sm"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center border border-outline-variant shadow-sm overflow-hidden">
-                              <span className="material-symbols-outlined text-[20px]">person</span>
+                </thead>
+                <tbody className="divide-y divide-outline-variant">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-on-surface-variant">
+                        Carregando usuários...
+                      </td>
+                    </tr>
+                  ) : (
+                    users.map(u => (
+                      <tr key={u.uid} className="hover:bg-surface-container-low/20 transition-colors">
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            {u.photoURL ? (
+                              <img 
+                                src={u.photoURL} 
+                                alt={u.name || u.email} 
+                                className="w-8 h-8 rounded-full object-cover border border-outline-variant shadow-sm"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center border border-outline-variant shadow-sm overflow-hidden">
+                                <span className="material-symbols-outlined text-[20px]">person</span>
+                              </div>
+                            )}
+                            <div className="flex flex-col">
+                              <span className="font-bold text-sm text-on-surface leading-none">{u.name || 'Sem Nome'}</span>
                             </div>
-                          )}
-                          <div className="flex flex-col">
-                            <span className="font-bold text-sm text-on-surface leading-none">{u.name || 'Sem Nome'}</span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm text-on-surface-variant">{u.email}</td>
-                      <td className="p-4">
-                        <button
-                          onClick={() => toggleStatus(u)}
-                          disabled={userData.uid === u.uid}
-                          className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                            u.isActive 
-                              ? 'bg-success-container/30 text-success hover:bg-success-container disabled:opacity-50' 
-                              : 'bg-error-container/30 text-error hover:bg-error-container disabled:opacity-50'
-                          }`}
-                        >
-                          {u.isActive ? 'Ativo' : 'Bloqueado'}
-                        </button>
-                      </td>
-                      <td className="p-4">
-                        <select 
-                          value={u.role}
-                          onChange={(e) => updateRole(u, e.target.value)}
-                          disabled={userData.uid === u.uid}
-                          className="bg-surface-container-low border border-outline-variant rounded-md text-sm px-2 py-1 focus:ring-primary outline-none disabled:opacity-50"
-                        >
-                          <option value="operador">Operador</option>
-                          <option value="auditor">Auditor</option>
-                          <option value="gestor">Gestor</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
+                        </td>
+                        <td className="p-4 text-sm text-on-surface-variant">{u.email}</td>
+                        <td className="p-4">
+                          <button
+                            onClick={() => toggleStatus(u)}
+                            disabled={userData.uid === u.uid}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                              u.isActive 
+                                ? 'bg-success-container/30 text-success hover:bg-success-container disabled:opacity-50' 
+                                : 'bg-error-container/30 text-error hover:bg-error-container disabled:opacity-50'
+                            }`}
+                          >
+                            {u.isActive ? 'Ativo' : 'Bloqueado'}
+                          </button>
+                        </td>
+                        <td className="p-4">
+                          <select 
+                            value={u.role}
+                            onChange={(e) => updateRole(u, e.target.value)}
+                            disabled={userData.uid === u.uid}
+                            className="bg-surface-container-low border border-outline-variant rounded-md text-sm px-2 py-1 focus:ring-primary outline-none disabled:opacity-50"
+                          >
+                            <option value="visitante">Visitante</option>
+                            <option value="operador">Operador</option>
+                            <option value="auditor">Auditor</option>
+                            <option value="gestor">Gestor</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-2">
                           {u.role?.toLowerCase() === 'admin' ? (
@@ -563,6 +688,7 @@ export function Admin() {
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 

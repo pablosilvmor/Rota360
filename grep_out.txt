@@ -1,0 +1,4 @@
+src/pages/Maintenance.tsx:    const unsubItems = onSnapshot(collectionGroup(db, 'items'), (snapshot) => {
+src/pages/Dashboard.tsx:          getDocs(collectionGroup(db, "items")),
+src/pages/Dashboard.tsx:          getDocs(collectionGroup(db, "records"))
+src/pages/Dashboard.tsx:    getDocs(collectionGroup(db, "maintenances")).then((snapshot) => {

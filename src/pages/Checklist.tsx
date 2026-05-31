@@ -65,10 +65,10 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get("edit");
-  const queryVehicleId = searchParams.get("vehicleId");
-  const queryAutoAlertaId = searchParams.get("autoAlertaId");
-  const queryVehiclePlate = searchParams.get("vehiclePlate");
-  const queryDriverName = searchParams.get("driverName");
+  const queryVehicleId = searchParams.get("vehicleId") === "undefined" ? "" : searchParams.get("vehicleId");
+  const queryAutoAlertaId = searchParams.get("autoAlertaId") === "undefined" ? "" : searchParams.get("autoAlertaId");
+  const queryVehiclePlate = searchParams.get("vehiclePlate") === "undefined" ? "" : searchParams.get("vehiclePlate");
+  const queryDriverName = searchParams.get("driverName") === "undefined" ? "" : searchParams.get("driverName");
 
   const { user, userData } = useAuth();
 
@@ -88,10 +88,11 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
   const [records, setRecords] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    if (!driverName && !queryDriverName && (userData?.name || user?.displayName)) {
-      setDriverName(userData?.name || user?.displayName || "");
+    if (!driverName && !queryDriverName) {
+      if (userData?.name) setDriverName(userData.name);
+      else if (user?.displayName) setDriverName(user.displayName);
     }
-  }, [userData, user, driverName, queryDriverName]);
+  }, [userData?.name, user?.displayName, queryDriverName]);
 
   useEffect(() => {
     const fetchVehicles = async () => {

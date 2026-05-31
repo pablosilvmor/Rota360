@@ -20,10 +20,11 @@ export function AutoAlerta() {
   const [successData, setSuccessData] = useState<any>(null);
 
   useEffect(() => {
-    if (!driverName && (userData?.name || user?.displayName)) {
-      setDriverName(userData?.name || user?.displayName || "");
+    if (!driverName) {
+      if (userData?.name) setDriverName(userData.name);
+      else if (user?.displayName) setDriverName(user.displayName);
     }
-  }, [userData, user, driverName]);
+  }, [userData?.name, user?.displayName]);
 
   useEffect(() => {
     const unsubVehicles = onSnapshot(collection(db, "vehicles"), (snapshot) => {

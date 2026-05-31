@@ -2,11 +2,14 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {
   collection,
   onSnapshot,
   collectionGroup,
   getDocs,
+  query,
+  limit
 } from "firebase/firestore";
 import {
   BarChart,
@@ -66,6 +69,7 @@ const itemVariants = {
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { cachedVehicles } = useAuth();
   const [isAlertCenterOpen, setIsAlertCenterOpen] = useState(false);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [vehicleStats, setVehicleStats] = useState({
@@ -83,101 +87,109 @@ export function Dashboard() {
   const [nextServices, setNextServices] = useState<any[]>([]);
   const [costCenterStats, setCostCenterStats] = useState<any[]>([]);
 
-  // 1. Fetch dynamic data in real-time
+  // 1. Fetch dynamic data initially
   useEffect(() => {
-    const unsubItems = onSnapshot(collectionGroup(db, "items"), (snapshot) => {
-      const iMap: Record<string, any> = {};
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        iMap[doc.id] = { ...data, id: doc.id };
-      });
-      setItemsMap(iMap);
-    }, (error) => {
-      console.error("Error fetching items in real-time:", error);
-    });
+    let isMounted = true;
+    
+    const fetchInitialData = async () => {
+      try {
+        const itemsQ = query(collectionGroup(db, "items"), limit(200));
+        const recordsQ = query(collectionGroup(db, "records"), limit(200));
 
-    const unsubRecords = onSnapshot(collectionGroup(db, "records"), (snapshot) => {
-      const rList: any[] = [];
-      snapshot.forEach((doc) => {
-        rList.push({ ...doc.data(), id: doc.id, path: doc.ref.path });
-      });
-      setAllRecords(rList);
-    }, (error) => {
-      console.error("Error fetching records in real-time:", error);
-    });
+        const [itemsSnap, recordsSnap] = await Promise.all([
+          getDocs(itemsQ),
+          getDocs(recordsQ)
+        ]);
+        
+        if (!isMounted) return;
+
+        const iMap: Record<string, any> = {};
+        itemsSnap.forEach((doc) => {
+          const data = doc.data();
+          iMap[doc.id] = { ...data, id: doc.id };
+        });
+        setItemsMap(iMap);
+
+        const rList: any[] = [];
+        recordsSnap.forEach((doc) => {
+          rList.push({ ...doc.data(), id: doc.id, path: doc.ref.path });
+        });
+        setAllRecords(rList);
+      } catch (error) {
+        console.error("Error fetching initial data:", error);
+      }
+    };
+
+    fetchInitialData();
 
     return () => {
-      unsubItems();
-      unsubRecords();
+      isMounted = false;
     };
   }, []);
 
   // 2. Main Logic Effect
   useEffect(() => {
-    const vehicleLookup = new Map();
-    
-    // Vehicles listener
-    const unsubscribeVehicles = onSnapshot(
-      collection(db, "vehicles"),
-      (snapshot) => {
-        const fetchedVehicles: any[] = snapshot.docs.map((d) => {
-          const data = d.data();
-          const hash = (data.plate || d.id).split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-          const latOffset = (hash % 100) / 1000;
-          const lngOffset = ((hash * 7) % 100) / 1000;
-          
-          const vehicle = {
-            ...data,
-            id: d.id,
-            location: {
-              lat: BASE_LAT + latOffset,
-              lng: BASE_LNG + lngOffset
-            }
-          };
-          
-          vehicleLookup.set(d.id, vehicle);
-          if (data.plate) vehicleLookup.set(data.plate, vehicle);
-          
-          return vehicle;
-        });
+    const processVehicles = () => {
+      const vehicleLookup = new Map();
+      const fetchedVehicles = cachedVehicles.map((data: any) => {
+        const hash = (data.plate || data.id).split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+        const latOffset = (hash % 100) / 1000;
+        const lngOffset = ((hash * 7) % 100) / 1000;
         
-        setVehicles(fetchedVehicles);
-
-        const stats = {
-          total: fetchedVehicles.length,
-          active: fetchedVehicles.filter((v) => v.status === "Ativo").length,
-          maintenance: fetchedVehicles.filter((v) => v.status === "Em Manutenção").length,
+        const vehicle = {
+          ...data,
+          location: {
+            lat: BASE_LAT + latOffset,
+            lng: BASE_LNG + lngOffset
+          }
         };
-        setVehicleStats(stats);
+        
+        vehicleLookup.set(data.id, vehicle);
+        if (data.plate) vehicleLookup.set(data.plate, vehicle);
+        
+        return vehicle;
+      });
+      
+      setVehicles(fetchedVehicles);
 
-        // Chart stats
-        const ccMap: Record<string, number> = {};
-        fetchedVehicles.forEach((v) => {
-          const ccs = Array.isArray(v.costCenter) ? v.costCenter : [v.costCenter || "Não Definido"];
-          ccs.forEach((cc: any) => {
-            const ccName = String(cc || "").replace(/logística - região sul/gi, "").replace(/logístic a - região sul/gi, "").replace(/,? ?$/, "").trim();
-            if (ccName) ccMap[ccName] = (ccMap[ccName] || 0) + 1;
-          });
+      const stats = {
+        total: fetchedVehicles.length,
+        active: fetchedVehicles.filter((v: any) => v.status === "Ativo").length,
+        maintenance: fetchedVehicles.filter((v: any) => v.status === "Em Manutenção").length,
+      };
+      setVehicleStats(stats);
+
+      // Chart stats
+      const ccMap: Record<string, number> = {};
+      fetchedVehicles.forEach((v: any) => {
+        const ccs = Array.isArray(v.costCenter) ? v.costCenter : [v.costCenter || "Não Definido"];
+        ccs.forEach((cc: any) => {
+          const ccName = String(cc || "").replace(/logística - região sul/gi, "").replace(/logístic a - região sul/gi, "").replace(/,? ?$/, "").trim();
+          if (ccName) ccMap[ccName] = (ccMap[ccName] || 0) + 1;
         });
-        setCostCenterStats(Object.entries(ccMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value));
-      }
-    );
+      });
+      setCostCenterStats(Object.entries(ccMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value));
+    };
 
-    // Alerts listener
-    const unsubscribeAlerts = onSnapshot(collection(db, "alerts"), (snapshot) => {
+    if (cachedVehicles.length > 0) {
+      processVehicles();
+    }
+  }, [cachedVehicles]);
+
+  // Secondary Data Effect
+  useEffect(() => {
+    // Alerts listener (fetch once)
+    getDocs(collection(db, "alerts")).then((snapshot) => {
       setAlerts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-    });
+    }).catch(console.error);
 
-    // Maintenance listener
-    const unsubscribeMaintenance = onSnapshot(collectionGroup(db, "maintenances"), (snapshot) => {
+    // Maintenance listener (fetch once)
+    getDocs(collectionGroup(db, "maintenances")).then((snapshot) => {
       const maintenanceData = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
       setNextServices(maintenanceData.filter((os: any) => os.status !== "Concluído").slice(0, 5));
-    });
+    }).catch(console.error);
 
     return () => {
-      unsubscribeVehicles();
-      unsubscribeAlerts();
-      unsubscribeMaintenance();
     };
   }, []);
 

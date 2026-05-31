@@ -56,9 +56,11 @@ const itemVariants = {
 function InspectionForm({
   vehicleId,
   onBack,
+  onPlateClick,
 }: {
   vehicleId: string;
   onBack: () => void;
+  onPlateClick: (vehicle: any) => void;
 }) {
   const [vehicle, setVehicle] = useState<any>(null);
   const [loadingForm, setLoadingForm] = useState(true);
@@ -1173,7 +1175,7 @@ function InspectionForm({
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
 
-          <div className="w-16 h-16 rounded-xl overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] flex-shrink-0 border border-outline-variant bg-white">
+          <div className="w-16 h-16 rounded-xl overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] flex-shrink-0 bg-white">
             <img
               className="w-full h-full object-contain p-1"
               src={
@@ -1188,12 +1190,12 @@ function InspectionForm({
           <div>
             <h2 className="text-2xl font-bold text-on-surface">
               Inspeção:{" "}
-              <Link
-                to={`/fleet?vehicleId=${vehicle.id}`}
+              <button
+                onClick={() => onPlateClick(vehicle)}
                 className="text-primary tracking-wide hover:underline decoration-2 underline-offset-4 transition-all"
               >
                 {vehicle.plate}
-              </Link>
+              </button>
             </h2>
             <p className="text-on-surface-variant font-medium text-sm mt-0.5">
               {vehicle.brand} {vehicle.model}
@@ -1978,9 +1980,10 @@ function InspectionForm({
   );
 }
 
-const VehicleInspectionCard: React.FC<{ vehicle: any; onClick: () => any }> = ({
+const VehicleInspectionCard: React.FC<{ vehicle: any; onClick: () => any; onPlateClick: (e: React.MouseEvent) => void }> = ({
   vehicle,
   onClick,
+  onPlateClick
 }) => {
   const [expiredCount, setExpiredCount] = useState<number | null>(null);
 
@@ -2028,9 +2031,9 @@ const VehicleInspectionCard: React.FC<{ vehicle: any; onClick: () => any }> = ({
       onClick={onClick}
       className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:bg-surface-container-low hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col h-full"
     >
-      <div className="relative h-44 overflow-hidden bg-white border-b border-outline-variant/30 flex items-center justify-center p-4">
+      <div className="relative h-44 overflow-hidden bg-white flex items-center justify-center p-4">
         <img
-          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110 drop-shadow-sm"
+          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110"
           src={
             vehicle.imageUrl ||
             "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"
@@ -2052,9 +2055,12 @@ const VehicleInspectionCard: React.FC<{ vehicle: any; onClick: () => any }> = ({
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-bold text-on-surface leading-none mb-1 truncate">
+            <button
+              onClick={onPlateClick}
+              className="text-xl font-bold text-on-surface leading-none mb-1 truncate hover:text-primary transition-colors hover:underline text-left pointer-events-auto"
+            >
               {vehicle.plate}
-            </h3>
+            </button>
             <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest truncate opacity-70">
               {vehicle.brand} {vehicle.model}
             </p>
@@ -2152,6 +2158,7 @@ export function Inspections() {
   const [checklistHistory, setChecklistHistory] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useLocalStorageState<
     "vehicles" | "history"
@@ -2159,6 +2166,7 @@ export function Inspections() {
   const [isExportingChecklist, setIsExportingChecklist] = useState<
     string | null
   >(null);
+  const [detailsModalVehicle, setDetailsModalVehicle] = useState<any>(null);
 
   const [searchQuery, setSearchQuery] = useLocalStorageState(
     "inspections_searchQuery",
@@ -2177,6 +2185,14 @@ export function Inspections() {
     "grid",
   );
   const [selectedChecklist, setSelectedChecklist] = useState<any | null>(null);
+
+  const assignedDriversForModal = detailsModalVehicle
+    ? drivers.filter((d) =>
+        Array.isArray(d.vehicleAssigned)
+          ? d.vehicleAssigned.includes(detailsModalVehicle.plate)
+          : d.vehicleAssigned === detailsModalVehicle.plate,
+      )
+    : [];
 
   useEffect(() => {
     // We fetch the vehicles list to show cards or if an ID is present, we just pass to the Form
@@ -2238,11 +2254,20 @@ export function Inspections() {
       (error) => handleFirestoreError(error, OperationType.LIST, "statuses"),
     );
 
+    const unsubscribeDrivers = onSnapshot(
+      collection(db, "drivers"),
+      (snapshot) => {
+        setDrivers(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, "drivers"),
+    );
+
     return () => {
       unsubscribeVehicles();
       unsubscribeHistory();
       unsubscribeWorks();
       unsubscribeStatuses();
+      unsubscribeDrivers();
     };
   }, [activeTab]);
 
@@ -2515,19 +2540,21 @@ export function Inspections() {
       (h.vehicleModel || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  if (id) {
-    return (
-      <InspectionForm vehicleId={id} onBack={() => navigate("/inspections")} />
-    );
-  }
-
   return (
-    <motion.div
-      className="space-y-6"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
+    <div className="space-y-6">
+      {id ? (
+        <InspectionForm 
+          vehicleId={id} 
+          onBack={() => navigate("/inspections")} 
+          onPlateClick={setDetailsModalVehicle}
+        />
+      ) : (
+        <motion.div
+          className="space-y-6"
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+        >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">
@@ -2762,6 +2789,10 @@ export function Inspections() {
                     onClick={() => {
                       navigate(`/inspections/${vehicle.id}`);
                     }}
+                    onPlateClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      setDetailsModalVehicle(vehicle);
+                    }}
                   />
                 ))
               )}
@@ -2791,7 +2822,7 @@ export function Inspections() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded overflow-hidden bg-white border border-outline-variant p-0.5">
+                          <div className="w-10 h-10 rounded overflow-hidden bg-white p-0.5">
                             <img
                               src={
                                 vehicle.imageUrl ||
@@ -2801,9 +2832,9 @@ export function Inspections() {
                             />
                           </div>
                           <div>
-                            <div className="text-sm font-bold text-on-surface">
+                            <button onClick={(e) => { e.stopPropagation(); setDetailsModalVehicle(vehicle); }} className="text-sm font-bold text-on-surface hover:text-primary transition-colors hover:underline text-left pointer-events-auto">
                               {vehicle.plate}
-                            </div>
+                            </button>
                             <div className="text-[10px] text-on-surface-variant uppercase">
                               {vehicle.model}
                             </div>
@@ -2973,7 +3004,7 @@ export function Inspections() {
                   </h2>
                   <div className="flex gap-4 items-center mt-4">
                     {vehicles.find(v => v.id === selectedChecklist.vehicleId || v.plate === selectedChecklist.vehiclePlate)?.imageUrl && (
-                      <div className="w-16 h-16 rounded-xl border border-outline-variant/50 bg-white overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
+                      <div className="w-16 h-16 rounded-xl bg-white overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
                         <img 
                           src={vehicles.find(v => v.id === selectedChecklist.vehicleId || v.plate === selectedChecklist.vehiclePlate)?.imageUrl} 
                           alt="Veículo" 
@@ -3041,5 +3072,262 @@ export function Inspections() {
         )}
       </AnimatePresence>
     </motion.div>
+  )}
+
+  {/* Vehicle Details Modal */}
+  <AnimatePresence>
+    {detailsModalVehicle && (
+        <div 
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto" 
+          onClick={() => setDetailsModalVehicle(null)}
+        >
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="bg-[#f8fafc] rounded-3xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col relative my-8" 
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header / Top Bar */}
+            <div className="p-6 border-b border-outline-variant/30 flex justify-between items-center bg-white shadow-sm">
+              <h3 className="text-xl font-bold text-primary flex items-center gap-2">
+                <span className="material-symbols-outlined">info</span>
+                Detalhes do Veículo: {detailsModalVehicle.plate}
+              </h3>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => navigate(`/fleet?editId=${detailsModalVehicle.id}`)}
+                  className="flex items-center gap-2 px-4 py-2 border border-outline-variant bg-white text-on-surface font-semibold rounded-lg hover:bg-surface-container transition-colors shadow-sm text-sm"
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit</span>
+                  Editar
+                </button>
+                <button 
+                  onClick={() => setDetailsModalVehicle(null)}
+                  className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-error transition-all"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8 overflow-y-auto max-h-[80vh] custom-scrollbar">
+              <div className="grid grid-cols-12 gap-6">
+                {/* Hero Card */}
+                <div className="col-span-12 lg:col-span-8 h-[380px] rounded-2xl overflow-hidden relative shadow-sm border border-outline-variant group">
+                  <img 
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                    src={detailsModalVehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=1200"} 
+                    alt={detailsModalVehicle.model} 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/20 to-transparent"></div>
+                  <div className="absolute bottom-8 left-8 text-on-primary">
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className={`px-3 py-1 rounded font-bold text-[10px] uppercase tracking-wider ${detailsModalVehicle.status === 'Ativo' ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-error-container text-on-error-container'}`}>
+                        {detailsModalVehicle.status}
+                      </span>
+                      <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded font-bold text-[10px] tracking-wider">
+                        RENAVAM: {detailsModalVehicle.renavam || '01291533734'}
+                      </span>
+                    </div>
+                    <h2 className="text-[48px] font-black leading-none mb-2 tracking-tighter">{detailsModalVehicle.plate}</h2>
+                    <p className="text-lg opacity-90 font-medium">{detailsModalVehicle.brand} {detailsModalVehicle.model} • {detailsModalVehicle.bodywork || 'ABERTA/MECANISMO OPERACIONAL'}</p>
+                  </div>
+                </div>
+
+                <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+                  {/* Status Documentation */}
+                  <div className={`p-6 rounded-2xl border-l-4 flex items-start gap-4 shadow-sm h-full ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'bg-red-50 border-red-500' : 'bg-blue-50 border-primary'}`}>
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'bg-red-100' : 'bg-primary/20'}`}>
+                      <span className={`material-symbols-outlined ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'text-red-500' : 'text-primary'}`}>
+                        {detailsModalVehicle.exerciceStatus === 'Vencido' ? 'warning' : 'verified'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Status Documentação</h3>
+                      <p className="text-[20px] font-bold mb-1">Exercício {detailsModalVehicle.exerciceYear || '2026'}</p>
+                      <p className={`text-sm font-medium ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'text-red-600' : 'text-on-surface-variant opacity-70'}`}>
+                        {detailsModalVehicle.exerciceStatus === 'Vencido' ? 'O licenciamento está atrasado.' : 'Documentação em dia e verificada.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Odometer Card */}
+                  <div className="bg-white border border-outline-variant/30 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-full">
+                    <div>
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Status do Odômetro</h3>
+                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                          detailsModalVehicle.lastSyncStatus === 'success' || !detailsModalVehicle.lastSyncStatus
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                            : 'bg-red-50 text-red-600 border-red-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                            detailsModalVehicle.lastSyncStatus === 'failed' ? 'bg-red-600' : 'bg-emerald-600'
+                          }`}></span>
+                          {detailsModalVehicle.lastSyncStatus === 'failed' ? 'ERRO SYNC' : 'CONECTADO'}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-baseline mb-2">
+                        <span className="text-[48px] font-bold text-primary leading-none tracking-tight">{(detailsModalVehicle.currentKM || 0).toLocaleString('pt-BR')}</span>
+                        <span className="text-[20px] font-bold text-on-surface-variant">KM</span>
+                      </div>
+                      <div className="flex flex-col gap-1 mb-4 opacity-70">
+                        <p className="text-[10px] text-on-surface-variant font-bold uppercase flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">sync</span>
+                          Última sincronização
+                        </p>
+                        <p className="text-xs font-bold text-primary">
+                          {new Date(detailsModalVehicle.lastSyncCheck || detailsModalVehicle.updatedAt || Date.now()).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { 
+                            detail: { vehicleId: detailsModalVehicle.id, plate: detailsModalVehicle.plate } 
+                          }));
+                        }}
+                        className="w-full py-2.5 bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">refresh</span>
+                        Sincronizar Agora
+                      </button>
+                    </div>
+                    <div className="space-y-2 mt-6">
+                      <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: '65%' }}></div>
+                      </div>
+                      <div className="flex justify-between text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                        <span>Último: {((detailsModalVehicle.currentKM || 0) - 5000).toLocaleString('pt-BR')}</span>
+                        <span>Próximo: {((detailsModalVehicle.currentKM || 0) + 5000).toLocaleString('pt-BR')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Bento Grid */}
+                <div className="col-span-12 lg:col-span-4 bg-white border border-outline-variant/30 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                  <div className="px-6 py-4 border-b border-outline-variant/30 bg-surface-container-low/30 flex justify-between items-center">
+                    <h3 className="text-[10px] font-bold text-on-surface uppercase tracking-widest">Informações Técnicas</h3>
+                    <span className="material-symbols-outlined text-primary text-[20px]">precision_manufacturing</span>
+                  </div>
+                  <div className="p-6 divide-y divide-outline-variant/30 flex-1">
+                    {[
+                      { label: 'Cor Predominante', value: detailsModalVehicle.color || 'BRANCA', isBadge: true },
+                      { label: 'Ano do Modelo', value: detailsModalVehicle.modelYear || '2023' },
+                      { label: 'Combustível', value: detailsModalVehicle.fuelType || 'DIESEL' },
+                      { label: 'Chassi', value: detailsModalVehicle.chassis || '9535V6TBXPR001424', font: 'font-mono' },
+                      { label: 'Centro de Custo', value: (Array.isArray(detailsModalVehicle.costCenter) ? detailsModalVehicle.costCenter : [detailsModalVehicle.costCenter]).map(v => String(v || '').replace(/logística - região sul/gi, '').trim()).filter(Boolean).join(', ') || 'Sede Adm' },
+                      { label: 'Lotação', value: detailsModalVehicle.capacity || '03P' },
+                      { label: 'Peso Bruto Total (PBT)', value: detailsModalVehicle.grossWeight || '10.7' },
+                      { label: 'CNPJ / CPF', value: detailsModalVehicle.ownerCnpj || '26.005.751/0001-94' },
+                    ].map((spec, i) => (
+                      <div key={i} className="py-3 flex justify-between items-center">
+                        <span className="text-on-surface-variant text-sm font-medium">{spec.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-bold text-sm ${spec.font || ''}`}>{spec.value}</span>
+                          {spec.isBadge && (
+                            <div className="w-4 h-4 rounded-full border border-outline-variant" style={{ backgroundColor: spec.value.toLowerCase().includes('bran') ? '#ffffff' : spec.value.toLowerCase().includes('pret') ? '#1f2937' : '#ccc' }}></div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-4">
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Observação</p>
+                      <p className="text-sm font-medium text-on-surface p-3 bg-surface-container-low rounded-xl">
+                        {detailsModalVehicle.observation || 'SEM OBSERVAÇÕES'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-span-12 lg:col-span-5 bg-white border border-outline-variant/30 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-outline-variant/30 bg-surface-container-low/30 flex justify-between items-center">
+                    <h3 className="text-[10px] font-bold text-on-surface uppercase tracking-widest">Distribuição Mensal</h3>
+                    <span className="material-symbols-outlined text-primary text-[20px]">payments</span>
+                  </div>
+                  <div className="p-8 flex items-center gap-10 h-full">
+                    <div className="relative h-40 w-40 shrink-0">
+                       <svg className="h-full w-full transform -rotate-90">
+                        <circle className="text-slate-100" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeWidth="15"></circle>
+                        <circle className="text-primary" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeDasharray="408" strokeDashoffset="180" strokeWidth="15"></circle>
+                        <circle className="text-orange-500" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeDasharray="408" strokeDashoffset="320" strokeWidth="15"></circle>
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-[10px] font-bold text-on-surface-variant uppercase">Total</span>
+                        <span className="text-sm font-bold">R$ 1.2k</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2.5 w-2.5 rounded-full bg-primary"></div>
+                          <span className="text-sm font-bold text-on-surface-variant">Combustível</span>
+                        </div>
+                        <span className="text-sm font-bold">55%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2.5 w-2.5 rounded-full bg-orange-500"></div>
+                          <span className="text-sm font-bold text-on-surface-variant">Manutenção</span>
+                        </div>
+                        <span className="text-sm font-bold">30%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2.5 w-2.5 rounded-full bg-slate-200"></div>
+                          <span className="text-sm font-bold text-on-surface-variant">Outros</span>
+                        </div>
+                        <span className="text-sm font-bold">15%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-span-12 lg:col-span-3 bg-white border border-outline-variant/30 p-6 rounded-2xl shadow-sm flex flex-col items-center text-center">
+                  <div className="flex justify-between items-center w-full mb-6">
+                    <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Motoristas Atribuídos</h3>
+                    <span className="material-symbols-outlined text-primary text-[20px]">person_add</span>
+                  </div>
+                  <div className="w-full flex-1 flex flex-col items-center justify-center">
+                    {assignedDriversForModal.length > 0 ? (
+                      <div className="w-full space-y-4">
+                        {assignedDriversForModal.map(driver => (
+                          <div key={driver.id} className="flex flex-col items-center">
+                            <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary p-1 bg-surface-container-low shadow-md">
+                              {driver.imageUrl ? (
+                                <img src={driver.imageUrl} alt={driver.name} className="h-full w-full rounded-full object-cover" />
+                              ) : (
+                                <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-xl">
+                                  {driver.name?.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <h4 className="text-base font-bold text-on-surface leading-tight">{driver.name}</h4>
+                            <p className="text-[10px] text-on-surface-variant font-bold uppercase mt-1">Status: {driver.status}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-10">
+                        <span className="material-symbols-outlined text-4xl text-on-surface-variant opacity-20 mb-4 scale-150">person_off</span>
+                        <p className="text-sm font-bold text-on-surface-variant opacity-60">Nenhum motorista atribuído</p>
+                        <button 
+                          onClick={() => navigate('/drivers')}
+                          className="mt-6 px-6 py-2 rounded-full border border-primary text-primary text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-white transition-all"
+                        >
+                          Atribuir Agora
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+    )}
+  </AnimatePresence>
+    </div>
   );
 }
