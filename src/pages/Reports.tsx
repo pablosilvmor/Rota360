@@ -6,6 +6,7 @@ import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
+import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
 
 type ModuleData = {
   id: string;
@@ -21,6 +22,28 @@ const formatDate = (timestamp: any) => {
   if (timestamp.toDate) return timestamp.toDate().toLocaleDateString('pt-BR');
   if (typeof timestamp === 'number') return new Date(timestamp).toLocaleDateString('pt-BR');
   return String(timestamp);
+};
+
+const DriverPhotoReport = ({ url }: { url: string }) => {
+  const { isPrivacyMode } = usePrivacy();
+  
+  if (!url) {
+    return (
+      <div className="w-12 h-12 rounded-full bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30 mx-auto">
+        <span className="material-symbols-outlined text-[16px]">person</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0 mx-auto flex items-center justify-center">
+      <img 
+        src={url} 
+        alt="Motorista" 
+        className={`w-full h-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
+      />
+    </div>
+  );
 };
 
 const MODULES: ModuleData[] = [
@@ -44,7 +67,7 @@ const MODULES: ModuleData[] = [
           </div>
         )
       },
-      { key: 'plate', label: 'Placa' },
+      { key: 'plate', label: 'Placa', renderer: (val) => <PrivateValue value={val} /> },
       { key: 'brand', label: 'Marca' },
       { key: 'model', label: 'Modelo' },
       { key: 'year', label: 'Ano', align: 'center', renderer: (val: any, item: any) => item?.modelYear || val || '-' },
@@ -67,7 +90,7 @@ const MODULES: ModuleData[] = [
           return clean(val) || '-';
         }
       },
-      { key: 'assignedDriver', label: 'Motorista Atribuído' },
+      { key: 'assignedDriver', label: 'Motorista Atribuído', renderer: (val) => <PrivateValue value={val} /> },
       { key: 'status', label: 'Status' },
       { key: 'observation', label: 'Observações', renderer: (val: any, item: any) => item?.observation || item?.observations || val || '-' },
     ]
@@ -82,18 +105,10 @@ const MODULES: ModuleData[] = [
         key: 'imageUrl', 
         label: 'Foto', 
         align: 'center',
-        renderer: (val: any) => val ? (
-          <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0 mx-auto flex items-center justify-center">
-            <img src={val} alt="Motorista" className="w-full h-full object-cover" />
-          </div>
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30 mx-auto">
-            <span className="material-symbols-outlined text-[16px]">person</span>
-          </div>
-        )
+        renderer: (val: any) => <DriverPhotoReport url={val} />
       },
-      { key: 'name', label: 'Nome' },
-      { key: 'cnh', label: 'CNH' },
+      { key: 'name', label: 'Nome', renderer: (val) => <PrivateValue value={val} /> },
+      { key: 'cnh', label: 'CNH', renderer: (val) => <PrivateValue value={val} /> },
       { key: 'cnhCategory', label: 'Categoria CNH', align: 'center' },
       { key: 'validUntil', label: 'Validade CNH', renderer: (val: any) => {
         if (!val) return '-';
@@ -107,7 +122,7 @@ const MODULES: ModuleData[] = [
         return `${day}-${month}-${d.getFullYear()}`;
       } },
       { key: 'cnhStatus', label: 'Status CNH', renderer: (val: any, item: any) => item.validUntil ? (new Date(item.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'N/A' },
-      { key: 'phone', label: 'Telefone' },
+      { key: 'phone', label: 'Telefone', renderer: (val) => <PrivateValue value={val} /> },
       { key: 'vehicleAssigned', label: 'Veículo Atribuído' },
     ]
   },
@@ -117,8 +132,8 @@ const MODULES: ModuleData[] = [
     collectionId: 'inspections',
     icon: 'fact_check',
     columns: [
-      { key: 'vehiclePlate', label: 'Placa' },
-      { key: 'driverName', label: 'Motorista' },
+      { key: 'vehiclePlate', label: 'Placa', renderer: (val) => <PrivateValue value={val} /> },
+      { key: 'driverName', label: 'Motorista', renderer: (val) => <PrivateValue value={val} /> },
       { key: 'date', label: 'Data', renderer: formatDate },
       { key: 'type', label: 'Tipo' },
       { key: 'odometer', label: 'Odômetro' },

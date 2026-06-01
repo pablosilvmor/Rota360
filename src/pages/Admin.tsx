@@ -51,6 +51,7 @@ interface Work {
 }
 
 export function Admin() {
+  const { isPrivacyMode } = usePrivacy();
   const { userData } = useAuth();
   const [users, setUsers] = useState<UserData[]>([]);
   const [preApproved, setPreApproved] = useState<any[]>([]);
@@ -675,7 +676,7 @@ export function Admin() {
                               <img 
                                 src={u.photoURL} 
                                 alt={u.name || u.email} 
-                                className="w-8 h-8 rounded-full object-cover border border-outline-variant shadow-sm"
+                                className={`w-8 h-8 rounded-full object-cover border border-outline-variant shadow-sm transition-all duration-300 ${isPrivacyMode ? 'blur-[6px]' : ''}`}
                                 referrerPolicy="no-referrer"
                               />
                             ) : (

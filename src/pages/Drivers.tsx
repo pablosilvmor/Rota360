@@ -5,7 +5,7 @@ import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
-import { PrivateValue } from '../contexts/PrivacyContext';
+import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -27,6 +27,7 @@ const itemVariants = {
 };
 
 export function Drivers() {
+  const { isPrivacyMode } = usePrivacy();
   const [searchParams, setSearchParams] = useSearchParams();
   const isAssignVehicleOpen = searchParams.get('assign') === 'true';
   const isAddDriverOpen = searchParams.get('add') === 'true';
@@ -618,7 +619,11 @@ export function Drivers() {
                     <div className="flex items-center gap-3">
                       {driver.imageUrl ? (
                         <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-outline-variant/30">
-                          <img src={driver.imageUrl} alt={driver.name} className="w-full h-full object-cover" />
+                          <img 
+                            src={driver.imageUrl} 
+                            alt={driver.name} 
+                            className={`w-full h-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
+                          />
                         </div>
                       ) : (
                         <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-secondary-container border border-outline-variant flex items-center justify-center font-bold text-primary">

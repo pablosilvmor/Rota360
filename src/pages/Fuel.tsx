@@ -4,6 +4,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDoc
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { PrivateValue } from '../contexts/PrivacyContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -160,7 +161,7 @@ export function Fuel() {
             <span className="bg-surface-container px-2 py-1 rounded text-xs font-bold text-on-surface-variant">Filtrado</span>
           </div>
           <p className="text-on-surface-variant text-sm font-semibold uppercase tracking-wider">Custo Total</p>
-          <h3 className="text-[36px] font-bold text-primary mt-1 leading-[1.2] tracking-[-0.02em]">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+          <h3 className="text-[36px] font-bold text-primary mt-1 leading-[1.2] tracking-[-0.02em]">R$ <PrivateValue value={totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /></h3>
           <p className="text-xs text-on-surface-variant mt-2 font-semibold">Valor total gasto no período filtrado</p>
         </motion.div>
 
@@ -215,7 +216,7 @@ export function Fuel() {
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="font-semibold text-primary">{item.vehicleModel}</span>
-                      <span className="font-mono text-xs text-on-surface-variant">{item.vehiclePlate}</span>
+                      <span className="font-mono text-xs text-on-surface-variant"><PrivateValue value={item.vehiclePlate} /></span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -229,7 +230,7 @@ export function Fuel() {
                   </td>
                   <td className="px-6 py-4">
                     <span className="font-bold text-sm">
-                      R$ {item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">

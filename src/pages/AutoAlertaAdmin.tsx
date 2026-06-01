@@ -3,8 +3,10 @@ import { collection, getDocs, query, orderBy, doc, updateDoc, deleteDoc, getDoc,
 import { db } from "../lib/firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { useNavigate } from "react-router";
+import { usePrivacy } from "../contexts/PrivacyContext";
 
 export function AutoAlertaAdmin() {
+  const { isPrivacyMode } = usePrivacy();
   const navigate = useNavigate();
   const [alertas, setAlertas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,7 +143,7 @@ export function AutoAlertaAdmin() {
                   <div className="mt-2 flex items-center gap-4">
                     {driverInfo?.imageUrl ? (
                       <div className="w-12 h-12 rounded-full overflow-hidden border border-outline-variant flex-shrink-0">
-                         <img src={driverInfo.imageUrl} alt={selectedAlerta.driverName} className="w-full h-full object-cover" />
+                         <img src={driverInfo.imageUrl} alt={selectedAlerta.driverName} className={`w-full h-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} />
                       </div>
                     ) : (
                       <div className="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center flex-shrink-0">

@@ -599,7 +599,7 @@ export function Layout({ children }: LayoutProps) {
                 <img
                   src={userData.photoURL}
                   alt={userData.name}
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[6px]' : ''}`}
                   referrerPolicy="no-referrer"
                 />
               ) : (

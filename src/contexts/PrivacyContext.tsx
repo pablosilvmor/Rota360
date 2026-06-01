@@ -39,10 +39,8 @@ export const usePrivacy = () => {
 export const PrivateValue: React.FC<{ value: React.ReactNode; original?: string }> = ({ value, original }) => {
   const { isPrivacyMode } = usePrivacy();
 
-  if (!isPrivacyMode) return <>{value}</>;
-
   return (
-    <span className="bg-surface-variant text-transparent select-none blur-[4px] px-1 rounded transition-all duration-300">
+    <span className={`transition-all duration-300 ${isPrivacyMode ? 'blur-[5px] select-none' : ''}`}>
       {value || original || '••••••••'}
     </span>
   );

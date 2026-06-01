@@ -19,7 +19,7 @@ import { useParams, useNavigate, Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
-import { PrivateValue } from "../contexts/PrivacyContext";
+import { PrivateValue, usePrivacy } from "../contexts/PrivacyContext";
 import * as XLSX from "xlsx";
 import * as htmlToImage from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -63,6 +63,7 @@ function InspectionForm({
   onBack: () => void;
   onPlateClick: (vehicle: any) => void;
 }) {
+  const { isPrivacyMode } = usePrivacy();
   const [vehicle, setVehicle] = useState<any>(null);
   const [loadingForm, setLoadingForm] = useState(true);
   const [loadingVehicle, setLoadingVehicle] = useState(true);
@@ -2159,6 +2160,7 @@ const VehicleOverdueBadge: React.FC<{
 export function Inspections() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isPrivacyMode } = usePrivacy();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [checklistHistory, setChecklistHistory] = useState<any[]>([]);
   const [works, setWorks] = useState<any[]>([]);
@@ -2928,13 +2930,13 @@ export function Inspections() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-bold">
-                        {item.vehiclePlate}
+                        <PrivateValue value={item.vehiclePlate} />
                       </div>
                       <div className="text-[10px] text-on-surface-variant uppercase">
                         {item.vehicleModel}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm">{item.driverName}</td>
+                    <td className="px-6 py-4 text-sm"><PrivateValue value={item.driverName} /></td>
                     <td className="px-6 py-4">
                       <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
                         {item.status}
@@ -3019,7 +3021,7 @@ export function Inspections() {
                     )}
                     <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
                       <span className="material-symbols-outlined text-[18px]">directions_car</span>
-                      {selectedChecklist.vehiclePlate || 'N/A'} - {selectedChecklist.vehicleModel}
+                      <PrivateValue value={selectedChecklist.vehiclePlate} original={selectedChecklist.vehiclePlate || 'N/A'} /> - {selectedChecklist.vehicleModel}
                     </span>
                     <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
                       <span className="material-symbols-outlined text-[18px]">calendar_today</span>
@@ -3027,7 +3029,7 @@ export function Inspections() {
                     </span>
                     <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
                       <span className="material-symbols-outlined text-[18px]">person</span>
-                      {selectedChecklist.driverName}
+                      <PrivateValue value={selectedChecklist.driverName} />
                     </span>
                   </div>
                 </div>
@@ -3132,10 +3134,10 @@ export function Inspections() {
                         {detailsModalVehicle.status}
                       </span>
                       <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded font-bold text-[10px] tracking-wider">
-                        RENAVAM: {detailsModalVehicle.renavam || '01291533734'}
+                        RENAVAM: <PrivateValue value={detailsModalVehicle.renavam || '01291533734'} />
                       </span>
                     </div>
-                    <h2 className="text-[48px] font-black leading-none mb-2 tracking-tighter">{detailsModalVehicle.plate}</h2>
+                    <h2 className="text-[48px] font-black leading-none mb-2 tracking-tighter"><PrivateValue value={detailsModalVehicle.plate} /></h2>
                     <p className="text-lg opacity-90 font-medium">{detailsModalVehicle.brand} {detailsModalVehicle.model} • {detailsModalVehicle.bodywork || 'ABERTA/MECANISMO OPERACIONAL'}</p>
                   </div>
                 </div>
@@ -3297,18 +3299,22 @@ export function Inspections() {
                   <div className="w-full flex-1 flex flex-col items-center justify-center">
                     {assignedDriversForModal.length > 0 ? (
                       <div className="w-full space-y-4">
-                        {assignedDriversForModal.map(driver => (
+                         {assignedDriversForModal.map(driver => (
                           <div key={driver.id} className="flex flex-col items-center">
                             <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary p-1 bg-surface-container-low shadow-md">
                               {driver.imageUrl ? (
-                                <img src={driver.imageUrl} alt={driver.name} className="h-full w-full rounded-full object-cover" />
+                                <img 
+                                  src={driver.imageUrl} 
+                                  alt={driver.name} 
+                                  className={`h-full w-full rounded-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
+                                />
                               ) : (
                                 <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-xl">
                                   {driver.name?.charAt(0).toUpperCase()}
                                 </div>
                               )}
                             </div>
-                            <h4 className="text-base font-bold text-on-surface leading-tight">{driver.name}</h4>
+                            <h4 className="text-base font-bold text-on-surface leading-tight"><PrivateValue value={driver.name} /></h4>
                             <p className="text-[10px] text-on-surface-variant font-bold uppercase mt-1">Status: {driver.status}</p>
                           </div>
                         ))}

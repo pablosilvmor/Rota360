@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { PrivateValue } from '../contexts/PrivacyContext';
+import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
 
 interface VehicleDetailsProps {
   vehicle: any;
@@ -16,6 +16,7 @@ interface VehicleDetailsProps {
 }
 
 export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, onBack, onEdit, onDelete }: VehicleDetailsProps) {
+  const { isPrivacyMode } = usePrivacy();
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assignment, setAssignment] = useState({ driverId: '', workId: '', workName: '' });
 
@@ -424,7 +425,11 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
                   </button>
                   <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary-fixed p-1 bg-surface-container-low">
                     {driver.imageUrl ? (
-                      <img src={driver.imageUrl} alt={driver.name} className="h-full w-full rounded-full object-cover" />
+                      <img 
+                        src={driver.imageUrl} 
+                        alt={driver.name} 
+                        className={`h-full w-full rounded-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
+                      />
                     ) : (
                       <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-xl">
                         {driver.name?.charAt(0).toUpperCase()}

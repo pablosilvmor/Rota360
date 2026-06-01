@@ -4,6 +4,7 @@ import L from 'leaflet';
 import { useState, useEffect } from 'react';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, getDocs } from 'firebase/firestore';
+import { PrivateValue } from '../contexts/PrivacyContext';
 
 // Custom icons based on status
 const createCustomIcon = (color: string) => L.divIcon({
@@ -153,7 +154,7 @@ export function Tracking() {
                       <Popup>
                         <div className="text-xs font-sans">
                           {v.imageUrl && <img src={v.imageUrl} alt={v.plate} className="w-16 h-10 object-cover rounded mb-1" />}
-                          <strong className="text-primary">{v.plate}</strong><br/>
+                          <strong className="text-primary"><PrivateValue value={v.plate} /></strong><br/>
                           {v.model}<br/>
                           <span className="font-bold">{status}</span>
                         </div>
@@ -177,7 +178,7 @@ export function Tracking() {
                 </button>
               </div>
               <p className="text-sm border-b border-outline-variant/30 pb-2 mb-2">
-                Placa: {selectedVehicle.plate}
+                Placa: <PrivateValue value={selectedVehicle.plate} />
               </p>
               <div className="space-y-1">
                 <p className="text-xs text-on-surface-variant flex justify-between">
@@ -186,7 +187,9 @@ export function Tracking() {
                 </p>
                 <p className="text-xs text-on-surface-variant flex justify-between">
                   <span>Motorista:</span>
-                  <span className="font-semibold text-on-surface">{selectedVehicleDriver ? selectedVehicleDriver.name : 'Não Atribuído'}</span>
+                  <span className="font-semibold text-on-surface">
+                    <PrivateValue value={selectedVehicleDriver?.name} />
+                  </span>
                 </p>
                 {selectedVehicleDriver?.workName && (
                   <p className="text-xs text-on-surface-variant flex justify-between">
@@ -225,10 +228,10 @@ export function Tracking() {
                       {status}
                     </span>
                   </div>
-                  <p className="text-xs text-on-surface-variant mb-2 font-mono">{v.plate}</p>
+                  <p className="text-xs text-on-surface-variant mb-2 font-mono"><PrivateValue value={v.plate} /></p>
                   <div className="text-xs flex items-center gap-1 text-on-surface-variant">
                     <span className="material-symbols-outlined text-[14px]">person</span>
-                    <span className="font-medium text-on-surface">{driver ? driver.name : 'Sem Motorista'}</span>
+                    <span className="font-medium text-on-surface"><PrivateValue value={driver?.name} /></span>
                   </div>
                   {driver?.workName && (
                      <div className="text-xs flex items-center gap-1 mt-1 text-on-surface-variant">
