@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
 import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
 
 interface VehicleDetailsProps {
@@ -16,6 +17,8 @@ interface VehicleDetailsProps {
 }
 
 export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, onBack, onEdit, onDelete }: VehicleDetailsProps) {
+  const { userData } = useAuth();
+  const isAdmin = userData?.role === 'admin';
   const { isPrivacyMode } = usePrivacy();
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assignment, setAssignment] = useState({ driverId: '', workId: '', workName: '' });
@@ -167,20 +170,24 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
           <span className="text-on-surface">Detalhes do Veículo: <PrivateValue value={vehicle.plate} /></span>
         </nav>
         <div className="flex gap-2">
-          <button 
-            onClick={onDelete} 
-            className="flex items-center gap-2 px-4 py-2 bg-error text-white font-semibold rounded-lg hover:bg-error/90 transition-colors shadow-sm text-sm"
-          >
-            <span className="material-symbols-outlined text-[18px]">delete</span>
-            Excluir
-          </button>
-          <button 
-            onClick={onEdit} 
-            className="flex items-center gap-2 px-4 py-2 border border-outline-variant bg-white text-on-surface font-semibold rounded-lg hover:bg-surface-container transition-colors shadow-sm text-sm"
-          >
-            <span className="material-symbols-outlined text-[18px]">edit</span>
-            Editar Veículo
-          </button>
+          {isAdmin && (
+            <>
+              <button 
+                onClick={onDelete} 
+                className="flex items-center gap-2 px-4 py-2 bg-error text-white font-semibold rounded-lg hover:bg-error/90 transition-colors shadow-sm text-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                Excluir
+              </button>
+              <button 
+                onClick={onEdit} 
+                className="flex items-center gap-2 px-4 py-2 border border-outline-variant bg-white text-on-surface font-semibold rounded-lg hover:bg-surface-container transition-colors shadow-sm text-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+                Editar Veículo
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -278,11 +285,13 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
               )}
               <button 
                 onClick={() => {
+                  if (!isAdmin) return;
                   window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { 
                     detail: { vehicleId: vehicle.id, plate: vehicle.plate } 
                   }));
                 }}
-                className="w-full py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                disabled={!isAdmin}
+                className={`w-full py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
                 Sincronizar Agora
@@ -404,25 +413,29 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
         <div className="col-span-12 lg:col-span-3 bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col items-center text-center">
           <div className="flex justify-between items-center w-full mb-4">
             <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Motoristas Atribuídos</h3>
-            <button 
-              onClick={() => setIsAssignModalOpen(true)}
-              className="text-primary hover:bg-primary/10 p-1 rounded-full transition-colors"
-              title="Atribuir Motorista"
-            >
-              <span className="material-symbols-outlined text-[20px]">person_add</span>
-            </button>
+            {isAdmin && (
+              <button 
+                onClick={() => setIsAssignModalOpen(true)}
+                className="text-primary hover:bg-primary/10 p-1 rounded-full transition-colors"
+                title="Atribuir Motorista"
+              >
+                <span className="material-symbols-outlined text-[20px]">person_add</span>
+              </button>
+            )}
           </div>
           <div className="w-full space-y-6 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
             {assignedDrivers && assignedDrivers.length > 0 ? (
               assignedDrivers.map((driver) => (
                 <div key={driver.id} className="pb-4 border-b border-outline-variant/30 last:border-0 last:pb-0 relative group/driver">
-                  <button 
-                    onClick={() => handleRemoveDriver(driver.id)}
-                    className="absolute top-0 right-0 p-1 text-on-surface-variant hover:text-error opacity-0 group-hover/driver:opacity-100 transition-opacity"
-                    title="Remover Atribuição"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">link_off</span>
-                  </button>
+                  {isAdmin && (
+                    <button 
+                      onClick={() => handleRemoveDriver(driver.id)}
+                      className="absolute top-0 right-0 p-1 text-on-surface-variant hover:text-error opacity-0 group-hover/driver:opacity-100 transition-opacity"
+                      title="Remover Atribuição"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">link_off</span>
+                    </button>
+                  )}
                   <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary-fixed p-1 bg-surface-container-low">
                     {driver.imageUrl ? (
                       <img 
@@ -449,12 +462,14 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
               <div className="flex flex-col items-center justify-center py-12">
                 <span className="material-symbols-outlined text-4xl text-on-surface-variant/30 mb-2">person_off</span>
                 <p className="text-sm font-medium text-on-surface-variant">Nenhum motorista atribuído</p>
-                <button 
-                  onClick={() => setIsAssignModalOpen(true)}
-                  className="mt-4 text-xs font-bold text-primary hover:underline uppercase tracking-wider"
-                >
-                  Atribuir Agora
-                </button>
+                {isAdmin && (
+                  <button 
+                    onClick={() => setIsAssignModalOpen(true)}
+                    className="mt-4 text-xs font-bold text-primary hover:underline uppercase tracking-wider"
+                  >
+                    Atribuir Agora
+                  </button>
+                )}
               </div>
             )}
           </div>

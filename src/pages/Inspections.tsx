@@ -19,6 +19,7 @@ import { useParams, useNavigate, Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { useAuth } from "../contexts/AuthContext";
 import { PrivateValue, usePrivacy } from "../contexts/PrivacyContext";
 import * as XLSX from "xlsx";
 import * as htmlToImage from "html-to-image";
@@ -63,6 +64,8 @@ function InspectionForm({
   onBack: () => void;
   onPlateClick: (vehicle: any) => void;
 }) {
+  const { userData } = useAuth();
+  const isAdmin = userData?.role === 'admin';
   const { isPrivacyMode } = usePrivacy();
   const [vehicle, setVehicle] = useState<any>(null);
   const [loadingForm, setLoadingForm] = useState(true);
@@ -1237,11 +1240,14 @@ function InspectionForm({
                 className="w-full md:w-32 bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-1.5 font-mono text-sm focus:ring-2 focus:ring-primary outline-none"
               />
               <button
-                onClick={handleUpdateKM}
+                onClick={() => {
+                  if (!isAdmin) return;
+                  handleUpdateKM();
+                }}
                 data-html2canvas-ignore="true"
-                disabled={isUpdatingKM || currentKM === vehicle.currentKM}
-                className="bg-primary/10 text-primary hover:bg-primary/20 p-2 rounded-lg transition-colors disabled:opacity-50 disabled:bg-surface-container disabled:text-on-surface-variant flex-shrink-0"
-                title="Salvar KM Atual"
+                disabled={!isAdmin || isUpdatingKM || currentKM === vehicle.currentKM}
+                className={`bg-primary/10 text-primary hover:bg-primary/20 p-2 rounded-lg transition-colors disabled:opacity-50 disabled:bg-surface-container disabled:text-on-surface-variant flex-shrink-0 ${!isAdmin ? 'cursor-not-allowed' : ''}`}
+                title={isAdmin ? "Salvar KM Atual" : "Apenas administradores"}
               >
                 <span className="material-symbols-outlined text-[20px]">
                   save
@@ -1249,11 +1255,13 @@ function InspectionForm({
               </button>
               <button
                 onClick={() => {
+                   if (!isAdmin) return;
                    window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { detail: { vehicleId: vehicle.id, plate: vehicle.plate } }));
                 }}
                 data-html2canvas-ignore="true"
-                className="bg-secondary/10 text-secondary hover:bg-secondary/20 p-2 rounded-lg transition-colors flex-shrink-0"
-                title="Sincronizar GPS Agora"
+                disabled={!isAdmin}
+                className={`bg-secondary/10 text-secondary hover:bg-secondary/20 p-2 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed`}
+                title={isAdmin ? "Sincronizar GPS Agora" : "Apenas administradores"}
               >
                 <span className="material-symbols-outlined text-[20px]">
                   satellite_alt
@@ -1285,7 +1293,7 @@ function InspectionForm({
             </span>
             {isExporting ? "Processando..." : "Exportar PDF"}
           </button>
-          {selectedItems.size > 0 && (
+          {selectedItems.size > 0 && isAdmin && (
             <button
               onClick={handleBulkDelete}
               className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-error text-onError rounded-lg font-bold shadow-sm hover:opacity-90 transition-all text-sm"
@@ -1296,22 +1304,26 @@ function InspectionForm({
               Excluir ({selectedItems.size})
             </button>
           )}
-          <button
-            onClick={() => setShowImport(true)}
-            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant text-on-surface-variant hover:text-on-surface rounded-lg font-bold shadow-sm hover:bg-surface-container-low transition-all text-sm"
-          >
-            <span className="material-symbols-outlined text-[18px]">
-              publish
-            </span>
-            Importar
-          </button>
-          <button
-            onClick={() => setShowNewItem(true)}
-            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold shadow-sm hover:opacity-90 transition-all text-sm"
-          >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Novo Item
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setShowImport(true)}
+                className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant text-on-surface-variant hover:text-on-surface rounded-lg font-bold shadow-sm hover:bg-surface-container-low transition-all text-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  publish
+                </span>
+                Importar
+              </button>
+              <button
+                onClick={() => setShowNewItem(true)}
+                className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold shadow-sm hover:opacity-90 transition-all text-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                Novo Item
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1590,19 +1602,21 @@ function InspectionForm({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-low/50 border-b border-outline-variant">
-                <th
-                  className="p-4 w-12 text-center border-r border-outline-variant/30"
-                  data-html2canvas-ignore="true"
-                >
-                  <input
-                    type="checkbox"
-                    onChange={toggleAll}
-                    checked={
-                      items.length > 0 && selectedItems.size === items.length
-                    }
-                    className="rounded cursor-pointer"
-                  />
-                </th>
+                {isAdmin && (
+                  <th
+                    className="p-4 w-12 text-center border-r border-outline-variant/30"
+                    data-html2canvas-ignore="true"
+                  >
+                    <input
+                      type="checkbox"
+                      onChange={toggleAll}
+                      checked={
+                        items.length > 0 && selectedItems.size === items.length
+                      }
+                      className="rounded cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th
                   className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider cursor-pointer select-none hover:bg-surface-container-low transition-colors"
                   onClick={() => handleSort("name")}
@@ -1698,12 +1712,14 @@ function InspectionForm({
                     )}
                   </div>
                 </th>
-                <th
-                  className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-center border-l border-outline-variant/30"
-                  data-html2canvas-ignore="true"
-                >
-                  Ações
-                </th>
+                {isAdmin && (
+                  <th
+                    className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-center border-l border-outline-variant/30"
+                    data-html2canvas-ignore="true"
+                  >
+                    Ações
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
@@ -1739,17 +1755,19 @@ function InspectionForm({
                       key={item.id}
                       className={`transition-colors ${selectedItems.has(item.id) ? "bg-primary/5" : "hover:bg-surface-container-low/30"}`}
                     >
-                      <td
-                        className="p-4 text-center border-r border-outline-variant/30"
-                        data-html2canvas-ignore="true"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedItems.has(item.id)}
-                          onChange={() => toggleSelection(item.id)}
-                          className="rounded cursor-pointer"
-                        />
-                      </td>
+                      {isAdmin && (
+                        <td
+                          className="p-4 text-center border-r border-outline-variant/30"
+                          data-html2canvas-ignore="true"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedItems.has(item.id)}
+                            onChange={() => toggleSelection(item.id)}
+                            className="rounded cursor-pointer"
+                          />
+                        </td>
+                      )}
                       <td className="p-4">
                         {editingItemId === item.id ? (
                           <div className="flex flex-col gap-2">
@@ -1832,12 +1850,14 @@ function InspectionForm({
                       <td className="p-4">
                         <select
                           value={record.conformity}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            if (!isAdmin) return;
                             updateRecord(item.id, {
                               conformity: e.target.value as any,
-                            })
-                          }
-                          className={`text-sm px-2 py-1 rounded border outline-none cursor-pointer ${
+                            });
+                          }}
+                          disabled={!isAdmin}
+                          className={`text-sm px-2 py-1 rounded border outline-none ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
                             record.conformity === "SIM"
                               ? "bg-success-container/30 border-success/30 text-success font-semibold"
                               : record.conformity === "NÃO"
@@ -1853,12 +1873,14 @@ function InspectionForm({
                       <td className="p-4">
                         <select
                           value={record.serviceExecuted}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            if (!isAdmin) return;
                             updateRecord(item.id, {
                               serviceExecuted: e.target.value as any,
-                            })
-                          }
-                          className={`text-sm px-2 py-1 rounded border outline-none cursor-pointer ${
+                            });
+                          }}
+                          disabled={!isAdmin}
+                          className={`text-sm px-2 py-1 rounded border outline-none ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
                             record.serviceExecuted === "SIM"
                               ? "bg-primary-container text-on-primary-container border-primary-container font-semibold"
                               : record.serviceExecuted === "NaKM"
@@ -1882,23 +1904,27 @@ function InspectionForm({
                             <input
                               type="date"
                               value={record.lastMaintenanceDate || ""}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                if (!isAdmin) return;
                                 updateRecord(item.id, {
                                   lastMaintenanceDate: e.target.value,
-                                })
-                              }
-                              className="w-[125px] bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary outline-none"
+                                });
+                              }}
+                              disabled={!isAdmin}
+                              className={`w-[125px] bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary outline-none ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
                             />
                           ) : (
                             <input
                               type="text"
                               value={formatKM(record.lastMaintenanceKM)}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                if (!isAdmin) return;
                                 updateRecord(item.id, {
                                   lastMaintenanceKM: parseKM(e.target.value),
-                                })
-                              }
-                              className="w-24 bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-primary outline-none"
+                                });
+                              }}
+                              disabled={!isAdmin}
+                              className={`w-24 bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-primary outline-none ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
                               placeholder="KM"
                             />
                           )}
@@ -1949,31 +1975,33 @@ function InspectionForm({
                           </div>
                         </div>
                       </td>
-                      <td
-                        className="p-4 border-l border-outline-variant/30"
-                        data-html2canvas-ignore="true"
-                      >
-                        <div className="flex items-center gap-2 justify-center">
-                          <button
-                            onClick={() => startEditing(item)}
-                            className="p-1 text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container rounded-lg flex items-center"
-                            title="Editar"
-                          >
-                            <span className="material-symbols-outlined text-[20px]">
-                              edit
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="p-1 text-on-surface-variant hover:text-error transition-colors hover:bg-surface-container rounded-lg flex items-center"
-                            title="Excluir"
-                          >
-                            <span className="material-symbols-outlined text-[20px]">
-                              delete
-                            </span>
-                          </button>
-                        </div>
-                      </td>
+                      {isAdmin && (
+                        <td
+                          className="p-4 border-l border-outline-variant/30"
+                          data-html2canvas-ignore="true"
+                        >
+                          <div className="flex items-center gap-2 justify-center">
+                            <button
+                              onClick={() => startEditing(item)}
+                              className="p-1 text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container rounded-lg flex items-center"
+                              title="Editar"
+                            >
+                              <span className="material-symbols-outlined text-[20px]">
+                                edit
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="p-1 text-on-surface-variant hover:text-error transition-colors hover:bg-surface-container rounded-lg flex items-center"
+                              title="Excluir"
+                            >
+                              <span className="material-symbols-outlined text-[20px]">
+                                delete
+                              </span>
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -2160,6 +2188,8 @@ const VehicleOverdueBadge: React.FC<{
 export function Inspections() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { userData } = useAuth();
+  const isAdmin = userData?.role === 'admin';
   const { isPrivacyMode } = usePrivacy();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [checklistHistory, setChecklistHistory] = useState<any[]>([]);
@@ -2583,15 +2613,19 @@ export function Inspections() {
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { detail: {} }));
-          }}
-          className="group p-3.5 transition-all duration-300 rounded-2xl bg-[#E8F0FE] text-primary hover:bg-primary hover:text-white border border-[#D2E3FC] shadow-sm hover:shadow-lg active:scale-95 hover:-translate-y-0.5"
-          title="Sincronizar GPS Agora"
-        >
-          <span className="material-symbols-outlined text-[26px] block group-hover:rotate-[360deg] transition-transform duration-700 ease-in-out">satellite_alt</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => {
+              if (!isAdmin) return;
+              window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { detail: {} }));
+            }}
+            disabled={!isAdmin}
+            className="group p-3.5 transition-all duration-300 rounded-2xl bg-[#E8F0FE] text-primary hover:bg-primary hover:text-white border border-[#D2E3FC] shadow-sm hover:shadow-lg active:scale-95 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isAdmin ? "Sincronizar GPS Agora" : "Apenas administradores"}
+          >
+            <span className="material-symbols-outlined text-[26px] block group-hover:rotate-[360deg] transition-transform duration-700 ease-in-out">satellite_alt</span>
+          </button>
+        )}
       </div>
 
       <motion.div
@@ -2718,7 +2752,7 @@ export function Inspections() {
             }, {})
           )
           .sort((a, b) => (b[1] as number) - (a[1] as number))
-          .map(([cc, count]) => (
+          .map(([cc, count]: [string, number]) => (
             <div key={cc} className="flex items-center gap-1.5 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant/50 shadow-sm animate-in fade-in zoom-in duration-300">
                <span className="text-[10px] font-bold text-primary uppercase tracking-tight">{cc}</span>
                <span className="w-5 h-5 flex items-center justify-center bg-primary text-on-primary rounded-full text-[10px] font-bold">{count}</span>
@@ -2944,15 +2978,17 @@ export function Inspections() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); navigate(`/checklist?edit=${item.id}`); }}
-                          className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all"
-                          title="Editar Checklist"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">
-                            edit
-                          </span>
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/checklist?edit=${item.id}`); }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all"
+                            title="Editar Checklist"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              edit
+                            </span>
+                          </button>
+                        )}
                         <button
                           onClick={(e) => { e.stopPropagation(); handleExportChecklistPDF(item); }}
                           disabled={isExportingChecklist === item.id}

@@ -4,7 +4,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserData, useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
-import { PrivateValue } from '../contexts/PrivacyContext';
+import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
 
 import { IntegrationsTab } from '../components/IntegrationsTab';
 import { TelemetryTab } from '../components/TelemetryTab';

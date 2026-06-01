@@ -19,7 +19,7 @@ export function Preloader() {
             animate={{ y: [0, -10, 0], rotate: [0, -1, 1, 0] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           >
-            <span className="material-symbols-outlined text-[96px] drop-shadow-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+            <span className="material-symbols-outlined notranslate text-[96px] drop-shadow-xl select-none" style={{ fontFamily: "'Material Symbols Outlined'", fontVariationSettings: "'FILL' 1", fontStyle: 'normal', lineHeight: 1 }}>
               local_shipping
             </span>
             
