@@ -1,6 +1,7 @@
 import { ReactNode, useState, useRef, useEffect } from "react";
 import { NavLink, useNavigate, useLocation, Link } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
+import { usePrivacy } from "../contexts/PrivacyContext";
 import { LogOut } from "lucide-react";
 import { ConfirmModal } from "./ConfirmModal";
 import { KmSyncService } from "./KmSyncService";
@@ -25,6 +26,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { user, userData, logout } = useAuth();
+  const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -422,6 +424,18 @@ export function Layout({ children }: LayoutProps) {
                 >
                   <span className="material-symbols-outlined text-[24px]">
                     psychology
+                  </span>
+                </button>
+              </div>
+
+              <div className="relative">
+                <button
+                  onClick={togglePrivacyMode}
+                  className={`p-2 transition-all duration-300 rounded-full flex items-center justify-center ${isPrivacyMode ? "bg-primary text-on-primary shadow-lg scale-110" : "text-on-primary-container hover:bg-white/10 hover:text-white"}`}
+                  title={isPrivacyMode ? "Desativar Modo Privacidade" : "Ativar Modo Privacidade"}
+                >
+                  <span className="material-symbols-outlined text-[24px]">
+                    {isPrivacyMode ? "visibility_off" : "visibility"}
                   </span>
                 </button>
               </div>

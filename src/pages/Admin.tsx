@@ -4,6 +4,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserData, useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { PrivateValue } from '../contexts/PrivacyContext';
 
 import { IntegrationsTab } from '../components/IntegrationsTab';
 import { TelemetryTab } from '../components/TelemetryTab';
@@ -626,7 +627,7 @@ export function Admin() {
                   {preApproved.map(p => (
                     <div key={p.id} className="flex justify-between items-center p-4 bg-surface-container-low rounded-xl border border-outline-variant">
                       <div className="flex items-center gap-4">
-                        <span className="font-medium text-on-surface">{p.email}</span>
+                        <span className="font-medium text-on-surface"><PrivateValue value={p.email} /></span>
                         <span className="text-[10px] uppercase font-bold px-2 py-1 bg-secondary-container text-on-secondary-container rounded">
                           {p.role}
                         </span>
@@ -683,11 +684,11 @@ export function Admin() {
                               </div>
                             )}
                             <div className="flex flex-col">
-                              <span className="font-bold text-sm text-on-surface leading-none">{u.name || 'Sem Nome'}</span>
+                              <span className="font-bold text-sm text-on-surface leading-none"><PrivateValue value={u.name || 'Sem Nome'} /></span>
                             </div>
                           </div>
                         </td>
-                        <td className="p-4 text-sm text-on-surface-variant">{u.email}</td>
+                        <td className="p-4 text-sm text-on-surface-variant"><PrivateValue value={u.email} /></td>
                         <td className="p-4">
                           <button
                             onClick={() => toggleStatus(u)}
@@ -839,7 +840,7 @@ export function Admin() {
               ) : (
                 vehicles.map(v => (
                   <div key={v.id} className="p-4 flex justify-between items-center hover:bg-surface-container-low/20 transition-colors">
-                    <span className="font-semibold text-on-surface">{v.plate}</span>
+                    <span className="font-semibold text-on-surface"><PrivateValue value={v.plate} /></span>
                     <div className="flex items-center gap-2">
                       {deletingId === v.id ? (
                         <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
@@ -875,7 +876,7 @@ export function Admin() {
               ) : (
                 drivers.map(d => (
                   <div key={d.id} className="p-4 flex justify-between items-center hover:bg-surface-container-low/20 transition-colors">
-                    <span className="font-semibold text-on-surface">{d.name}</span>
+                    <span className="font-semibold text-on-surface"><PrivateValue value={d.name} /></span>
                     <div className="flex items-center gap-2">
                       {deletingId === d.id ? (
                         <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">

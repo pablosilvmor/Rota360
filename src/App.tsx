@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { PrivacyProvider } from './contexts/PrivacyContext';
 import { Layout } from './components/Layout';
 import { ConfirmModal } from './components/ConfirmModal';
 import { Preloader } from './components/Preloader';
@@ -79,9 +80,10 @@ function PlaceholderPage({ title, description, icon }: { title: string, descript
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <ErrorBoundary>
-          <Routes>
+      <PrivacyProvider>
+        <BrowserRouter>
+          <ErrorBoundary>
+            <Routes>
             <Route path="/checklist" element={<Checklist />} />
             <Route path="/autoalerta" element={<ProtectedRoute path="/autoalerta"><AutoAlerta /></ProtectedRoute>} />
             <Route path="/autoalerta-admin" element={<ProtectedRoute path="/autoalerta-admin"><AutoAlertaAdmin /></ProtectedRoute>} />
@@ -108,6 +110,7 @@ export default function App() {
           </Routes>
         </ErrorBoundary>
       </BrowserRouter>
-    </AuthProvider>
-  );
+    </PrivacyProvider>
+  </AuthProvider>
+);
 }

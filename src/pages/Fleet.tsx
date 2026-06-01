@@ -8,6 +8,7 @@ import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { PrivateValue } from '../contexts/PrivacyContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -371,7 +372,7 @@ export function Fleet() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-bold whitespace-nowrap">{vehicle.plate}</span>
+                          <span className="font-bold whitespace-nowrap"><PrivateValue value={vehicle.plate} /></span>
                         </td>
                         <td className="px-6 py-4 text-sm font-bold text-on-surface-variant uppercase">
                           {(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
@@ -427,7 +428,7 @@ export function Fleet() {
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-4 relative">
                     <div>
-                      <h3 className="font-bold text-[28px] text-primary leading-none mb-1">{vehicle.plate}</h3>
+                      <h3 className="font-bold text-[28px] text-primary leading-none mb-1"><PrivateValue value={vehicle.plate} /></h3>
                       <p className="text-sm text-on-surface-variant font-medium">{vehicle.brand} {vehicle.model}</p>
                       {vehicle.bodywork && <p className="text-xs text-on-surface-variant/80 uppercase font-bold tracking-wide mt-1">{vehicle.bodywork}</p>}
                       <div className="flex items-center gap-1 mt-2 text-on-surface-variant bg-surface-container w-fit px-2 py-0.5 rounded">
@@ -501,7 +502,7 @@ export function Fleet() {
               <tbody className="divide-y divide-outline-variant/20">
                 {filteredVehicles.map((vehicle) => (
                   <tr key={`table-${vehicle.id}`} className="hover:bg-surface-container transition-colors group">
-                    <td className="px-6 py-4"><span className="text-sm font-semibold text-primary">{vehicle.plate}</span></td>
+                    <td className="px-6 py-4"><span className="text-sm font-semibold text-primary"><PrivateValue value={vehicle.plate} /></span></td>
                     <td className="px-6 py-4 text-sm font-medium">{vehicle.brand} {vehicle.model}</td>
                     <td className="px-6 py-4 text-sm uppercase">{vehicle.bodywork || '-'}</td>
                     <td className="px-6 py-4 text-sm">

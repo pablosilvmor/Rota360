@@ -19,6 +19,7 @@ import { useParams, useNavigate, Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { PrivateValue } from "../contexts/PrivacyContext";
 import * as XLSX from "xlsx";
 import * as htmlToImage from "html-to-image";
 import { jsPDF } from "jspdf";
@@ -42,7 +43,7 @@ const containerVariants = {
       staggerChildren: 0.1,
     },
   },
-};
+} as const;
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
@@ -51,7 +52,7 @@ const itemVariants = {
     opacity: 1,
     transition: { type: "spring", stiffness: 300, damping: 24 },
   },
-};
+} as const;
 
 function InspectionForm({
   vehicleId,
@@ -397,10 +398,14 @@ function InspectionForm({
       sortedItems.forEach((item) => {
         if (!item || !item.id) return;
         const record = records[item.id] || {
+          id: "",
+          itemId: item.id,
           conformity: "",
           serviceExecuted: "",
           lastMaintenanceKM: 0,
           nextMaintenanceKM: 0,
+          lastMaintenanceDate: null,
+          nextMaintenanceDate: null,
         };
         const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
 
@@ -1194,7 +1199,7 @@ function InspectionForm({
                 onClick={() => onPlateClick(vehicle)}
                 className="text-primary tracking-wide hover:underline decoration-2 underline-offset-4 transition-all"
               >
-                {vehicle.plate}
+                <PrivateValue value={vehicle.plate} />
               </button>
             </h2>
             <p className="text-on-surface-variant font-medium text-sm mt-0.5">

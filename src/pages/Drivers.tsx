@@ -5,6 +5,7 @@ import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { PrivateValue } from '../contexts/PrivacyContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -625,16 +626,16 @@ export function Drivers() {
                         </div>
                       )}
                       <div>
-                        <p className="text-base text-on-surface font-semibold">{driver.name}</p>
-                        <p className="text-[12px] text-on-surface-variant flex gap-2"><span>CPF: {driver.cpf}</span> {driver.phone && <span>• Tel: {driver.phone}</span>}</p>
+                        <p className="text-base text-on-surface font-semibold"><PrivateValue value={driver.name} /></p>
+                        <p className="text-[12px] text-on-surface-variant flex gap-2"><span>CPF: <PrivateValue value={driver.cpf} /></span> {driver.phone && <span>• Tel: <PrivateValue value={driver.phone} /></span>}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className="font-mono bg-on-primary-fixed-variant/5 px-2 py-1 rounded text-on-surface border border-outline-variant/50">
-                      {Array.isArray(driver.vehicleAssigned) 
+                      <PrivateValue value={Array.isArray(driver.vehicleAssigned) 
                         ? (driver.vehicleAssigned.length > 0 ? driver.vehicleAssigned.join(', ') : 'Não Atribuído') 
-                        : (driver.vehicleAssigned || 'Não Atribuído')}
+                        : (driver.vehicleAssigned || 'Não Atribuído')} />
                     </span>
                   </td>
                   <td className="px-6 py-4">

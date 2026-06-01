@@ -4,6 +4,7 @@ import { MaintenanceAlertsConfig } from '../components/MaintenanceAlertsConfig';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, getDoc, getDocs, updateDoc, serverTimestamp, collectionGroup } from 'firebase/firestore';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { PrivateValue } from '../contexts/PrivacyContext';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -799,8 +800,8 @@ export function Maintenance() {
             </div>
             <span className="text-secondary font-bold text-sm">+12% vs mês ant.</span>
           </div>
-          <p className="text-on-surface-variant text-sm font-semibold">Custo Mensal de Serviço</p>
-          <h3 className="text-[48px] font-bold text-primary mt-1 leading-[1.2] tracking-[-0.02em]">R$ {stats.monthlyCost.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</h3>
+          <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Custo Mensal de Serviço</h3>
+          <h3 className="text-[48px] font-bold text-primary mt-1 leading-[1.2] tracking-[-0.02em]">R$ <PrivateValue value={stats.monthlyCost.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} /></h3>
           <p className="text-xs text-on-surface-variant mt-2">Utilização do orçamento: 78%</p>
         </motion.div>
       </motion.div>
@@ -879,8 +880,8 @@ export function Maintenance() {
                   </p>
                   {getTasksForDate(selectedCalendarDate).map((os, index) => (
                     <div key={os.id} className={`bg-surface-container-low p-3 rounded-lg mb-2 border-l-4 ${os.priority === 'Alta' || os.priority === 'Crítica' ? 'border-error' : index === 0 ? 'border-secondary' : 'border-primary'}`}>
-                      <p className="font-semibold text-sm truncate">{os.title}: {os.plate}</p>
-                      <p className="text-xs text-on-surface-variant truncate">{os.provider || 'A Definir'}</p>
+                      <p className="font-semibold text-sm truncate">{os.title}: <PrivateValue value={os.plate} /></p>
+                      <p className="text-xs text-on-surface-variant truncate"><PrivateValue value={os.provider || 'A Definir'} /></p>
                     </div>
                   ))}
                   {getTasksForDate(selectedCalendarDate).length === 0 && (
@@ -947,7 +948,7 @@ export function Maintenance() {
                           <div className={`w-10 h-10 bg-surface-container-high rounded-lg flex items-center justify-center`}>
                             <span className={`material-symbols-outlined text-${os.color}`}>{os.icon}</span>
                           </div>
-                          <span className="font-bold text-on-surface">{os.plate}</span>
+                          <span className="font-bold text-on-surface"><PrivateValue value={os.plate} /></span>
                         </div>
                       </td>
                       <td className="px-6 py-5">
@@ -956,7 +957,7 @@ export function Maintenance() {
                           <span className="text-xs text-on-surface-variant mt-1">{os.description}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-base">{os.provider}</td>
+                      <td className="px-6 py-5 text-base"><PrivateValue value={os.provider} /></td>
                       <td className="px-6 py-5">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[12px] font-bold ${os.priority === 'Alta' ? 'bg-error-container text-on-error-container' : os.priority === 'Média' ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant'}`}>
                           {os.priority}
@@ -1091,7 +1092,7 @@ export function Maintenance() {
                     )}
                     <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
                       <span className="material-symbols-outlined text-[18px]">directions_car</span>
-                      {selectedOS.plate || 'N/A'}
+                      <PrivateValue value={selectedOS.plate || 'N/A'} />
                     </span>
                     <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
                       <span className="material-symbols-outlined text-[18px]">calendar_today</span>
@@ -1134,7 +1135,7 @@ export function Maintenance() {
                         placeholder="Nome do Fornecedor..."
                       />
                     ) : (
-                      <span className="font-medium text-on-surface">{selectedOS.provider}</span>
+                      <span className="font-medium text-on-surface"><PrivateValue value={selectedOS.provider} /></span>
                     )}
                   </div>
                 </div>

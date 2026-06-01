@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { PrivateValue } from "../contexts/PrivacyContext";
 import {
   collection,
   onSnapshot,
@@ -378,7 +379,7 @@ export function Dashboard() {
                               </span>
                             </p>
                             <p className="text-xs font-semibold text-on-surface-variant mt-1.5 uppercase tracking-wide">
-                              {insp.vehiclePlate} • {insp.vehicleBrand}{" "}
+                              <PrivateValue value={insp.vehiclePlate} /> • {insp.vehicleBrand}{" "}
                               {insp.vehicleModel}
                             </p>
                             <p
@@ -674,11 +675,12 @@ export function Dashboard() {
                       </div>
                     <div>
                       <p className="text-sm font-bold text-white">
-                        {alert.title}
+                        {alert.title.includes(':') ? alert.title.split(':')[0] + ': ' : alert.title}
+                        {alert.title.includes(':') ? <PrivateValue value={alert.title.split(':')[1].trim()} /> : null}
                       </p>
                       {alert.vehiclePlate && (
                         <p className="text-xs text-white/70 mt-0.5">
-                          Placa: {alert.vehiclePlate}
+                          Placa: <PrivateValue value={alert.vehiclePlate} />
                         </p>
                       )}
                       <p className="text-xs text-white/70 mt-1">
@@ -754,7 +756,7 @@ export function Dashboard() {
                       <Popup>
                         <div className="text-xs">
                           {v.imageUrl && <img src={v.imageUrl} alt={v.plate} className="w-16 h-10 object-cover rounded mb-1" />}
-                          <strong className="text-primary">{v.plate}</strong><br/>
+                          <strong className="text-primary"><PrivateValue value={v.plate} /></strong><br/>
                           {v.model}
                         </div>
                       </Popup>
@@ -824,7 +826,7 @@ export function Dashboard() {
                         </div>
                         <div>
                           <p className="text-sm font-bold text-on-surface">
-                            {insp.vehiclePlate}
+                            <PrivateValue value={insp.vehiclePlate} />
                           </p>
                           <p className="text-xs text-on-surface-variant line-clamp-1">
                             {insp.itemName} • {insp.desc}
@@ -853,7 +855,7 @@ export function Dashboard() {
                       </div>
                       <div>
                         <p className="text-sm font-bold text-on-surface">
-                          {service.plate}
+                          <PrivateValue value={service.plate} />
                         </p>
                         <p className="text-xs text-on-surface-variant line-clamp-1">
                           {service.title}

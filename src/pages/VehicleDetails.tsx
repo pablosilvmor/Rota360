@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { PrivateValue } from '../contexts/PrivacyContext';
 
 interface VehicleDetailsProps {
   vehicle: any;
@@ -162,7 +163,7 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
             Frota
           </button>
           <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-          <span className="text-on-surface">Detalhes do Veículo: {vehicle.plate}</span>
+          <span className="text-on-surface">Detalhes do Veículo: <PrivateValue value={vehicle.plate} /></span>
         </nav>
         <div className="flex gap-2">
           <button 
@@ -197,10 +198,10 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
                 {vehicle.status}
               </span>
               <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded font-bold text-[10px] tracking-wider">
-                RENAVAM: {vehicle.renavam}
+                RENAVAM: <PrivateValue value={vehicle.renavam} />
               </span>
             </div>
-            <h2 className="text-[48px] font-bold leading-none mb-2">{vehicle.plate}</h2>
+            <h2 className="text-[48px] font-bold leading-none mb-2"><PrivateValue value={vehicle.plate} /></h2>
             <p className="text-lg opacity-90 font-medium">{vehicle.brand} {vehicle.model} • {vehicle.bodywork}</p>
           </div>
         </div>
@@ -324,7 +325,7 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
             </div>
             <div className="py-3.5 flex justify-between items-center">
               <span className="text-on-surface-variant text-sm font-medium">Chassi</span>
-              <span className="font-mono text-sm font-bold">{vehicle.chassis}</span>
+              <span className="font-mono text-sm font-bold"><PrivateValue value={vehicle.chassis} /></span>
             </div>
             <div className="py-3.5 flex justify-between items-center">
               <span className="text-on-surface-variant text-sm font-medium">Centro de Custo</span>
@@ -345,7 +346,7 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
             </div>
             <div className="py-3.5 flex justify-between items-center">
               <span className="text-on-surface-variant text-sm font-medium">CNPJ / CPF</span>
-              <span className="font-bold text-sm">{vehicle.ownerCnpj || '-'}</span>
+              <span className="font-bold text-sm"><PrivateValue value={vehicle.ownerCnpj} /></span>
             </div>
             {vehicle.observation && (
               <div className="py-3.5 flex flex-col gap-2">
@@ -430,9 +431,9 @@ export function VehicleDetails({ vehicle, assignedDrivers, allDrivers, works, on
                       </div>
                     )}
                   </div>
-                  <h4 className="text-lg font-bold leading-tight mb-1">{driver.name}</h4>
+                  <h4 className="text-lg font-bold leading-tight mb-1"><PrivateValue value={driver.name} /></h4>
                   <p className="text-[12px] text-on-surface-variant font-medium mb-1 truncate px-2">Cat. {driver.cnhCategory} • {driver.validUntil ? (new Date(driver.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'Status N/A'}</p>
-                  <p className="text-[11px] text-on-surface-variant font-medium mb-3">{driver.phone || 'Telefone N/A'}</p>
+                  <p className="text-[11px] text-on-surface-variant font-medium mb-3"><PrivateValue value={driver.phone} /></p>
                   <div className="w-full bg-surface-container px-3 py-2 rounded-lg flex justify-between items-center">
                     <span className="text-[9px] font-bold text-on-surface-variant uppercase">Status</span>
                     <span className="text-xs font-bold text-emerald-600">{driver.status}</span>
