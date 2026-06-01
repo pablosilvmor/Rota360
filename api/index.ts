@@ -82,4 +82,34 @@ app.get("/api/proxy/solusat/vehicles", async (req, res) => {
   }
 });
 
+// GaussFleet Proxy Route
+app.post("/api/proxy/gaussfleet/hourmeter", async (req, res) => {
+  const apiEndpoint = "https://bemonengenharia.gaussfleet.com/api/v2/private/EquipmentHourmeter";
+
+  try {
+    const token = req.headers['x-auth-token'] as string;
+
+    if (!token) {
+       console.warn("[GAUSSFLEET PROXY] Missing X-AUTH-TOKEN");
+       return res.status(400).json({ error: "X-AUTH-TOKEN header is required" });
+    }
+
+    console.log(`[GAUSSFLEET PROXY] Fetching data...`);
+    const response = await fetch(apiEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-AUTH-TOKEN": token
+      },
+      body: JSON.stringify(req.body)
+    });
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("[GAUSSFLEET PROXY] Fatal Error:", error);
+    res.status(500).json({ error: "Failed to fetch from GaussFleet" });
+  }
+});
+
 export default app;

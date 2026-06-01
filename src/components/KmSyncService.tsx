@@ -187,7 +187,6 @@ export function KmSyncService() {
                       const groupKeys = Object.keys(data.data);
                       
                       setSyncStatus(prev => ({ ...prev, progress: 70, label: "Processando dados recebidos..." }));
-                      // Pequeno delay para percepção de atividade
                       await new Promise(r => setTimeout(r, 400));
 
                       groupKeys.forEach(groupKey => {
@@ -220,12 +219,9 @@ export function KmSyncService() {
                                const currentInDbBase = matchingVehicles.length > 0 ? Number(matchingVehicles[0].currentKM || 0) : 0;
                                let currentKmApi = Math.floor(rawKm);
                                
-                               // A telemetria pode retornar em metros ou quilômetros
-                               // Mais de 3.000.000 de km é irreal, assumimos que são metros
                                if (rawKm > 3000000) {
                                  currentKmApi = Math.floor(rawKm / 1000);
                                } 
-                               // Se o pulo for massivo (100x+) em relação ao BD, provavelmente a API mandou em metros e o BD tem KM
                                else if (rawKm > 0 && currentInDbBase > 0 && rawKm > (currentInDbBase * 500)) {
                                  currentKmApi = Math.floor(rawKm / 1000);
                                }
@@ -235,12 +231,6 @@ export function KmSyncService() {
                                  checksCount++;
                                  const currentInDb = Number(matchedVehicle.currentKM || 0);
 
-                                 if (targetVehicleId === matchedVehicle.id || true) { // Always log on this version to debug for user
-                                    console.log(`[SYNC SOLUSAT RAW] Placa: ${matchedVehicle.plate} | payload:`, JSON.stringify(av));
-                                    console.log(`[SYNC SOLUSAT PROC] DB: ${currentInDb} | API(Calc): ${currentKmApi} | TrackerTime: ${trackerTime}`);
-                                 }
-                                 
-                                 const isLikelyErrorValue = currentInDb > 1000000 || (currentInDb > (currentKmApi * 5) && currentInDb > 200000);
                                  const vRef = doc(db, 'vehicles', matchedVehicle.id);
                                  
                                  const updateData: any = {
@@ -250,7 +240,7 @@ export function KmSyncService() {
                                    lastSyncError: null
                                  };
 
-                                 if ((currentKmApi > currentInDb || currentInDb === 0 || isLikelyErrorValue) && currentKmApi > 0) {
+                                 if ((currentKmApi > currentInDb || currentInDb === 0 || (currentInDb > 1000000 || (currentInDb > (currentKmApi * 5) && currentInDb > 200000))) && currentKmApi > 0) {
                                    updateData.currentKM = currentKmApi;
                                    updateData.lastKmUpdate = generalLastCheck;
                                    updatesCount++;
@@ -287,6 +277,95 @@ export function KmSyncService() {
                    console.error(`[SYNC ERROR] Solusat API status ${response.status}:`, errText);
                    if (isManual && providers.length === 1) alert(`Erro na API Solusat (${response.status})`);
                 }
+              }
+            } else if (provider.url.toLowerCase().includes('gaussfleet')) {
+              try {
+                const token = provider.token.trim();
+                if (!token) throw new Error("Token GaussFleet não configurado");
+
+                const now = new Date();
+                const dateParam = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+                const response = await fetch(`/api/proxy/gaussfleet/hourmeter`, {
+                  method: 'POST',
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'X-AUTH-TOKEN': token 
+                  },
+                  body: JSON.stringify({
+                    date_time: dateParam
+                  })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data && data.msg && Array.isArray(data.msg)) {
+                      setSyncStatus(prev => ({ ...prev, progress: 70, label: "Processando dados GaussFleet..." }));
+                      await new Promise(r => setTimeout(r, 400));
+
+                      data.msg.forEach((av: any) => {
+                         const plate = (av.vehicle_name || "").toString();
+                         const cleanApiPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                         if (!cleanApiPlate) return;
+
+                         const matchingVehicles = vehiclesToSync.filter(v => {
+                           const cleanVPlate = (v.plate || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                           return cleanVPlate === cleanApiPlate;
+                         });
+                         
+                         if (matchingVehicles.length > 0) {
+                           const rawKmStr = (av.odometer_hourmeter_now || "0").toString().replace(',', '.');
+                           const currentKmApi = Math.floor(parseFloat(rawKmStr));
+                           const trackerTime = av.date_odmhr_now || null;
+
+                           matchingVehicles.forEach(matchedVehicle => {
+                             processedIds.add(matchedVehicle.id);
+                             checksCount++;
+                             const currentInDb = Number(matchedVehicle.currentKM || 0);
+
+                             const vRef = doc(db, 'vehicles', matchedVehicle.id);
+                             
+                             const updateData: any = {
+                               lastSyncCheck: generalLastCheck,
+                               lastTrackerUpdate: trackerTime,
+                               lastSyncStatus: 'success',
+                               lastSyncError: null
+                             };
+
+                             if (currentKmApi > 0 && (currentKmApi > currentInDb || currentInDb === 0)) {
+                               updateData.currentKM = currentKmApi;
+                               updateData.lastKmUpdate = generalLastCheck;
+                               updatesCount++;
+                               updatedPlates.push(matchedVehicle.plate);
+                             } else {
+                               notUpdatedKm.push(matchedVehicle.plate);
+                             }
+
+                             batch.update(vRef, updateData);
+                           });
+                         }
+                      });
+
+                      vehiclesToSync.forEach(v => {
+                        if (!processedIds.has(v.id)) {
+                           const vRef = doc(db, 'vehicles', v.id);
+                           batch.update(vRef, {
+                             lastSyncCheck: generalLastCheck,
+                             lastSyncStatus: 'failed',
+                             lastSyncError: 'Não retornado na listagem da API GaussFleet'
+                           });
+                           notFoundInApi.push(v.plate);
+                        }
+                      });
+                    }
+                } else {
+                   const errText = await response.text();
+                   console.error(`[SYNC ERROR] GaussFleet API status ${response.status}:`, errText);
+                }
+              } catch (apiError) {
+                console.error(`Erro ao sincronizar com GaussFleet:`, apiError);
+                hasError = true;
               }
             } else {
               await new Promise(r => setTimeout(r, 600));
