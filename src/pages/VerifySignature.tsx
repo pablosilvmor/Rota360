@@ -49,9 +49,9 @@ export function VerifySignature() {
         <div className="absolute top-0 left-0 right-0 h-2 bg-primary"></div>
         
         <div className="p-8 pb-6 text-center border-b border-outline-variant/30 flex flex-col items-center">
-          <div className="flex justify-center items-center gap-3">
-             <div className="w-16 h-16 bg-white rounded-full shadow-inner flex items-center justify-center mb-2 border border-outline-variant/20">
-               <img src="https://i.imgur.com/9gByHVv.png" alt="Logo ROTA 360" className="w-12 h-12 object-contain" />
+          <div className="flex justify-center items-center mb-4">
+             <div className="w-24 h-24 flex items-center justify-center">
+               <img src="https://i.imgur.com/1DaE4Bm.png" alt="Logo ROTA 360" className="w-20 h-20 object-contain" />
              </div>
           </div>
           <h2 className="text-2xl font-bold text-on-surface tracking-tight" style={{fontFamily: 'Space Grotesk, sans-serif'}}>ROTA 360</h2>

@@ -24,7 +24,7 @@ export const createSignature = async (data: SignatureData): Promise<string | nul
     await setDoc(signatureRef, {
       documentType: data.documentType,
       documentTitle: data.documentTitle,
-      signerName: user.displayName || user.email || 'Usuário ROTA 360',
+      signerName: signatureInfo?.fullName || user.displayName || user.email || 'Usuário ROTA 360',
       signerEmail: user.email,
       signerId: user.uid,
       timestamp: Date.now(),

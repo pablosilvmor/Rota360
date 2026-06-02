@@ -4,6 +4,7 @@ import { MaintenanceAlertsConfig } from '../components/MaintenanceAlertsConfig';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, getDoc, getDocs, updateDoc, serverTimestamp, collectionGroup } from 'firebase/firestore';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { useAuth } from '../contexts/AuthContext';
 import { PrivateValue } from '../contexts/PrivacyContext';
 
 const containerVariants = {
@@ -28,6 +29,7 @@ const itemVariants = {
 import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
 
 export function Maintenance() {
+  const { userData } = useAuth();
   const [isGenerateOSOpen, setIsGenerateOSOpen] = useState(false);
   const [isScheduleMaintenanceOpen, setIsScheduleMaintenanceOpen] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -406,21 +408,45 @@ export function Maintenance() {
         }
         
         pdf.setFontSize(10);
-        pdf.setTextColor(15, 23, 42);
+        pdf.setTextColor(30, 41, 59);
         pdf.setFont("helvetica", "bold");
-        pdf.text("DOCUMENTO ASSINADO DIGITALMENTE", 56, signatureY + 12);
+        pdf.text("DOCUMENTO ASSINADO DIGITALMENTE", 56, signatureY + 8);
+        
+        const userName = userData?.signatureInfo?.fullName || userData?.name || 'USUÁRIO DO SISTEMA';
+        pdf.setFontSize(11);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text(`por ${userName.toUpperCase()}`, 56, signatureY + 14);
         
         pdf.setFontSize(8);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(100, 116, 139);
-        pdf.text(`Para verificar a autenticidade deste documento, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, signatureY + 18);
+        pdf.text(`Para verificar a autenticidade deste documento, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, signatureY + 20);
         
         pdf.setTextColor(37, 99, 235);
-        pdf.text(verifyUrl, 56, signatureY + 26);
+        pdf.text(verifyUrl, 56, signatureY + 28);
         
         pdf.setTextColor(100, 116, 139);
         pdf.setFontSize(7);
-        pdf.text(`Código de Validação: ${signatureId}`, 56, signatureY + 34);
+        pdf.text(`Código de Validação: ${signatureId}`, 56, signatureY + 36);
+
+        // Add Seal Logo on the right
+        try {
+          const sealUrl = "https://i.imgur.com/1DaE4Bm.png";
+          const sealResp = await fetch(sealUrl);
+          const sealBlob = await sealResp.blob();
+          const sealDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(sealBlob);
+          });
+          
+          const h = 14;
+          const w = h * (1.0); 
+          // Position it at the top right of the signature box area
+          pdf.addImage(sealDataUrl, 'PNG', pageWidth - 14 - w - 10, signatureY + 6, w, h, '', 'FAST');
+        } catch (sealErr) {
+          console.warn("Could not add seal logo to Maintenance PDF", sealErr);
+        }
       } else {
         pdf.setLineWidth(0.5);
         pdf.setDrawColor(200);

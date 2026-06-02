@@ -4,6 +4,7 @@ import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../contexts/AuthContext';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
 import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
@@ -222,6 +223,7 @@ const MultiSelect = ({ label, options, selected, onChange, placeholder }: { labe
 };
 
 export function Reports() {
+  const { userData } = useAuth();
   const [selectedModuleId, setSelectedModuleId] = useLocalStorageState<string | null>('reports_selectedModuleId', null);
   const selectedModule = MODULES.find(m => m.id === selectedModuleId) || null;
   
@@ -679,21 +681,34 @@ export function Reports() {
       }
       
       doc.setFontSize(10);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(30, 41, 59);
       doc.setFont("helvetica", "bold");
-      doc.text("DOCUMENTO ASSINADO DIGITALMENTE", 56, signatureY + 12);
+      doc.text("DOCUMENTO ASSINADO DIGITALMENTE", 56, signatureY + 8);
+      
+      const userName = userData?.signatureInfo?.fullName || userData?.name || 'USUÁRIO DO SISTEMA';
+      doc.setFontSize(11);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`por ${userName.toUpperCase()}`, 56, signatureY + 14);
       
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      doc.text(`Para verificar a autenticidade deste documento, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, signatureY + 18);
+      doc.text(`Para verificar a autenticidade deste documento, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, signatureY + 20);
       
       doc.setTextColor(37, 99, 235);
-      doc.text(verifyUrl, 56, signatureY + 26);
+      doc.text(verifyUrl, 56, signatureY + 28);
       
       doc.setTextColor(100, 116, 139);
       doc.setFontSize(7);
-      doc.text(`Código de Validação: ${signatureId}`, 56, signatureY + 34);
+      doc.text(`Código de Validação: ${signatureId}`, 56, signatureY + 36);
+
+      // Add Seal Logo on the right
+      if (footerLogo) {
+        const h = 14;
+        const w = h * footerLogo.ratio;
+        // Position it at the top right of the signature box area
+        doc.addImage(footerLogo.src, 'PNG', pageWidth - 14 - w - 10, signatureY + 6, w, h, '', 'FAST');
+      }
     } else {
       doc.setLineWidth(0.5);
       doc.setDrawColor(200);
