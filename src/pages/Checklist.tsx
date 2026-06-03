@@ -332,6 +332,7 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
         vehicleId,
         vehiclePlate: vehicle?.plate || "",
         vehicleModel: vehicle?.model || "",
+        kmAtClosure: vehicle?.currentKM || 0,
         items: items.map((item) => ({
           id: item.id,
           item: item.item,

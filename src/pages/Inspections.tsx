@@ -13,6 +13,7 @@ import {
   getDocs,
   where,
   orderBy,
+  limit,
 } from "firebase/firestore";
 import { db, handleFirestoreError, OperationType } from "../lib/firebase";
 import { useParams, useNavigate, Link } from "react-router";
@@ -110,6 +111,8 @@ function InspectionForm({
     direction: "asc" | "desc";
   } | null>(null);
   const [itemSearchText, setItemSearchText] = useState("");
+  const [checklistDate, setChecklistDate] = useState<string>("");
+  const [historyKM, setHistoryKM] = useState<number | null>(null);
 
   const [confirmDelete, setConfirmDelete] = useState<{
     isOpen: boolean;
@@ -358,6 +361,27 @@ function InspectionForm({
 
     fixInconsistencies();
   }, [items, records, resolvedVehicleId]);
+
+  useEffect(() => {
+    if (!checklistDate || !resolvedVehicleId) return;
+    const fetchHistoryKM = async () => {
+      const q = query(
+        collection(db, "checklist_history"),
+        where("vehicleId", "==", resolvedVehicleId),
+        where("date", "==", checklistDate),
+        where("status", "==", "Concluído"),
+        orderBy("createdAt", "desc"),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setHistoryKM(snap.docs[0].data().kmAtClosure || null);
+      } else {
+        setHistoryKM(null);
+      }
+    };
+    fetchHistoryKM();
+  }, [checklistDate, resolvedVehicleId]);
 
   const parseKM = (val: string) => {
     return parseInt(val.replace(/\D/g, "") || "0", 10);
@@ -1290,6 +1314,16 @@ function InspectionForm({
                   satellite_alt
                 </span>
               </button>
+            </div>
+          </div>
+          <div className="w-full pt-4 flex gap-4 border-t border-outline-variant">
+            <div className="flex-1">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">Data Checklist</label>
+                <input type="date" value={checklistDate} onChange={(e) => setChecklistDate(e.target.value)} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-1.5 text-sm" />
+            </div>
+            <div className="flex-1">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">KM Checklist</label>
+                <input type="text" readOnly value={historyKM ? historyKM.toLocaleString('pt-BR') : ''} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-1.5 text-sm font-mono" />
             </div>
           </div>
         </div>
