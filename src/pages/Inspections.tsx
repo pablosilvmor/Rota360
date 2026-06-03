@@ -111,7 +111,10 @@ function InspectionForm({
     direction: "asc" | "desc";
   } | null>(null);
   const [itemSearchText, setItemSearchText] = useState("");
-  const [checklistDate, setChecklistDate] = useState<string>("");
+  const [checklistDate, setChecklistDate] = useLocalStorageState<string>(
+    `inspections_checklistDate_${vehicleId}`,
+    ""
+  );
   const [historyKM, setHistoryKM] = useState<number | null>(null);
   const [concludedMaintenanceOrders, setConcludedMaintenanceOrders] = useState<any[]>([]);
 
@@ -391,11 +394,18 @@ function InspectionForm({
       const snapOs = await getDocs(qOs);
       const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() } as any));
       
-      // Filtrar pelo dia no javascript pois createdAt pode ser timestamp ou number
-      const dateTarget = new Date(checklistDate).toDateString();
+      // Filtrar pelo dia no javascript comparando strings YYYY-MM-DD para evitar problemas de fuso horário
+      const dateTarget = checklistDate; // "YYYY-MM-DD"
       const filteredOrders = orders.filter(os => {
-          const createdAt = os.createdAt?.toDate ? os.createdAt.toDate() : os.createdAt;
-          return createdAt ? new Date(createdAt).toDateString() === dateTarget : false;
+          const createdAt = os.createdAt?.toDate ? os.createdAt.toDate() : (os.createdAt ? new Date(os.createdAt) : null);
+          if (!createdAt) return false;
+          
+          const y = createdAt.getFullYear();
+          const m = String(createdAt.getMonth() + 1).padStart(2, '0');
+          const d = String(createdAt.getDate()).padStart(2, '0');
+          const osDateStr = `${y}-${m}-${d}`;
+
+          return osDateStr === dateTarget;
       });
       setConcludedMaintenanceOrders(filteredOrders);
     };
