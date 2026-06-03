@@ -113,6 +113,7 @@ function InspectionForm({
   const [itemSearchText, setItemSearchText] = useState("");
   const [checklistDate, setChecklistDate] = useState<string>("");
   const [historyKM, setHistoryKM] = useState<number | null>(null);
+  const [concludedMaintenanceOrders, setConcludedMaintenanceOrders] = useState<any[]>([]);
 
   const [confirmDelete, setConfirmDelete] = useState<{
     isOpen: boolean;
@@ -363,9 +364,14 @@ function InspectionForm({
   }, [items, records, resolvedVehicleId]);
 
   useEffect(() => {
-    if (!checklistDate || !resolvedVehicleId) return;
-    const fetchHistoryKM = async () => {
-      const q = query(
+    if (!checklistDate || !resolvedVehicleId) {
+        setHistoryKM(null);
+        setConcludedMaintenanceOrders([]);
+        return;
+    }
+    const fetchMaintenanceInfo = async () => {
+      // 1. Fetch History KM
+      const qKm = query(
         collection(db, "checklist_history"),
         where("vehicleId", "==", resolvedVehicleId),
         where("date", "==", checklistDate),
@@ -373,15 +379,33 @@ function InspectionForm({
         orderBy("createdAt", "desc"),
         limit(1)
       );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        setHistoryKM(snap.docs[0].data().kmAtClosure || null);
-      } else {
-        setHistoryKM(null);
-      }
+      const snapKm = await getDocs(qKm);
+      setHistoryKM(!snapKm.empty ? snapKm.docs[0].data().kmAtClosure || null : null);
+
+      // 2. Fetch Concluded Maintenance Orders
+      const qOs = query(
+        collection(db, "maintenance"),
+        where("vehicleId", "==", resolvedVehicleId),
+        where("status", "==", "Concluído")
+      );
+      const snapOs = await getDocs(qOs);
+      const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      // Filtrar pelo dia no javascript pois createdAt é timestamp
+      const dateTarget = new Date(checklistDate).toDateString();
+      const filteredOrders = orders.filter(os => {
+          return new Date(os.createdAt).toDateString() === dateTarget;
+      });
+      setConcludedMaintenanceOrders(filteredOrders);
     };
-    fetchHistoryKM();
+    fetchMaintenanceInfo();
   }, [checklistDate, resolvedVehicleId]);
+
+  const isServiceExecuted = (itemId: string) => {
+    return concludedMaintenanceOrders.some(os => 
+        os.inspectionItems?.some((i: any) => i.itemId === itemId)
+    ) ? "SIM" : "NÃO";
+  };
 
   const parseKM = (val: string) => {
     return parseInt(val.replace(/\D/g, "") || "0", 10);
