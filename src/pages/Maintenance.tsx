@@ -508,9 +508,11 @@ export function Maintenance() {
             if (currentKM > 0) {
               // Buscar todos os itens de inspeção do veículo para verificar periodicidades
               const itemsSnap = await getDocs(collection(db, `inspections/${os.vehicleId}/items`));
+              // Filtrar somente os itens que estão explicitamente na OS
+              const itemIdsInOS = new Set(os.inspectionItems.map((i: any) => i.id || i.itemId));
               const itemsFilter = itemsSnap.docs
                 .map(d => ({ id: d.id, ...d.data() as any }))
-                .filter(item => periodicities.includes(item.periodicityKM));
+                .filter(item => itemIdsInOS.has(item.id));
 
               if (itemsFilter.length > 0) {
                 // Atualizar records

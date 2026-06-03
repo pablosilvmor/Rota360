@@ -391,10 +391,11 @@ function InspectionForm({
       const snapOs = await getDocs(qOs);
       const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() } as any));
       
-      // Filtrar pelo dia no javascript pois createdAt é timestamp
+      // Filtrar pelo dia no javascript pois createdAt pode ser timestamp ou number
       const dateTarget = new Date(checklistDate).toDateString();
       const filteredOrders = orders.filter(os => {
-          return new Date(os.createdAt).toDateString() === dateTarget;
+          const createdAt = os.createdAt?.toDate ? os.createdAt.toDate() : os.createdAt;
+          return createdAt ? new Date(createdAt).toDateString() === dateTarget : false;
       });
       setConcludedMaintenanceOrders(filteredOrders);
     };
@@ -403,7 +404,7 @@ function InspectionForm({
 
   const isServiceExecuted = (itemId: string) => {
     return concludedMaintenanceOrders.some(os => 
-        os.inspectionItems?.some((i: any) => i.itemId === itemId)
+        os.inspectionItems?.some((i: any) => i.id === itemId || i.itemId === itemId)
     ) ? "SIM" : "NÃO";
   };
 
