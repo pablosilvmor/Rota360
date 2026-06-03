@@ -578,46 +578,48 @@ function InspectionForm({
           }
 
           // Boxes informativos (KM Atual, Data Checklist, KM Checklist)
-          const infoBoxWidth = 28;
-          const infoSpacing = 3;
+          const infoBoxWidth = 24;
+          const infoBoxHeight = 16;
+          const infoSpacing = 2;
+          const rightMargin = 10;
           
           // KM Atual
           pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(pageWidth - infoBoxWidth - 14, startY, infoBoxWidth, 20, 2, 2, "F");
-          pdf.setFontSize(6);
+          pdf.roundedRect(pageWidth - infoBoxWidth - rightMargin, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
+          pdf.setFontSize(5);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(100, 116, 139);
-          pdf.text("KM ATUAL", pageWidth - infoBoxWidth - 10, startY + 6);
-          pdf.setFontSize(9);
+          pdf.text("KM ATUAL", pageWidth - infoBoxWidth - rightMargin + 3, startY + 5);
+          pdf.setFontSize(8);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(30, 41, 59);
-          pdf.text(formatKM(currentKM), pageWidth - infoBoxWidth - 10, startY + 14);
+          pdf.text(formatKM(currentKM), pageWidth - infoBoxWidth - rightMargin + 3, startY + 12);
 
           // Data Checklist
-          const dateBoxX = pageWidth - (infoBoxWidth * 2) - infoSpacing - 14;
+          const dateBoxX = pageWidth - (infoBoxWidth * 2) - infoSpacing - rightMargin;
           pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(dateBoxX, startY, infoBoxWidth, 20, 2, 2, "F");
-          pdf.setFontSize(6);
+          pdf.roundedRect(dateBoxX, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
+          pdf.setFontSize(5);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(100, 116, 139);
-          pdf.text("DATA CHECKLIST", dateBoxX + 4, startY + 6);
-          pdf.setFontSize(9);
+          pdf.text("DATA CHECKLIST", dateBoxX + 3, startY + 5);
+          pdf.setFontSize(8);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(30, 41, 59);
-          pdf.text(checklistDate ? checklistDate.split('-').reverse().join('/') : "-", dateBoxX + 4, startY + 14);
+          pdf.text(checklistDate ? checklistDate.split('-').reverse().join('/') : "-", dateBoxX + 3, startY + 12);
 
           // KM Checklist
-          const kmChecklistX = pageWidth - (infoBoxWidth * 3) - (infoSpacing * 2) - 14;
+          const kmChecklistX = pageWidth - (infoBoxWidth * 3) - (infoSpacing * 2) - rightMargin;
           pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(kmChecklistX, startY, infoBoxWidth, 20, 2, 2, "F");
-          pdf.setFontSize(6);
+          pdf.roundedRect(kmChecklistX, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
+          pdf.setFontSize(5);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(100, 116, 139);
-          pdf.text("KM CHECKLIST", kmChecklistX + 4, startY + 6);
-          pdf.setFontSize(9);
+          pdf.text("KM CHECKLIST", kmChecklistX + 3, startY + 5);
+          pdf.setFontSize(8);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(30, 41, 59);
-          pdf.text(historyKM !== null ? formatKM(historyKM) : "-", kmChecklistX + 4, startY + 14);
+          pdf.text(historyKM !== null ? formatKM(historyKM) : "-", kmChecklistX + 3, startY + 12);
         },
         didDrawCell: function (data) {
           if (data.section === "body" && data.column.index === 4) {
@@ -2559,48 +2561,50 @@ export function Inspections() {
           pdf.text(`NÃO CONFORME: ${nonCompliantItems}`, 85, startY + 22);
 
           // Boxes informativos (KMs e Dados do Checklist)
-          const boxWidth = 28;
-          const spacing = 3;
-          const driverBoxWidth = 38;
+          const boxWidth = 24;
+          const boxHeight = 16;
+          const spacing = 2;
+          const driverBoxWidth = 34;
+          const rightMargin = 10;
           
           // KM Atual
           pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(pageWidth - boxWidth - 14, startY, boxWidth, 20, 2, 2, "F");
-          pdf.setFontSize(6);
+          pdf.roundedRect(pageWidth - boxWidth - rightMargin, startY, boxWidth, boxHeight, 2, 2, "F");
+          pdf.setFontSize(5);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(100, 116, 139);
-          pdf.text("KM ATUAL", pageWidth - boxWidth - 10, startY + 6);
-          pdf.setFontSize(9);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(30, 41, 59);
-          pdf.text(formatKM(vehicle?.currentKM || 0), pageWidth - boxWidth - 10, startY + 14);
-
-          // KM Checklist
-          const kmX = pageWidth - (boxWidth * 2) - spacing - 14;
-          pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(kmX, startY, boxWidth, 20, 2, 2, "F");
-          pdf.setFontSize(6);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(100, 116, 139);
-          pdf.text("KM CHECKLIST", kmX + 4, startY + 6);
-          pdf.setFontSize(9);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(30, 41, 59);
-          pdf.text(formatKM(checklist.kmAtClosure || 0), kmX + 4, startY + 14);
-
-          // Data e Motorista (que é a Data Checklist na prática aqui)
-          const dataX = pageWidth - (boxWidth * 2) - driverBoxWidth - (spacing * 2) - 14;
-          pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(dataX, startY, driverBoxWidth, 20, 2, 2, "F");
-          pdf.setFontSize(6);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(100, 116, 139);
-          pdf.text("DATA E MOTORISTA", dataX + 4, startY + 6);
+          pdf.text("KM ATUAL", pageWidth - boxWidth - rightMargin + 3, startY + 5);
           pdf.setFontSize(8);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(30, 41, 59);
-          pdf.text(`${checklist.date}`, dataX + 4, startY + 11);
-          pdf.text(`${checklist.driverName}`, dataX + 4, startY + 16);
+          pdf.text(formatKM(vehicle?.currentKM || 0), pageWidth - boxWidth - rightMargin + 3, startY + 12);
+
+          // KM Checklist
+          const kmX = pageWidth - (boxWidth * 2) - spacing - rightMargin;
+          pdf.setFillColor(241, 245, 249);
+          pdf.roundedRect(kmX, startY, boxWidth, boxHeight, 2, 2, "F");
+          pdf.setFontSize(5);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(100, 116, 139);
+          pdf.text("KM CHECKLIST", kmX + 3, startY + 5);
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(30, 41, 59);
+          pdf.text(formatKM(checklist.kmAtClosure || 0), kmX + 3, startY + 12);
+
+          // Data e Motorista (que é a Data Checklist na prática aqui)
+          const dataX = pageWidth - (boxWidth * 2) - driverBoxWidth - (spacing * 2) - rightMargin;
+          pdf.setFillColor(241, 245, 249);
+          pdf.roundedRect(dataX, startY, driverBoxWidth, boxHeight, 2, 2, "F");
+          pdf.setFontSize(5);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(100, 116, 139);
+          pdf.text("DATA E MOTORISTA", dataX + 3, startY + 5);
+          pdf.setFontSize(7);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(30, 41, 59);
+          pdf.text(`${checklist.date}`, dataX + 3, startY + 10);
+          pdf.text(`${checklist.driverName}`, dataX + 3, startY + 14);
         },
       });
 

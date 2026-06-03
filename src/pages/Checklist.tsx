@@ -460,7 +460,7 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
         setSuccess(true);
         // Após 2 segundos, redirecionar
         setTimeout(() => {
-          navigate("/inspections");
+          navigate(`/inspections/${vehicleId}`);
         }, 2000);
       }, 500);
     } catch (e) {
