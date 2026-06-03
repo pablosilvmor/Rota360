@@ -1953,18 +1953,18 @@ function InspectionForm({
                       </td>
                       <td className="p-4">
                         <select
-                          value={record.serviceExecuted}
+                          value={checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")}
                           onChange={(e) => {
                             if (!isAdmin) return;
                             updateRecord(item.id, {
                               serviceExecuted: e.target.value as any,
                             });
                           }}
-                          disabled={!isAdmin}
-                          className={`text-sm px-2 py-1 rounded border outline-none ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
-                            record.serviceExecuted === "SIM"
+                          disabled={!isAdmin || !!checklistDate}
+                          className={`text-sm px-2 py-1 rounded border outline-none ${isAdmin && !checklistDate ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
+                            (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) === "SIM"
                               ? "bg-primary-container text-on-primary-container border-primary-container font-semibold"
-                              : record.serviceExecuted === "NaKM"
+                              : (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) === "NaKM"
                                 ? "bg-warning-container/50 text-warning-dark border-warning/50 font-semibold"
                                 : "bg-surface-container border-outline-variant text-on-surface-variant"
                           }`}
