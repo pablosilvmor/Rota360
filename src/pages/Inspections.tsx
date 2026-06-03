@@ -389,7 +389,7 @@ function InspectionForm({
         where("status", "==", "Concluído")
       );
       const snapOs = await getDocs(qOs);
-      const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() }));
+      const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() } as any));
       
       // Filtrar pelo dia no javascript pois createdAt é timestamp
       const dateTarget = new Date(checklistDate).toDateString();
@@ -2285,6 +2285,8 @@ export function Inspections() {
     string | null
   >(null);
   const [detailsModalVehicle, setDetailsModalVehicle] = useState<any>(null);
+  const [checklistToDelete, setChecklistToDelete] = useState<any | null>(null);
+  const [isDeletingChecklist, setIsDeletingChecklist] = useState(false);
 
   const [searchQuery, setSearchQuery] = useLocalStorageState(
     "inspections_searchQuery",
@@ -2311,6 +2313,20 @@ export function Inspections() {
           : d.vehicleAssigned === detailsModalVehicle.plate,
       )
     : [];
+
+  const handleDeleteChecklist = async (checklist: any) => {
+    if (!checklist?.id) return;
+    setIsDeletingChecklist(true);
+    try {
+      await deleteDoc(doc(db, "checklist_history", checklist.id));
+      setChecklistToDelete(null);
+    } catch (error) {
+      console.error("Error deleting checklist:", error);
+      handleFirestoreError(error, OperationType.DELETE, "checklist_history");
+    } finally {
+      setIsDeletingChecklist(false);
+    }
+  };
 
   useEffect(() => {
     // We fetch the vehicles list to show cards or if an ID is present, we just pass to the Form
@@ -3081,14 +3097,14 @@ export function Inspections() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-3">
                         {isAdmin && (
                           <button
                             onClick={(e) => { e.stopPropagation(); navigate(`/checklist?edit=${item.id}`); }}
-                            className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all"
+                            className="w-9 h-9 rounded-full flex items-center justify-center bg-primary/10 text-primary hover:bg-primary hover:text-on-primary transition-colors"
                             title="Editar Checklist"
                           >
-                            <span className="material-symbols-outlined text-[18px]">
+                            <span className="material-symbols-outlined text-[20px]">
                               edit
                             </span>
                           </button>
@@ -3096,19 +3112,30 @@ export function Inspections() {
                         <button
                           onClick={(e) => { e.stopPropagation(); handleExportChecklistPDF(item); }}
                           disabled={isExportingChecklist === item.id}
-                          className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-all"
+                          className="w-9 h-9 rounded-full flex items-center justify-center bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary transition-colors"
                           title="Exportar PDF"
                         >
                           {isExportingChecklist === item.id ? (
-                            <span className="animate-spin text-[18px] material-symbols-outlined">
+                            <span className="animate-spin text-[20px] material-symbols-outlined">
                               refresh
                             </span>
                           ) : (
-                            <span className="material-symbols-outlined text-[18px]">
+                            <span className="material-symbols-outlined text-[20px]">
                               picture_as_pdf
                             </span>
                           )}
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setChecklistToDelete(item); }}
+                            className="w-9 h-9 rounded-full flex items-center justify-center bg-error/10 text-error hover:bg-error hover:text-on-error transition-colors"
+                            title="Excluir Checklist"
+                          >
+                            <span className="material-symbols-outlined text-[20px]">
+                              delete
+                            </span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -3123,6 +3150,55 @@ export function Inspections() {
           )}
         </motion.div>
       )}
+
+      {/* Confirmação de Exclusão de Checklist */}
+      <AnimatePresence>
+        {checklistToDelete && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isDeletingChecklist && setChecklistToDelete(null)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-surface w-full max-w-sm rounded-3xl shadow-2xl relative z-10 overflow-hidden p-6 text-center"
+            >
+              <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="material-symbols-outlined text-3xl">delete_forever</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-2">Excluir Checklist?</h3>
+              <p className="text-sm text-on-surface-variant mb-6">
+                Esta ação é irreversível. O checklist do veículo <strong>{checklistToDelete.vehiclePlate}</strong> do dia {checklistToDelete.date} será removido permanentemente.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  disabled={isDeletingChecklist}
+                  onClick={() => setChecklistToDelete(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors disabled:opacity-50"
+                >
+                  CANCELAR
+                </button>
+                <button
+                  disabled={isDeletingChecklist}
+                  onClick={() => handleDeleteChecklist(checklistToDelete)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-error text-onError hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isDeletingChecklist ? (
+                    <span className="material-symbols-outlined animate-spin text-[18px]">refresh</span>
+                  ) : (
+                    "EXCLUIR"
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Checklist Details Modal */}
       <AnimatePresence>
