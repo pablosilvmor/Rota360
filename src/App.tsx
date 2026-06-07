@@ -23,6 +23,7 @@ import { AutoAlerta } from './pages/AutoAlerta';
 import { AutoAlertaAdmin } from './pages/AutoAlertaAdmin';
 import { VerifySignature } from './pages/VerifySignature';
 import { Profile } from './pages/Profile';
+import { Invoices } from './pages/Invoices';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function ProtectedRoute({ children, path }: { children: ReactNode, path: string }) {
@@ -101,6 +102,7 @@ export default function App() {
             <Route path="/profile" element={<ProtectedRoute path="/profile"><Profile /></ProtectedRoute>} />
             <Route path="/works" element={<ProtectedRoute path="/works"><Works /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute path="/reports"><Reports /></ProtectedRoute>} />
+            <Route path="/invoices" element={<ProtectedRoute path="/invoices"><Invoices /></ProtectedRoute>} />
             
             <Route path="/suppliers" element={<ProtectedRoute path="/suppliers"><PlaceholderPage title="Fornecedores e Oficinas" description="Gestão de parceiros de manutenção e serviços externos." icon="build" /></ProtectedRoute>} />
             <Route path="/parts" element={<ProtectedRoute path="/parts"><PlaceholderPage title="Peças e Estoque" description="Controle de Insumos e peças de manutenção." icon="inventory" /></ProtectedRoute>} />

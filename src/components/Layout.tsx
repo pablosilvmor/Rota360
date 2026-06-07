@@ -143,6 +143,7 @@ export function Layout({ children }: LayoutProps) {
     { name: "Frota", path: "/fleet", icon: "local_shipping" },
     { name: "Inspeções", path: "/inspections", icon: "fact_check" },
     { name: "Checklist", path: "/checklist", icon: "checklist" },
+    { name: "Notas Fiscais", path: "/invoices", icon: "receipt_long" },
     { name: "AutoAlerta", path: "/autoalerta", icon: "campaign" },
   ];
 

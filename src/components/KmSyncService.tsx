@@ -141,8 +141,6 @@ export function KmSyncService() {
           return;
         }
 
-        setSyncStatus(prev => ({ ...prev, progress: 50, label: "Acessando API Solusat..." }));
-
         let hasError = false;
         const batch = writeBatch(db);
         let updatesCount = 0;
@@ -154,8 +152,16 @@ export function KmSyncService() {
 
         const generalLastCheck = new Date().toISOString();
 
+        let providerIndex = 0;
         for (const provider of providers) {
           try {
+            providerIndex++;
+            const baseProgress = 50 + (providerIndex / providers.length) * 30; // goes from 50 to 80
+            
+            setSyncStatus(prev => ({ ...prev, progress: baseProgress, label: `Sincronizando ${provider.name || 'provedor'}...` }));
+            // Pequeno delay para atualizar UI
+            await new Promise(r => setTimeout(r, 400));
+            
             if (provider.url.toLowerCase().includes('solusat')) {
               let apiKey = "";
               let apiToken = "";
@@ -186,7 +192,7 @@ export function KmSyncService() {
                     if (data.status && data.data) {
                       const groupKeys = Object.keys(data.data);
                       
-                      setSyncStatus(prev => ({ ...prev, progress: 70, label: "Processando dados recebidos..." }));
+                      setSyncStatus(prev => ({ ...prev, progress: baseProgress + 5, label: `Processando dados de ${provider.name || 'Solusat'}...` }));
                       await new Promise(r => setTimeout(r, 400));
 
                       groupKeys.forEach(groupKey => {
@@ -301,7 +307,7 @@ export function KmSyncService() {
                     const data = await response.json();
                     
                     if (data && data.msg && Array.isArray(data.msg)) {
-                      setSyncStatus(prev => ({ ...prev, progress: 70, label: "Processando dados GaussFleet..." }));
+                      setSyncStatus(prev => ({ ...prev, progress: baseProgress + 5, label: `Processando dados de ${provider.name || 'GaussFleet'}...` }));
                       await new Promise(r => setTimeout(r, 400));
 
                       data.msg.forEach((av: any) => {

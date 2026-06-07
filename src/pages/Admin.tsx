@@ -8,6 +8,7 @@ import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
 
 import { IntegrationsTab } from '../components/IntegrationsTab';
 import { TelemetryTab } from '../components/TelemetryTab';
+import { NotasFiscaisTab } from '../components/NotasFiscaisTab';
 
 const Countdown = ({ expiresAt, onExtend }: { expiresAt: number, onExtend: () => void }) => {
   const [timeLeft, setTimeLeft] = useState(expiresAt - Date.now());
@@ -484,6 +485,7 @@ export function Admin() {
     ...(isAdmin ? [{ id: 'adm', label: 'ADM' }] : []),
     { id: 'integracoes', label: 'Integrações' },
     { id: 'telemetria', label: 'Telemetria' },
+    { id: 'notas_fiscais', label: 'Notas Fiscais' },
   ];
 
   return (
@@ -519,7 +521,7 @@ export function Admin() {
           <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">Central de Cadastros</h2>
           <p className="text-on-surface-variant font-medium">Controle o acesso e regras dos usuários no sistema Rota 360.</p>
         </div>
-        {activeTab !== 'adm' && (
+        {activeTab !== 'adm' && activeTab !== 'notas_fiscais' && activeTab !== 'integracoes' && activeTab !== 'telemetria' && (
           <button 
             onClick={() => setShowImport(true)}
             className="px-5 py-2.5 bg-primary text-on-primary rounded-xl font-bold shadow-lg hover:opacity-90 transition-all active:scale-95 flex items-center gap-2"
@@ -583,6 +585,10 @@ export function Admin() {
 
       {(activeTab === 'telemetria') && (
         <TelemetryTab />
+      )}
+
+      {(activeTab === 'notas_fiscais') && (
+        <NotasFiscaisTab />
       )}
 
       {(activeTab === 'adm' && isAdmin) && (
