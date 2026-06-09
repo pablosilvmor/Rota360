@@ -117,6 +117,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /fuel_records/{fuelId} {
+      allow read, write: if isSignedIn();
+    }
+
     match /statuses/{statusId} {
       allow read, write: if isSignedIn();
     }
