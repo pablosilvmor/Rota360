@@ -151,6 +151,7 @@ export function KmSyncService() {
         let processedIds = new Set<string>();
 
         const generalLastCheck = new Date().toISOString();
+        const syncLogs: Record<string, { status: 'success' | 'failed', timestamp: string, message: string }> = {};
 
         let providerIndex = 0;
         for (const provider of providers) {
@@ -190,6 +191,11 @@ export function KmSyncService() {
                 if (response.ok) {
                     const data = await response.json();
                     if (data.status && data.data) {
+                      syncLogs[provider.id] = {
+                        status: 'success',
+                        timestamp: generalLastCheck,
+                        message: 'Sincronização realizada com sucesso via API Solusat.'
+                      };
                       const groupKeys = Object.keys(data.data);
                       
                       setSyncStatus(prev => ({ ...prev, progress: baseProgress + 5, label: `Processando dados de ${provider.name || 'Solusat'}...` }));
@@ -281,6 +287,11 @@ export function KmSyncService() {
                 } else {
                    const errText = await response.text();
                    console.error(`[SYNC ERROR] Solusat API status ${response.status}:`, errText);
+                   syncLogs[provider.id] = {
+                     status: 'failed',
+                     timestamp: generalLastCheck,
+                     message: `Erro na API Solusat (Status ${response.status})`
+                   };
                    if (isManual && providers.length === 1) alert(`Erro na API Solusat (${response.status})`);
                 }
               }
@@ -307,6 +318,11 @@ export function KmSyncService() {
                     const data = await response.json();
                     
                     if (data && data.msg && Array.isArray(data.msg)) {
+                      syncLogs[provider.id] = {
+                        status: 'success',
+                        timestamp: generalLastCheck,
+                        message: 'Sincronização realizada com sucesso via API GaussFleet.'
+                      };
                       setSyncStatus(prev => ({ ...prev, progress: baseProgress + 5, label: `Processando dados de ${provider.name || 'GaussFleet'}...` }));
                       await new Promise(r => setTimeout(r, 400));
 
@@ -368,9 +384,19 @@ export function KmSyncService() {
                 } else {
                    const errText = await response.text();
                    console.error(`[SYNC ERROR] GaussFleet API status ${response.status}:`, errText);
+                   syncLogs[provider.id] = {
+                     status: 'failed',
+                     timestamp: generalLastCheck,
+                     message: `Erro na API GaussFleet (Status ${response.status})`
+                   };
                 }
               } catch (apiError) {
                 console.error(`Erro ao sincronizar com GaussFleet:`, apiError);
+                syncLogs[provider.id] = {
+                  status: 'failed',
+                  timestamp: generalLastCheck,
+                  message: `Exceção na integração GaussFleet: ${apiError instanceof Error ? apiError.message : String(apiError)}`
+                };
                 hasError = true;
               }
             } else {
@@ -378,11 +404,27 @@ export function KmSyncService() {
             }
           } catch (apiError) {
             console.error(`Erro ao sincronizar com ${provider.name}:`, apiError);
+            syncLogs[provider.id] = {
+              status: 'failed',
+              timestamp: generalLastCheck,
+              message: `Erro ao processar provedor ${provider.name}: ${apiError instanceof Error ? apiError.message : String(apiError)}`
+            };
             hasError = true;
           }
         }
 
         setSyncStatus(prev => ({ ...prev, progress: 90, label: "Finalizando registros..." }));
+
+        // Salvar logs de sincronização por provedor
+        if (Object.keys(syncLogs).length > 0) {
+          try {
+            await setDoc(doc(db, "settings", "integrations"), {
+              lastLogs: syncLogs
+            }, { merge: true });
+          } catch (logError) {
+            console.error("Erro ao salvar logs de provedores:", logError);
+          }
+        }
 
         if (checksCount > 0 || updatesCount > 0 || hasError) {
           console.log(`[SYNC DEBUG] Fazendo batch.commit() com ${checksCount} checks, ${updatesCount} updates, hasError: ${hasError}`);

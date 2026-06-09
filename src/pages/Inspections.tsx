@@ -2456,21 +2456,27 @@ export function Inspections() {
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
-      // Buscar dados do veículo para pegar a imagem
-      const vehicle = vehicles.find((v) => v.id === checklist.vehicleId);
+      // Buscar dados do veículo para pegar a imagem (tenta por ID ou Placa)
+      const vehicle = vehicles.find((v) => 
+        (v.id && checklist.vehicleId && v.id === checklist.vehicleId) || 
+        (v.plate && checklist.vehiclePlate && v.plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === checklist.vehiclePlate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())
+      );
       let vehicleLogoDataUrl = "";
 
       if (vehicle?.imageUrl) {
         try {
           const imgUrl = vehicle.imageUrl;
+          // Usando proxy para evitar CORS e garantir conversão
           const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}&w=400&output=jpeg`;
           const resp = await fetch(proxyUrl);
-          const blob = await resp.blob();
-          vehicleLogoDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
+          if (resp.ok) {
+            const blob = await resp.blob();
+            vehicleLogoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+          }
         } catch (e) {
           console.warn("Could not load vehicle image for checklist PDF:", e);
         }

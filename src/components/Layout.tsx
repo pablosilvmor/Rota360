@@ -5,6 +5,7 @@ import { usePrivacy } from "../contexts/PrivacyContext";
 import { LogOut } from "lucide-react";
 import { ConfirmModal } from "./ConfirmModal";
 import { KmSyncService } from "./KmSyncService";
+import { InvoiceSyncService } from "./InvoiceSyncService";
 import { HelpModal } from "./HelpModal";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -191,6 +192,7 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-background text-on-background flex">
       <KmSyncService />
+      <InvoiceSyncService />
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div

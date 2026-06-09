@@ -12,6 +12,7 @@ export interface IntegrationProvider {
 
 export function IntegrationsTab() {
   const [providers, setProviders] = useState<IntegrationProvider[]>([]);
+  const [syncLogs, setSyncLogs] = useState<Record<string, { status: 'success' | 'failed', timestamp: string, message: string }>>({});
   const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
@@ -34,6 +35,10 @@ export function IntegrationsTab() {
               url: data.telemetryUrl || '',
               token: data.telemetryToken || ''
             }]);
+          }
+
+          if (data.lastLogs) {
+            setSyncLogs(data.lastLogs);
           }
         }
       } catch (error) {
@@ -203,6 +208,28 @@ export function IntegrationsTab() {
                       </p>
                     )}
                   </div>
+                  
+                  {/* Log de Sincronização */}
+                  {syncLogs[provider.id] && (
+                    <div className={`mt-2 p-3 rounded-lg border flex items-start gap-3 ${syncLogs[provider.id].status === 'success' ? 'bg-emerald-50 border-emerald-100' : 'bg-error/5 border-error/10'}`}>
+                      <span className={`material-symbols-outlined text-[18px] mt-0.5 ${syncLogs[provider.id].status === 'success' ? 'text-emerald-600' : 'text-error'}`}>
+                        {syncLogs[provider.id].status === 'success' ? 'verified' : 'report'}
+                      </span>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-0.5">
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${syncLogs[provider.id].status === 'success' ? 'text-emerald-700' : 'text-error'}`}>
+                            Última Sincronização: {syncLogs[provider.id].status === 'success' ? 'SUCESSO' : 'FALHA'}
+                          </span>
+                          <span className="text-[10px] text-on-surface-variant font-mono">
+                            {new Date(syncLogs[provider.id].timestamp).toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                        <p className={`text-[11px] font-medium ${syncLogs[provider.id].status === 'success' ? 'text-emerald-800' : 'text-error/80'}`}>
+                          {syncLogs[provider.id].message}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => handleRemoveProvider(provider.id)}

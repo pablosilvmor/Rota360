@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs, where, writeBatch, doc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { PrivateValue } from '../contexts/PrivacyContext';
+import * as xlsx from 'xlsx';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -23,6 +24,10 @@ export function Fuel() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filterWork, setFilterWork] = useLocalStorageState('fuel_filterWork', 'Todas as Obras');
+  
+  const [isDragging, setIsDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     vehicleId: '',
@@ -106,6 +111,140 @@ export function Fuel() {
     }
   };
 
+  const handleFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = xlsx.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rows = xlsx.utils.sheet_to_json(sheet, { raw: false, header: 1 }) as string[][];
+      if (rows.length < 2) return;
+
+      const headers = rows[0].map((h: any) => String(h).trim().toUpperCase());
+      
+      const idxCodTransacao = headers.findIndex(h => h.includes('CODIGO TRANSACAO') || h.includes('CÓDIGO TRANSAÇÃO'));
+      const idxDataTransacao = headers.findIndex(h => h.includes('DATA TRANSACAO') || h.includes('DATA TRANSAÇÃO'));
+      const idxPlaca = headers.findIndex(h => h.includes('PLACA'));
+      const idxModelo = headers.findIndex(h => h.includes('MODELO VEICULO') || h.includes('MODELO VEÍCULO'));
+      const idxCombustivel = headers.findIndex(h => h.includes('TIPO COMBUSTIVEL') || h.includes('TIPO COMBUSTÍVEL'));
+      const idxLitros = headers.findIndex(h => h === 'LITROS');
+      const idxValor = headers.findIndex(h => h.includes('VALOR EMISSAO') || h.includes('VALOR EMISSÃO') || h.includes('VALOR TOTAL'));
+      const idxOdometro = headers.findIndex(h => h.includes('ODOMETRO') || h.includes('ODÔMETRO'));
+      const idxPosto = headers.findIndex(h => h.includes('NOME ESTABELECIMENT') || h.includes('ESTABELECIMENTO'));
+      
+      let existingTransIds = new Set(fuelRecords.map(r => String(r.transactionId)));
+      const batchList = [];
+      let imported = 0;
+      let duplicates = 0;
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        
+        const codTransacao = idxCodTransacao >= 0 ? row[idxCodTransacao] : row[0];
+        if (!codTransacao) continue;
+        const transactionId = String(codTransacao).trim();
+        
+        if (existingTransIds.has(transactionId)) {
+          duplicates++;
+          continue;
+        }
+        
+        const dataTransStr = idxDataTransacao >= 0 ? row[idxDataTransacao] : row[4];
+        const placa = idxPlaca >= 0 ? row[idxPlaca] : row[5];
+        const modelo = idxModelo >= 0 ? row[idxModelo] : row[7];
+        const combustivel = idxCombustivel >= 0 ? row[idxCombustivel] : row[13];
+        const litrosStr = idxLitros >= 0 ? row[idxLitros] : row[14];
+        const valorStr = idxValor >= 0 ? row[idxValor] : row[18];
+        const odometroStr = idxOdometro >= 0 ? row[idxOdometro] : row[16];
+        const posto = idxPosto >= 0 ? row[idxPosto] : row[20];
+        
+        const litros = parseFloat(String(litrosStr).replace(',', '.'));
+        const valor = parseFloat(String(valorStr).replace(/[^\d.,-]/g, '').replace(',', '.'));
+        const odometro = parseFloat(String(odometroStr).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        
+        let dateValue = new Date();
+        if (dataTransStr) {
+          const dateStr = String(dataTransStr).trim();
+          if (dateStr.includes('/')) {
+              const [datePart, timePart] = dateStr.split(' ');
+              const [d, m, y] = datePart.split('/');
+              if (timePart) {
+                  const [h, min, s] = timePart.split(':');
+                  dateValue = new Date(Number(y), Number(m)-1, Number(d), Number(h), Number(min), Number(s || 0));
+              } else {
+                  dateValue = new Date(Number(y), Number(m)-1, Number(d));
+              }
+          }
+        }
+        
+        batchList.push({
+          transactionId,
+          date: dateValue,
+          vehiclePlate: String(placa || '').trim(),
+          vehicleModel: String(modelo || '').trim(),
+          fuelType: String(combustivel || '').trim(),
+          liters: isNaN(litros) ? 0 : litros,
+          totalValue: isNaN(valor) ? 0 : valor,
+          odometer: isNaN(odometro) ? 0 : odometro,
+          station: String(posto || '').trim(),
+          workName: 'Não informada',
+          card: '', 
+          createdAt: new Date(),
+          importMode: 'excel'
+        });
+        existingTransIds.add(transactionId);
+      }
+      
+      const chunkSize = 400;
+      for (let i = 0; i < batchList.length; i += chunkSize) {
+        const chunk = batchList.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        for (const item of chunk) {
+          batch.set(doc(collection(db, 'fuel_records')), item);
+        }
+        await batch.commit();
+        imported += chunk.length;
+      }
+      
+      alert(`Importação concluída: ${imported} registros novos.\n(Ignorados: ${duplicates} duplicados)`);
+      
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao importar arquivo Excel. Verifique se o formato está correto.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFile(e.target.files[0]);
+    }
+    if (e.target) {
+       e.target.value = '';
+    }
+  };
+
   const filteredRecords = filterWork === 'Todas as Obras' 
     ? fuelRecords 
     : fuelRecords.filter(r => r.workName === filterWork);
@@ -115,11 +254,35 @@ export function Fuel() {
 
   return (
     <motion.div 
-      className="pb-12"
+      className="pb-12 relative"
       initial="hidden"
       animate="visible"
       variants={containerVariants}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
+      <AnimatePresence>
+        {isDragging && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-primary/10 backdrop-blur-sm flex items-center justify-center pointer-events-none"
+          >
+            <div className="bg-white p-12 rounded-[40px] shadow-2xl border-4 border-dashed border-primary flex flex-col items-center gap-6 scale-110">
+              <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-[64px] text-primary animate-bounce">upload_file</span>
+              </div>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-on-surface mb-2">Solte sua planilha do Excel</h2>
+                <p className="text-on-surface-variant font-medium">O arquivo (.xlsx) será processado automaticamente.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4" variants={itemVariants}>
         <div>
           <h2 className="text-[32px] font-semibold text-primary leading-[1.3] tracking-[-0.01em]">Gestão de Combustível</h2>
@@ -141,6 +304,23 @@ export function Fuel() {
           </div>
           <button className="self-end px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">
             Gerenciar Cartões
+          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            accept=".xlsx,.xls" 
+            className="hidden" 
+            onChange={handleFileInput}
+          />
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="self-end px-4 py-2 border border-primary text-primary rounded-lg font-semibold hover:bg-primary/5 transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            <span className={`material-symbols-outlined text-[18px] ${importing ? 'animate-spin' : ''}`}>
+              {importing ? 'autorenew' : 'upload_file'}
+            </span>
+            {importing ? 'Importando...' : 'Importar Excel'}
           </button>
           <button 
             onClick={() => setIsModalOpen(true)}
