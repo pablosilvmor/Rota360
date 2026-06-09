@@ -19,26 +19,17 @@ const itemVariants = {
 
 export function Fuel() {
   const [works, setWorks] = useState<any[]>([]);
-  const [vehicles, setVehicles] = useState<any[]>([]);
   const [fuelRecords, setFuelRecords] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [filterWork, setFilterWork] = useLocalStorageState('fuel_filterWork', 'Todas as Obras');
   
   const [isDragging, setIsDragging] = useState(false);
   const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
-  const [formData, setFormData] = useState({
-    vehicleId: '',
-    workId: '',
-    station: '',
-    fuelType: 'Diesel S10',
-    liters: '',
-    totalValue: '',
-    odometer: '',
-    card: ''
-  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const qWorks = query(collection(db, 'works'), orderBy('name', 'asc'));
@@ -46,13 +37,6 @@ export function Fuel() {
       setWorks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'works');
-    });
-
-    const qVehicles = query(collection(db, 'vehicles'), orderBy('plate', 'asc'));
-    const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
-      setVehicles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'vehicles');
     });
 
     const qFuel = query(collection(db, 'fuel_records'), orderBy('date', 'desc'));
@@ -64,52 +48,11 @@ export function Fuel() {
 
     return () => {
       unsubscribeWorks();
-      unsubscribeVehicles();
       unsubscribeFuel();
     };
   }, []);
 
-  const handleSaveFuel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.vehicleId || !formData.liters || !formData.totalValue) {
-      alert("Preencha todos os campos obrigatórios.");
-      return;
-    }
 
-    setLoading(true);
-    try {
-      const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
-      const selectedWork = works.find(w => w.id === formData.workId);
-
-      await addDoc(collection(db, 'fuel_records'), {
-        ...formData,
-        vehiclePlate: selectedVehicle?.plate || '',
-        vehicleModel: selectedVehicle?.model || '',
-        workName: selectedWork?.name || 'Não informada',
-        liters: parseFloat(formData.liters),
-        totalValue: parseFloat(formData.totalValue),
-        odometer: parseFloat(formData.odometer) || 0,
-        date: serverTimestamp(),
-        createdAt: serverTimestamp()
-      });
-
-      setIsModalOpen(false);
-      setFormData({
-        vehicleId: '',
-        workId: '',
-        station: '',
-        fuelType: 'Diesel S10',
-        liters: '',
-        totalValue: '',
-        odometer: '',
-        card: ''
-      });
-    } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, 'fuel_records');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleFile = async (file: File) => {
     setImporting(true);
@@ -197,6 +140,9 @@ export function Fuel() {
         existingTransIds.add(transactionId);
       }
       
+      const totalToImport = batchList.length;
+      setImportProgress({ current: 0, total: totalToImport });
+
       const chunkSize = 400;
       for (let i = 0; i < batchList.length; i += chunkSize) {
         const chunk = batchList.slice(i, i + chunkSize);
@@ -206,15 +152,18 @@ export function Fuel() {
         }
         await batch.commit();
         imported += chunk.length;
+        setImportProgress({ current: imported, total: totalToImport });
       }
       
-      alert(`Importação concluída: ${imported} registros novos.\n(Ignorados: ${duplicates} duplicados)`);
+      setImportProgress({ current: totalToImport, total: totalToImport });
+      setTimeout(() => alert(`Importação concluída: ${imported} registros novos.\n(Ignorados: ${duplicates} duplicados)`), 100);
       
     } catch (err) {
       console.error(err);
       alert('Erro ao importar arquivo Excel. Verifique se o formato está correto.');
     } finally {
       setImporting(false);
+      setImportProgress({ current: 0, total: 0 });
     }
   };
 
@@ -245,12 +194,80 @@ export function Fuel() {
     }
   };
 
+  const handleClearData = async () => {
+    setClearing(true);
+    try {
+      const q = query(collection(db, 'fuel_records'), where('importMode', '==', 'excel'));
+      const snapshot = await getDocs(q);
+      const batchList: any[] = [];
+      snapshot.forEach(doc => batchList.push(doc.ref));
+      
+      const chunkSize = 400;
+      for (let i = 0; i < batchList.length; i += chunkSize) {
+        const chunk = batchList.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        for (const ref of chunk) {
+          batch.delete(ref);
+        }
+        await batch.commit();
+      }
+      setShowClearConfirm(false);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao apagar dados importados.');
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const filteredRecords = filterWork === 'Todas as Obras' 
     ? fuelRecords 
     : fuelRecords.filter(r => r.workName === filterWork);
 
+  let sortedRecords = [...filteredRecords];
+  if (sortConfig !== null) {
+    sortedRecords.sort((a, b) => {
+      let aVal = a[sortConfig.key];
+      let bVal = b[sortConfig.key];
+      
+      if (sortConfig.key === 'date') {
+         aVal = a.date?.toDate ? a.date.toDate() : new Date(0);
+         bVal = b.date?.toDate ? b.date.toDate() : new Date(0);
+      }
+      
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  }
+
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) return 'swap_vert';
+    return sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
+  };
+
   const totalCost = filteredRecords.reduce((acc, curr) => acc + (curr.totalValue || 0), 0);
   const totalLiters = filteredRecords.reduce((acc, curr) => acc + (curr.liters || 0), 0);
+
+  let firstDateStr = '-';
+  let lastDateStr = '-';
+  if (fuelRecords.length > 0) {
+    const dates = fuelRecords.map(r => r.date?.toDate ? r.date.toDate().getTime() : 0).filter(t => t > 0);
+    if (dates.length > 0) {
+      const minDate = new Date(Math.min(...dates));
+      const maxDate = new Date(Math.max(...dates));
+      firstDateStr = minDate.toLocaleDateString('pt-BR');
+      lastDateStr = maxDate.toLocaleDateString('pt-BR');
+    }
+  }
 
   return (
     <motion.div 
@@ -286,7 +303,12 @@ export function Fuel() {
       <motion.div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4" variants={itemVariants}>
         <div>
           <h2 className="text-[32px] font-semibold text-primary leading-[1.3] tracking-[-0.01em]">Gestão de Combustível</h2>
-          <p className="text-base text-on-surface-variant mt-2">Monitore os abastecimentos, custos com combustível e gerencie os cartões da frota.</p>
+          <p className="text-base text-on-surface-variant mt-2">Monitore os abastecimentos e custos importados da frota.</p>
+          {fuelRecords.length > 0 && (
+            <p className="text-xs text-on-surface-variant font-medium mt-1">
+              Período dos dados: <strong className="text-primary">{firstDateStr}</strong> a <strong className="text-primary">{lastDateStr}</strong>
+            </p>
+          )}
         </div>
         <div className="flex gap-3">
           <div className="flex flex-col">
@@ -302,9 +324,6 @@ export function Fuel() {
               ))}
             </select>
           </div>
-          <button className="self-end px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors">
-            Gerenciar Cartões
-          </button>
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -313,24 +332,80 @@ export function Fuel() {
             onChange={handleFileInput}
           />
           <button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="self-end px-4 py-2 border border-primary text-primary rounded-lg font-semibold hover:bg-primary/5 transition-colors flex items-center gap-2 disabled:opacity-50"
+            onClick={() => setShowClearConfirm(true)}
+            className="self-end px-4 py-2 border border-error/50 text-error rounded-lg font-semibold hover:bg-error/10 transition-colors flex items-center gap-2"
           >
-            <span className={`material-symbols-outlined text-[18px] ${importing ? 'animate-spin' : ''}`}>
-              {importing ? 'autorenew' : 'upload_file'}
-            </span>
-            {importing ? 'Importando...' : 'Importar Excel'}
+            <span className="material-symbols-outlined text-[18px]">delete</span>
+            Limpar Dados
           </button>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="self-end bg-primary text-on-primary px-4 py-2 rounded-lg font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Registrar Abastecimento
-          </button>
+          <div className="relative flex flex-col items-end">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="self-end px-4 py-2 bg-primary text-on-primary rounded-lg font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {importing ? (
+                <>
+                  <span className="material-symbols-outlined text-[18px] animate-spin">autorenew</span>
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                  Importar Excel
+                </>
+              )}
+            </button>
+            {importing && importProgress.total > 0 && (
+              <div className="absolute top-[110%] w-full">
+                <div className="flex justify-between text-[10px] font-bold text-primary mb-1">
+                  <span>Progresso</span>
+                  <span>{Math.round((importProgress.current / importProgress.total) * 100)}%</span>
+                </div>
+                <div className="w-full bg-primary/20 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-primary h-full transition-all duration-300"
+                    style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {showClearConfirm && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm text-center">
+              <span className="material-symbols-outlined text-[48px] text-error mb-4">warning</span>
+              <h3 className="text-xl font-bold text-on-surface mb-2">Excluir Dados</h3>
+              <p className="text-sm text-on-surface-variant mb-6">Tem certeza que deseja apagar todos os dados importados? Esta ação não pode ser desfeita.</p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowClearConfirm(false)}
+                  className="flex-1 py-2.5 border border-outline-variant rounded-xl font-bold text-on-surface hover:bg-surface-container"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleClearData}
+                  disabled={clearing}
+                  className="flex-1 py-2.5 bg-error text-white rounded-xl font-bold hover:bg-error/90 disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {clearing ? <span className="material-symbols-outlined animate-spin text-[18px]">autorenew</span> : null}
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10" variants={containerVariants}>
         <motion.div variants={itemVariants} className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm hover:-translate-y-1 transition-transform duration-300">
@@ -377,16 +452,35 @@ export function Fuel() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant">
-                <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase">Data</th>
-                <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase">Veículo</th>
-                <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase">Posto / Local</th>
-                <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase">Quantidade</th>
-                <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase">Valor Total</th>
-                <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase text-right">Cartão</th>
+                <th className="p-0">
+                  <button onClick={() => handleSort('date')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                    Data <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('date')}</span>
+                  </button>
+                </th>
+                <th className="p-0">
+                  <button onClick={() => handleSort('vehiclePlate')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                    Veículo <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('vehiclePlate')}</span>
+                  </button>
+                </th>
+                <th className="p-0">
+                  <button onClick={() => handleSort('station')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                    Posto / Local <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('station')}</span>
+                  </button>
+                </th>
+                <th className="p-0">
+                  <button onClick={() => handleSort('liters')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                    Quantidade <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('liters')}</span>
+                  </button>
+                </th>
+                <th className="p-0">
+                  <button onClick={() => handleSort('totalValue')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                    Valor <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('totalValue')}</span>
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
-              {filteredRecords.map((item) => (
+              {sortedRecords.map((item) => (
                 <tr key={item.id} className="hover:bg-surface-container transition-colors group">
                   <td className="px-6 py-4">
                     <span className="font-semibold text-sm">
@@ -395,35 +489,29 @@ export function Fuel() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-semibold text-primary">{item.vehicleModel}</span>
+                      <span className="font-semibold text-primary">{item.vehicleModel || 'N/A'}</span>
                       <span className="font-mono text-xs text-on-surface-variant"><PrivateValue value={item.vehiclePlate} /></span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm">{item.station || 'Não informado'}</span>
+                    <span className="text-sm font-medium">{item.station || 'Não informado'}</span>
                   </td>
                   <td className="px-6 py-4">
                      <div className="flex flex-col">
-                      <span className="font-bold text-sm">{item.liters}L</span>
-                      <span className="text-xs text-on-surface-variant">{item.fuelType}</span>
+                      <span className="font-bold text-sm text-on-surface">{item.liters} L</span>
+                      <span className="text-xs text-on-surface-variant">{item.fuelType || 'Não informado'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="font-bold text-sm">
+                    <span className="font-bold text-sm text-on-surface">
                       R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container-high text-xs font-mono">
-                      <span className="material-symbols-outlined text-[14px]">credit_card</span>
-                      **** {item.card || 'XXXX'}
                     </span>
                   </td>
                 </tr>
               ))}
-              {filteredRecords.length === 0 && (
+              {sortedRecords.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant">
+                  <td colSpan={5} className="px-6 py-12 text-center text-on-surface-variant font-medium">
                     Nenhum registro de abastecimento encontrado.
                   </td>
                 </tr>
@@ -433,141 +521,7 @@ export function Fuel() {
         </div>
       </motion.div>
 
-      <AnimatePresence>
-        {isModalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => setIsModalOpen(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="p-6 border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
-                <h3 className="text-xl font-bold text-primary">Registrar Abastecimento</h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-on-surface-variant hover:text-error">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
-              
-              <form onSubmit={handleSaveFuel} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-1">
-                    <SearchableSelect 
-                      label="Veículo *"
-                      placeholder="Selecione..."
-                      options={vehicles.map(v => ({ value: v.id, label: `${v.plate} - ${v.model}` }))}
-                      value={formData.vehicleId}
-                      onChange={val => setFormData({...formData, vehicleId: val})}
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <SearchableSelect 
-                      label="Obra"
-                      placeholder="Selecione..."
-                      options={works.map(w => ({ value: w.id, label: w.name }))}
-                      value={formData.workId}
-                      onChange={val => setFormData({...formData, workId: val})}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-1">Posto / Estabelecimento</label>
-                    <input 
-                      type="text" 
-                      value={formData.station}
-                      onChange={e => setFormData({...formData, station: e.target.value})}
-                      className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-sm focus:border-primary outline-none"
-                      placeholder="Ex: Posto BR Rodoanel"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-1">Tipo de Combustível</label>
-                    <select 
-                      value={formData.fuelType}
-                      onChange={e => setFormData({...formData, fuelType: e.target.value})}
-                      className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-sm focus:border-primary outline-none"
-                    >
-                      <option value="Diesel S10">Diesel S10</option>
-                      <option value="Diesel S500">Diesel S500</option>
-                      <option value="Gasolina Comum">Gasolina Comum</option>
-                      <option value="Gasolina Aditivada">Gasolina Aditivada</option>
-                      <option value="Etanol">Etanol</option>
-                      <option value="Arla 32">Arla 32</option>
-                    </select>
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-1">Cartão (Final)</label>
-                    <input 
-                      type="text" 
-                      maxLength={4}
-                      value={formData.card}
-                      onChange={e => setFormData({...formData, card: e.target.value})}
-                      className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-sm focus:border-primary outline-none"
-                      placeholder="Ex: 4521"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-1">Quantidade (Litros) *</label>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      value={formData.liters}
-                      onChange={e => setFormData({...formData, liters: e.target.value})}
-                      className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-sm focus:border-primary outline-none font-bold"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-1">Valor Total (R$) *</label>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      value={formData.totalValue}
-                      onChange={e => setFormData({...formData, totalValue: e.target.value})}
-                      className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-sm focus:border-primary outline-none font-bold"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-1">Odômetro Atual</label>
-                    <input 
-                      type="number" 
-                      value={formData.odometer}
-                      onChange={e => setFormData({...formData, odometer: e.target.value})}
-                      className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-sm focus:border-primary outline-none font-mono"
-                      placeholder="KM atual"
-                    />
-                  </div>
-                </div>
-                
-                <div className="pt-4 flex gap-4">
-                  <button 
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 py-3 border border-outline-variant rounded-xl font-bold hover:bg-surface-container transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 py-3 bg-primary text-on-primary rounded-xl font-bold hover:bg-primary/90 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                  >
-                    {loading ? <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span> : <span className="material-symbols-outlined text-[20px]">save</span>}
-                    {loading ? 'Salvando...' : 'Salvar Registro'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
     </motion.div>
   );
 }
