@@ -656,7 +656,7 @@ export function Dashboard() {
                 ].slice(0, 3).map((alert) => (
                   <div
                     key={alert.id}
-                    onClick={() => navigate(`/vehicle-details/${alert.vehicleId || alert.id.split('-')[1]}`)}
+                    onClick={() => navigate(`/inspections/${alert.vehicleId || alert.id.split('-')[1]}`)}
                     className="flex gap-4 p-4 bg-white/5 rounded-lg border border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
                   >
                     <span

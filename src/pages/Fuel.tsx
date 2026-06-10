@@ -41,7 +41,8 @@ export function Fuel() {
   
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [showReportPreview, setShowReportPreview] = useState(false);
-  
+  const [showActionMenu, setShowActionMenu] = useState(false);
+
   const [selectedColumns, setSelectedColumns] = useLocalStorageState('fuel_selectedColumns', [
     'date', 'vehiclePlate', 'station', 'liters', 'totalValue'
   ]);
@@ -180,7 +181,12 @@ export function Fuel() {
           if (colId === 'workName') {
             const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
             const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
-            return String(cc).replace(/logística - região sul/gi, "").replace(/logístic a - região sul/gi, "").trim() || 'Não informada';
+            // Remove specific forbidden text and clean up commas/whitespace completely
+            return String(cc)
+              .replace(/logística\s*-\s*região\s*sul/gi, "") // Remove bad text
+              .replace(/,\s*,/g, ",") // Fix double commas
+              .replace(/^[\s,]+|[\s,]+$/g, "") // Clean edges
+              .trim() || 'Não informada';
           }
           
           if (colId === 'driverRegistration') return r.driverRegistration || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('MATRICULA'))?.[1] || '-' : '-');
@@ -983,29 +989,62 @@ export function Fuel() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <button 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importing}
-                className="h-11 px-6 bg-primary text-on-primary rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+                onClick={clearFilters} 
+                className="h-11 px-6 rounded-xl border border-outline-variant text-[13px] font-semibold text-on-surface hover:bg-surface-container transition-all flex items-center gap-2"
               >
-                  <span className="material-symbols-outlined text-[18px]">upload_file</span>
-                  {importing ? 'Importando...' : 'Importar Excel'}
+                <span className="material-symbols-outlined text-[20px]">filter_alt_off</span>
+                Limpar Filtros
               </button>
-              <button 
-                onClick={() => setShowClearConfirm(true)}
-                className="h-11 px-6 rounded-xl border border-error/50 text-sm font-semibold text-error hover:bg-error/10"
-              >
-                Limpar Importações
-              </button>
-              <button onClick={clearFilters} className="h-11 px-6 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface hover:bg-surface-container">Limpar Filtros</button>
-              <button 
-                 onClick={() => window.location.href = '/reports'}
-                className="h-11 px-6 bg-secondary text-on-secondary rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px]">summarize</span>
-                Exportar Relatório
-              </button>
+
+              <div className="relative">
+                <button 
+                  onClick={() => setShowActionMenu(!showActionMenu)}
+                  className={`h-11 w-11 rounded-full flex items-center justify-center transition-all ${showActionMenu ? 'bg-primary text-on-primary ring-4 ring-primary/20' : 'bg-surface-container-highest text-on-surface hover:bg-surface-variant'}`}
+                  title="Ações do Sistema"
+                >
+                  <span className="material-symbols-outlined text-[22px]">{showActionMenu ? 'close' : 'more_vert'}</span>
+                </button>
+
+                <AnimatePresence>
+                  {showActionMenu && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95, y: 10, x: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10, x: -10 }}
+                      className="absolute right-0 top-full mt-2 w-56 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl p-2 z-[60]"
+                    >
+                      <button 
+                        onClick={() => {
+                          setShowActionMenu(false);
+                          fileInputRef.current?.click();
+                        }}
+                        disabled={importing}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/10 text-on-surface transition-colors text-sm font-medium"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                          <span className="material-symbols-outlined text-[20px]">upload_file</span>
+                        </div>
+                        {importing ? 'Importando...' : 'Importar Excel'}
+                      </button>
+
+                      <button 
+                        onClick={() => {
+                          setShowActionMenu(false);
+                          setShowClearConfirm(true);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-error/10 text-error transition-colors text-sm font-medium"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-error/10 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]">delete_sweep</span>
+                        </div>
+                        Limpar Importações
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
             
             {showClearConfirm && (
@@ -1107,7 +1146,11 @@ export function Fuel() {
                     {(() => {
                         const v = vehicles.find(v => v.plate === item.vehiclePlate);
                         const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || item.workName || 'Não informada';
-                        return String(cc).replace(/logística - região sul/gi, "").replace(/logístic a - região sul/gi, "").trim() || 'Não informada';
+                        return String(cc)
+                          .replace(/logística\s*-\s*região\s*sul/gi, "")
+                          .replace(/,\s*,/g, ",")
+                          .replace(/^[\s,]+|[\s,]+$/g, "")
+                          .trim() || 'Não informada';
                     })()}
                   </td>
                   <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>{item.station || '-'}</td>
@@ -1286,7 +1329,12 @@ export function Fuel() {
                                     <span>
                                       {(() => {
                                           const v = vehicles.find(v => v.plate === r.vehiclePlate);
-                                          return (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
+                                          const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
+                                          return String(cc)
+                                            .replace(/logística\s*-\s*região\s*sul/gi, "")
+                                            .replace(/,\s*,/g, ",")
+                                            .replace(/^[\s,]+|[\s,]+$/g, "")
+                                            .trim() || 'Não informada';
                                       })()}
                                     </span>
                                   );

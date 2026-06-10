@@ -318,8 +318,9 @@ export function AutoAlertaAdmin() {
               <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#dbeafe' }}></div>
             </div>
 
-            <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0', textAlign: 'center' }}>AutoAlerta Emitido</h2>
-            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 32px 0', textAlign: 'center' }}>Seu reporte foi enviado com sucesso.</p>
+            <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#1e293b', margin: '0 0 4px 0', textAlign: 'center', lineHeight: '1.2' }}>AutoAlerta</h2>
+            <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#1e293b', margin: '0 0 12px 0', textAlign: 'center', lineHeight: '1.2', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Emitido</h2>
+            <p style={{ fontSize: '15px', color: '#64748b', margin: '0 0 32px 0', textAlign: 'center', fontWeight: '500' }}>Seu reporte foi enviado com sucesso.</p>
 
             {/* Ticket ID Box */}
             <div style={{ backgroundColor: '#f1f5f9', borderRadius: '20px', padding: '16px 40px', textAlign: 'center', marginBottom: '40px', width: '100%' }}>
