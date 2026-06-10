@@ -96,6 +96,8 @@ function InspectionForm({
   const [isSaving, setIsSaving] = useState(false);
   const [isReadingFile, setIsReadingFile] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [customAlert, setCustomAlert] = useState<{ message: string; type?: 'error' | 'success' | 'info'; title?: string; onConfirm?: () => void } | null>(null);
+  const [isGeneratingAlert, setIsGeneratingAlert] = useState(false);
   const [vehicleImgDataUrl, setVehicleImgDataUrl] = useState<string | null>(
     null,
   );
@@ -1263,16 +1265,21 @@ function InspectionForm({
     // get items that are >= 90%
     const criticalItems = items.filter(item => {
         const record = records[item.id] || {};
-        const { progressPercent } = calculateProgress(item, record, currentVehicleKM);
+        const { progressPercent } = calculateProgress(item, record, vehicle?.currentKM || 0);
         return progressPercent >= 90;
     });
 
     if (criticalItems.length === 0) {
-        alert("Nenhum item com progresso >= 90%.");
+        setCustomAlert({ 
+          title: "Atenção",
+          message: "Nenhum item com progresso >= 90%.",
+          type: "info"
+        });
         return;
     }
 
     try {
+        setIsGeneratingAlert(true);
         let driverName = "Não definido";
         let driverId = "";
         
@@ -1286,7 +1293,7 @@ function InspectionForm({
 
         const observation = criticalItems.map(i => {
            const record = records[i.id] || {};
-           const { progressPercent } = calculateProgress(i, record, currentVehicleKM);
+           const { progressPercent } = calculateProgress(i, record, vehicle?.currentKM || 0);
            return `- ${i.name} (${Math.round(progressPercent)}%)`;
         }).join('\n');
 
@@ -1304,10 +1311,20 @@ function InspectionForm({
             fromSystem: true
         });
 
-        alert("AutoAlerta gerado com sucesso para este veículo!");
+        setIsGeneratingAlert(false);
+        setCustomAlert({
+          title: "AutoAlerta Emitido",
+          message: "AutoAlerta gerado com sucesso para este veículo!",
+          type: "success"
+        });
     } catch (e) {
         console.error("Erro ao gerar auto alerta", e);
-        alert("Erro ao gerar auto alerta: " + (e as Error).message);
+        setIsGeneratingAlert(false);
+        setCustomAlert({
+          title: "Erro",
+          message: "Erro ao gerar auto alerta: " + (e as Error).message,
+          type: "error"
+        });
     }
   };
 
@@ -1342,6 +1359,41 @@ function InspectionForm({
 
   return (
     <div className="space-y-6" id="inspection-print-container">
+      {customAlert && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 text-center">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                  customAlert.type === 'error' ? 'bg-error-container text-on-error-container' :
+                  customAlert.type === 'success' ? 'bg-primary-container text-on-primary-container' :
+                  'bg-surface-variant text-on-surface'
+                }`}>
+                  <span className="material-symbols-outlined text-[32px]">
+                    {customAlert.type === 'error' ? 'warning' : customAlert.type === 'success' ? 'check_circle' : 'info'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-semibold text-on-surface mb-2">{customAlert.title || 'Atenção'}</h3>
+                <p className="text-sm text-on-surface-variant">{customAlert.message}</p>
+              </div>
+              <div className="p-6 bg-surface-container-low border-t border-outline-variant flex gap-4">
+                <button 
+                  onClick={() => {
+                    const onConfirm = customAlert.onConfirm;
+                    setCustomAlert(null);
+                    if (onConfirm) onConfirm();
+                  }}
+                  className={`flex-1 px-4 py-2 font-bold rounded-lg shadow-sm transition-all focus:outline-none ${
+                    customAlert.type === 'error' ? 'bg-error text-white hover:bg-error/90' :
+                    customAlert.type === 'success' ? 'bg-primary text-on-primary hover:bg-primary/90' :
+                    'bg-surface-container-highest text-on-surface hover:bg-surface-variant'
+                  }`}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+      )}
       <div className="flex flex-col md:flex-row justify-between md:items-center bg-surface-container-low p-6 rounded-2xl border border-outline-variant gap-6">
         <div className="flex items-center gap-5">
           <button
@@ -1463,12 +1515,18 @@ function InspectionForm({
         >
           <button
             onClick={handleGenerateAutoAlerta}
-            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg font-bold shadow-sm transition-all text-sm text-primary"
+            disabled={isGeneratingAlert}
+            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg font-bold shadow-sm transition-all text-sm text-primary relative overflow-hidden"
           >
+            {isGeneratingAlert && (
+              <div className="absolute inset-0 bg-primary/10">
+                <div className="h-full bg-primary/20 animate-pulse w-full max-w-[100%] transition-all origin-left"></div>
+              </div>
+            )}
             <span className="material-symbols-outlined text-[18px]">
-              campaign
+              {isGeneratingAlert ? 'hourglass_empty' : 'campaign'}
             </span>
-            Gerar AutoAlerta
+            {isGeneratingAlert ? 'Gerando...' : 'Gerar AutoAlerta'}
           </button>
           <button
             onClick={exportToPDF}

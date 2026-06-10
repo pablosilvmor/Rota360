@@ -37,6 +37,7 @@ export function Fuel() {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [customAlert, setCustomAlert] = useState<{ message: string; title?: string; type?: 'error' | 'success' | 'info'; onConfirm?: () => void; onCancel?: () => void; isConfirm?: boolean } | null>(null);
   
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [showReportPreview, setShowReportPreview] = useState(false);
@@ -174,7 +175,7 @@ export function Fuel() {
           if (colId === 'odometer') return r.odometer?.toLocaleString('pt-BR') || '-';
           if (colId === 'workName') {
             const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
-            return v?.costCenter || v?.workName || r.workName || 'Não informada';
+            return (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
           }
           
           if (colId === 'driverRegistration') return r.driverRegistration || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('MATRICULA'))?.[1] || '-' : '-');
@@ -298,20 +299,35 @@ export function Fuel() {
       doc.save(`Relatorio_Combustivel_Export.pdf`);
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
-      alert('Erro ao gerar PDF. Verifique se o bloqueador de popups está ativo.');
+      setCustomAlert({
+        title: 'Erro',
+        message: 'Erro ao gerar PDF.',
+        type: 'error'
+      });
     }
   };
 
   const handleDeleteRecord = async (recordId: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este registro de abastecimento?')) return;
-    try {
-      const batch = writeBatch(db);
-      batch.delete(doc(db, 'fuel_records', recordId));
-      await batch.commit();
-    } catch (err) {
-      console.error('Erro ao excluir registro:', err);
-      alert('Erro ao excluir registro do sistema.');
-    }
+    setCustomAlert({
+      isConfirm: true,
+      title: 'Atenção',
+      message: 'Tem certeza que deseja excluir este registro de abastecimento?',
+      type: 'info',
+      onConfirm: async () => {
+        try {
+          const batch = writeBatch(db);
+          batch.delete(doc(db, 'fuel_records', recordId));
+          await batch.commit();
+        } catch (err) {
+          console.error('Erro ao excluir registro:', err);
+          setCustomAlert({
+            title: 'Erro',
+            message: 'Erro ao excluir registro do sistema.',
+            type: 'error'
+          });
+        }
+      }
+    });
   };
 
   const clearFilters = () => {
@@ -562,7 +578,7 @@ export function Fuel() {
       setShowClearConfirm(false);
     } catch (err) {
       console.error(err);
-      alert('Erro ao apagar dados importados.');
+      setCustomAlert({ title: 'Erro', message: 'Erro ao apagar dados importados.', type: 'error' });
     } finally {
       setClearing(false);
     }
@@ -727,6 +743,52 @@ export function Fuel() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {customAlert && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 text-center">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                  customAlert.type === 'error' ? 'bg-error-container text-on-error-container' :
+                  customAlert.type === 'success' ? 'bg-primary-container text-on-primary-container' :
+                  'bg-surface-variant text-on-surface'
+                }`}>
+                  <span className="material-symbols-outlined text-[32px]">
+                    {customAlert.type === 'error' ? 'warning' : customAlert.type === 'success' ? 'check_circle' : 'info'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-semibold text-on-surface mb-2">{customAlert.title || 'Atenção'}</h3>
+                <p className="text-sm text-on-surface-variant">{customAlert.message}</p>
+              </div>
+              <div className="p-6 bg-surface-container-low border-t border-outline-variant flex gap-4">
+                {customAlert.isConfirm && (
+                  <button 
+                    onClick={() => {
+                      if (customAlert.onCancel) customAlert.onCancel();
+                      setCustomAlert(null);
+                    }}
+                    className="flex-1 px-4 py-2 border border-outline-variant rounded-lg font-semibold hover:bg-surface-container transition-colors text-on-surface"
+                  >
+                    Cancelar
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    const onConfirm = customAlert.onConfirm;
+                    setCustomAlert(null);
+                    if (onConfirm) onConfirm();
+                  }}
+                  className={`flex-1 px-4 py-2 font-bold rounded-lg shadow-sm transition-all focus:outline-none ${
+                    customAlert.type === 'error' ? 'bg-error text-white hover:bg-error/90' :
+                    customAlert.type === 'success' ? 'bg-primary text-on-primary hover:bg-primary/90' :
+                    'bg-surface-container-highest text-on-surface hover:bg-surface-variant'
+                  }`}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+      )}
       <MessageDialog />
       <AnimatePresence>
         {isDragging && (
@@ -1027,7 +1089,7 @@ export function Fuel() {
                   <td className="px-6 py-4 text-[13px] text-on-surface">
                     {(() => {
                         const v = vehicles.find(v => v.plate === item.vehiclePlate);
-                        return v?.costCenter || v?.workName || item.workName || 'Não informada';
+                        return (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || item.workName || 'Não informada';
                     })()}
                   </td>
                   <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>{item.station || '-'}</td>
@@ -1206,7 +1268,7 @@ export function Fuel() {
                                     <span>
                                       {(() => {
                                           const v = vehicles.find(v => v.plate === r.vehiclePlate);
-                                          return v?.costCenter || v?.workName || r.workName || 'Não informada';
+                                          return (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
                                       })()}
                                     </span>
                                   );
@@ -1227,6 +1289,10 @@ export function Fuel() {
                                       <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-black">{r.vehiclePlate}</span>
                                     </div>
                                   );
+                                  
+                                  if (opt.id === 'totalValue') return <span className="font-bold text-primary">R$ {Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
+                                  if (opt.id === 'unitPrice') return <span className="">R$ {(Number(r.totalValue || 0) / (Number(r.liters) || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
+                                  if (opt.id === 'station') return r.station || '-';
                                   
                                   if (opt.id === 'vehicleModel') return r.vehicleModel || '-';
 

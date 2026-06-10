@@ -644,7 +644,7 @@ export function Dashboard() {
                     vehicleImage: vehicles.find(v => v.plate === os.plate || v.id === os.vehicleId)?.imageUrl,
                     vehiclePlate: os.plate
                   })),
-                  ...expiredInspections.filter(i => i.type === 'expired').map(i => ({
+                  ...expiredInspections.filter(i => i.type === 'expired' || i.type === 'warning').map(i => ({
                     id: `insp-${i.vehiclePlate}-${i.itemName}`,
                     title: `VEÍCULO: ${i.vehiclePlate}`,
                     description: i.desc.toUpperCase(),
@@ -655,7 +655,8 @@ export function Dashboard() {
                 ].slice(0, 3).map((alert) => (
                   <div
                     key={alert.id}
-                    className="flex gap-4 p-4 bg-white/5 rounded-lg border border-white/10"
+                    onClick={() => navigate('/autoalerta-admin')}
+                    className="flex gap-4 p-4 bg-white/5 rounded-lg border border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
                   >
                     <span
                       className={`material-symbols-outlined mt-1 ${alert.severity === "critical" ? "text-error" : "text-primary-fixed"}`}
