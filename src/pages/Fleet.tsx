@@ -26,7 +26,7 @@ const itemVariants = {
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: 'spring', stiffness: 300, damping: 24 }
+    transition: { type: 'spring' as const, stiffness: 300, damping: 24 }
   }
 };
 
@@ -261,24 +261,24 @@ export function Fleet() {
         
         {/* Contadores por Centro de Custo */}
         <div className="w-full mt-4 pt-4 border-t border-outline-variant/30 flex flex-wrap gap-2">
-          {Object.entries(
-            filteredVehicles.reduce((acc: Record<string, number>, v) => {
-              const ccs = Array.isArray(v.costCenter) ? v.costCenter : [v.costCenter];
-              ccs.forEach(cc => {
-                if (!cc) return;
-                const cleanCC = String(cc).replace(/logística - região sul/gi, '').trim() || 'Geral';
-                acc[cleanCC] = (acc[cleanCC] || 0) + 1;
-              });
-              return acc;
-            }, {})
-          )
-          .sort((a, b) => (b[1] as number) - (a[1] as number)) // Sort by count
-          .map(([cc, count]) => (
-            <div key={cc} className="flex items-center gap-1.5 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant/50 shadow-sm animate-in fade-in zoom-in duration-300">
-               <span className="text-[10px] font-bold text-primary uppercase tracking-tight">{cc}</span>
-               <span className="w-5 h-5 flex items-center justify-center bg-primary text-on-primary rounded-full text-[10px] font-bold">{count}</span>
-            </div>
-          ))}
+            {Object.entries(
+              filteredVehicles.reduce((acc: Record<string, number>, v) => {
+                const ccs = Array.isArray(v.costCenter) ? v.costCenter : [v.costCenter];
+                ccs.forEach((cc: any) => {
+                  if (!cc) return;
+                  const cleanCC = String(cc).replace(/logística - região sul/gi, '').trim() || 'Geral';
+                  acc[cleanCC] = (acc[cleanCC] || 0) + 1;
+                });
+                return acc;
+              }, {} as Record<string, number>)
+            )
+            .sort((a, b) => (b[1] as number) - (a[1] as number))
+            .map(([cc, count]) => (
+              <div key={cc} className="flex items-center gap-1.5 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant/50 shadow-sm animate-in fade-in zoom-in duration-300">
+                 <span className="text-[10px] font-bold text-primary uppercase tracking-tight">{cc}</span>
+                 <span className="w-5 h-5 flex items-center justify-center bg-primary text-on-primary rounded-full text-[10px] font-bold">{count as React.ReactNode}</span>
+              </div>
+            ))}
         </div>
         
         <div className="flex items-center gap-4 pt-6">

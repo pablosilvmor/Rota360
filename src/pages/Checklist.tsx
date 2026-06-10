@@ -98,11 +98,11 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
     const fetchVehicles = async () => {
       try {
         const snap = await getDocs(collection(db, "vehicles"));
-        const vList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const vList = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
         setVehicles(vList);
 
         if (queryVehiclePlate && !vehicleId) {
-          const matched = vList.find(v => v.plate === queryVehiclePlate);
+          const matched = vList.find((v: any) => v.plate === queryVehiclePlate);
           if (matched) setVehicleId(matched.id);
         }
       } catch (e) {

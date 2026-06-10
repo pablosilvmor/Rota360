@@ -22,7 +22,7 @@ const itemVariants = {
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: 'spring', stiffness: 300, damping: 24 }
+    transition: { type: 'spring' as const, stiffness: 300, damping: 24 }
   }
 };
 
@@ -483,7 +483,15 @@ export function Drivers() {
       <motion.div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4" variants={itemVariants}>
         <div>
           <h2 className="text-[32px] font-semibold text-on-surface">Gestão de Motoristas</h2>
-          <p className="text-on-surface-variant text-base">Monitore o desempenho e gerencie atribuições em toda a sua frota.</p>
+          <p className="text-on-surface-variant text-base flex items-center gap-2">
+            Monitore o desempenho e gerencie atribuições em toda a sua frota.
+            {drivers.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-surface-container-high rounded text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                <span className="w-1 h-1 rounded-full bg-primary animate-pulse"></span>
+                {drivers.length} Driver(s) no Banco
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -536,7 +544,7 @@ export function Drivers() {
         </motion.div>
       </motion.div>
       
-      <motion.div className="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden mb-10" variants={itemVariants}>
+      <motion.div className="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden mb-10" variants={itemVariants as any}>
         <div className="px-6 py-4 border-b border-outline-variant flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-4 flex-1">
             <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -623,6 +631,7 @@ export function Drivers() {
                             src={driver.imageUrl} 
                             alt={driver.name} 
                             className={`w-full h-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
+                            referrerPolicy="no-referrer"
                           />
                         </div>
                       ) : (
@@ -631,8 +640,8 @@ export function Drivers() {
                         </div>
                       )}
                       <div>
-                        <p className="text-base text-on-surface font-semibold"><PrivateValue value={driver.name} /></p>
-                        <p className="text-[12px] text-on-surface-variant flex gap-2"><span>CPF: <PrivateValue value={driver.cpf} /></span> {driver.phone && <span>• Tel: <PrivateValue value={driver.phone} /></span>}</p>
+                        <p className="text-base text-on-surface font-semibold"><PrivateValue value={driver.name || 'Sem Nome'} /></p>
+                        <p className="text-[12px] text-on-surface-variant flex gap-2"><span>CPF: <PrivateValue value={driver.cpf || '---'} /></span> {driver.phone && <span>• Tel: <PrivateValue value={driver.phone} /></span>}</p>
                       </div>
                     </div>
                   </td>
@@ -742,8 +751,28 @@ export function Drivers() {
               ))}
               {drivers.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">
-                    Nenhum motorista cadastrado.
+                  <td colSpan={6} className="px-6 py-12 text-center pointer-events-none">
+                    <div className="flex flex-col items-center opacity-40">
+                      <span className="material-symbols-outlined text-[64px] mb-2">person_off</span>
+                      <p className="text-lg font-medium">Nenhum motorista cadastrado</p>
+                      <p className="text-sm">Os dados sincronizados aparecerão aqui.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {drivers.length > 0 && sortedDrivers.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant">
+                    <div className="flex flex-col items-center">
+                      <span className="material-symbols-outlined text-[48px] text-on-surface-variant/30 mb-2">filter_alt_off</span>
+                      <p className="font-medium">Nenhum resultado para os filtros atuais.</p>
+                      <button 
+                        onClick={clearFilters}
+                        className="mt-4 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold hover:opacity-90 transition-all shadow-sm"
+                      >
+                        LIMPAR TODOS OS FILTROS
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
