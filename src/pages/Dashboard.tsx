@@ -650,12 +650,13 @@ export function Dashboard() {
                     description: i.desc.toUpperCase(),
                     severity: 'critical',
                     vehicleImage: i.vehicleImage,
-                    vehiclePlate: i.vehiclePlate
+                    vehiclePlate: i.vehiclePlate,
+                    vehicleId: i.vehicleId
                   }))
                 ].slice(0, 3).map((alert) => (
                   <div
                     key={alert.id}
-                    onClick={() => navigate('/autoalerta-admin')}
+                    onClick={() => navigate(`/vehicle-details/${alert.vehicleId || alert.id.split('-')[1]}`)}
                     className="flex gap-4 p-4 bg-white/5 rounded-lg border border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
                   >
                     <span

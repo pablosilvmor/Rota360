@@ -1264,7 +1264,7 @@ function InspectionForm({
   const handleGenerateAutoAlerta = async () => {
     // get items that are >= 90%
     const criticalItems = items.filter(item => {
-        const record = records[item.id] || {};
+        const record = records[item.id] || {} as any;
         const { progressPercent } = calculateProgress(item, record, vehicle?.currentKM || 0);
         return progressPercent >= 90;
     });
@@ -1292,7 +1292,7 @@ function InspectionForm({
         }
 
         const observation = criticalItems.map(i => {
-           const record = records[i.id] || {};
+           const record = records[i.id] || {} as any;
            const { progressPercent } = calculateProgress(i, record, vehicle?.currentKM || 0);
            return `- ${i.name} (${Math.round(progressPercent)}%)`;
         }).join('\n');

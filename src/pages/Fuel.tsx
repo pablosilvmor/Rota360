@@ -169,13 +169,18 @@ export function Fuel() {
       const tableData = reportRecords.map(r => {
         return selectedColumns.map((colId: string) => {
           if (colId === 'date') return r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-';
-          if (colId === 'liters') return `${r.liters}L`;
-          if (colId === 'totalValue') return `R$ ${r.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-          if (colId === 'unitPrice') return `R$ ${(r.totalValue / (r.liters || 1)).toFixed(2)}`;
+          if (colId === 'liters') return r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
+          if (colId === 'totalValue') return `R$ ${Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+          if (colId === 'unitPrice') {
+            const val = Number(r.totalValue || 0);
+            const lit = Number(r.liters || 1);
+            return `R$ ${(val / lit).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+          }
           if (colId === 'odometer') return r.odometer?.toLocaleString('pt-BR') || '-';
           if (colId === 'workName') {
             const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
-            return (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
+            const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
+            return String(cc).replace(/logística - região sul/gi, "").replace(/logístic a - região sul/gi, "").trim() || 'Não informada';
           }
           
           if (colId === 'driverRegistration') return r.driverRegistration || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('MATRICULA'))?.[1] || '-' : '-');
@@ -205,13 +210,19 @@ export function Fuel() {
         styles: { fontSize: 7, cellPadding: 2, valign: 'middle' },
         margin: { top: 50, bottom: 40 },
         didDrawCell: (data) => {
-          if (data.section === 'body' && selectedColumns[data.column.index] === 'vehiclePlate') {
+          if (data && data.section === 'body' && selectedColumns[data.column.index] === 'vehiclePlate') {
             const rowIndex = data.row.index;
             const record = reportRecords[rowIndex];
+            if (!record) return;
             const imgData = vehicleImages[record.vehiclePlate];
-            if (imgData) {
-                doc.addImage(imgData, 'JPEG', data.cell.x + 1.5, data.cell.y + 1, 8, 6);
-                data.cell.textPos.x += 10;
+            if (imgData && data.cell) {
+                try {
+                  doc.addImage(imgData, 'JPEG', data.cell.x + 1.5, data.cell.y + 1, 8, 6);
+                  const cell = data.cell as any;
+                  if (cell.textPos) cell.textPos.x += 10;
+                } catch (err) {
+                  console.warn('Error drawing cell image', err);
+                }
             }
           }
         },
@@ -237,16 +248,22 @@ export function Fuel() {
       }
 
       // Assinatura Eletrônica Avançada
-      const sigId = await createSignature({
-        documentType: 'FUEL_REPORT',
-        documentTitle: title
-      });
+      let sigId = '';
+      try {
+        sigId = await createSignature({
+          documentType: 'FUEL_REPORT',
+          documentTitle: title
+        });
+      } catch (e) {
+        console.warn('Signature service unavailable', e);
+      }
       
       const pageCount = (doc as any).internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
           doc.setPage(i);
           if (i === pageCount && sigId) {
-              const finalY = (doc as any).lastAutoTable.finalY + 15;
+              const tableInfo = (doc as any).lastAutoTable;
+              const finalY = tableInfo ? tableInfo.finalY + 15 : 70;
               const pageWidth = doc.internal.pageSize.getWidth();
               
               const boxHeight = 45;
@@ -1089,7 +1106,8 @@ export function Fuel() {
                   <td className="px-6 py-4 text-[13px] text-on-surface">
                     {(() => {
                         const v = vehicles.find(v => v.plate === item.vehiclePlate);
-                        return (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || item.workName || 'Não informada';
+                        const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || item.workName || 'Não informada';
+                        return String(cc).replace(/logística - região sul/gi, "").replace(/logístic a - região sul/gi, "").trim() || 'Não informada';
                     })()}
                   </td>
                   <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>{item.station || '-'}</td>
@@ -1292,7 +1310,7 @@ export function Fuel() {
                                   
                                   if (opt.id === 'totalValue') return <span className="font-bold text-primary">R$ {Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
                                   if (opt.id === 'unitPrice') return <span className="">R$ {(Number(r.totalValue || 0) / (Number(r.liters) || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
-                                  if (opt.id === 'station') return r.station || '-';
+                                  if (opt.id === 'station') return r.station || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('POSTO') || String(k).toUpperCase().includes('ESTABELECIMENTO'))?.[1] || '-' : '-');
                                   
                                   if (opt.id === 'vehicleModel') return r.vehicleModel || '-';
 
