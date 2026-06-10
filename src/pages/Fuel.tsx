@@ -4,6 +4,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDoc
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { PrivateValue } from '../contexts/PrivacyContext';
+import { useAuth } from '../contexts/AuthContext';
 import * as xlsx from 'xlsx';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area } from 'recharts';
 import jsPDF from 'jspdf';
@@ -31,7 +32,110 @@ export function Fuel() {
   const [filterMonth, setFilterMonth] = useLocalStorageState('fuel_filterMonth', 'Todos');
   const [filterYear, setFilterYear] = useLocalStorageState('fuel_filterYear', 'Todos');
   
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+
+  const ColumnFilter = ({ columnId, label }: { columnId: string, label: string }) => {
+    const uniqueValues = React.useMemo(() => {
+      const vals = new Set<string>();
+      fuelRecords.forEach(r => {
+        let v = '';
+        if (columnId === 'date') v = r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '';
+        else if (columnId === 'liters') v = r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
+        else if (columnId === 'workName') {
+            const veh = vehicles.find(v => v.plate === r.vehiclePlate);
+            const cc = (Array.isArray(veh?.costCenter) ? veh.costCenter.join(', ') : veh?.costCenter) || veh?.workName || r.workName || 'Não informada';
+            v = String(cc).replace(/logística\s*-\s*região\s*sul/gi, "").replace(/,\s*,/g, ",").replace(/^[\s,]+|[\s,]+$/g, "").trim() || 'Não informada';
+        }
+        else v = String(r[columnId] || 'Não informado');
+        if (v) vals.add(v);
+      });
+      return Array.from(vals).sort();
+    }, [columnId, fuelRecords, vehicles]);
+
+    const filteredValues = filterSearch 
+      ? uniqueValues.filter(v => v.toLowerCase().includes(filterSearch.toLowerCase()))
+      : uniqueValues;
+
+    if (openFilter !== columnId) return (
+      <button onClick={(e) => { e.stopPropagation(); setOpenFilter(columnId); setFilterSearch(''); }} className="ml-1 p-1 hover:bg-black/5 rounded-full transition-colors leading-none">
+        <span className={`material-symbols-outlined text-[16px] ${columnFilters[columnId]?.length ? 'text-primary fill-1' : 'text-on-surface-variant/30'}`}>filter_alt</span>
+      </button>
+    );
+
+    return (
+      <div className="absolute top-full left-0 mt-2 z-50 w-64 bg-white rounded-2xl shadow-2xl border border-outline-variant p-4 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-bold text-on-surface">Filtrar {label}</h4>
+          <button onClick={() => setOpenFilter(null)} className="p-1 hover:bg-surface-container rounded-full leading-none">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+        
+        <div className="relative mb-4">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">search</span>
+          <input 
+            type="text"
+            autoFocus
+            placeholder="Buscar valor..."
+            value={filterSearch}
+            onChange={e => setFilterSearch(e.target.value)}
+            className="w-full bg-surface-container border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+
+        <div className="max-h-48 overflow-y-auto mb-4 space-y-1 custom-scrollbar">
+          {filteredValues.map(val => (
+            <label key={val} className="flex items-center gap-3 p-2 hover:bg-surface-container rounded-lg cursor-pointer transition-colors group">
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                columnFilters[columnId]?.includes(val) ? 'bg-primary border-primary' : 'border-outline group-hover:border-primary/50'
+              }`}>
+                {columnFilters[columnId]?.includes(val) && (
+                  <span className="material-symbols-outlined text-white text-[14px] font-bold">check</span>
+                )}
+              </div>
+              <input 
+                type="checkbox"
+                className="hidden"
+                checked={columnFilters[columnId]?.includes(val)}
+                onChange={() => {
+                  const current = columnFilters[columnId] || [];
+                  const next = current.includes(val) ? current.filter(v => v !== val) : [...current, val];
+                  setColumnFilters({ ...columnFilters, [columnId]: next });
+                }}
+              />
+              <span className="text-sm text-on-surface font-medium truncate">{val}</span>
+            </label>
+          ))}
+          {filteredValues.length === 0 && (
+            <p className="text-xs text-center py-4 text-on-surface-variant font-medium">Nenhum valor encontrado.</p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t border-outline-variant">
+          <button 
+            onClick={() => {
+              const next = { ...columnFilters };
+              delete next[columnId];
+              setColumnFilters(next);
+            }}
+            className="text-xs font-bold text-primary hover:underline"
+          >
+            Limpar Filtro
+          </button>
+          <button 
+            onClick={() => setOpenFilter(null)}
+            className="px-4 py-1.5 bg-surface-container-highest text-on-surface rounded-lg text-sm font-bold hover:bg-surface-variant"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    );
+  };
   const [isDragging, setIsDragging] = useState(false);
+  const [showReportPreview, setShowReportPreview] = useState(false);
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -40,9 +144,11 @@ export function Fuel() {
   const [customAlert, setCustomAlert] = useState<{ message: string; title?: string; type?: 'error' | 'success' | 'info'; onConfirm?: () => void; onCancel?: () => void; isConfirm?: boolean } | null>(null);
   
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
-  const [showReportPreview, setShowReportPreview] = useState(false);
-  const [showActionMenu, setShowActionMenu] = useState(false);
-
+  const [fuelTypeMenu, setFuelTypeMenu] = useState<string | null>(null);
+  const [columnFilters, setColumnFilters] = useLocalStorageState('fuel_columnFilters', {} as Record<string, string[]>);
+  const [filterSearch, setFilterSearch] = useState('');
+  
+  const { userData } = useAuth();
   const [selectedColumns, setSelectedColumns] = useLocalStorageState('fuel_selectedColumns', [
     'date', 'vehiclePlate', 'station', 'liters', 'totalValue'
   ]);
@@ -104,11 +210,11 @@ export function Fuel() {
 
   const exportPDF = async () => {
     try {
-      const orientation = selectedColumns.length > 5 ? 'landscape' : 'portrait';
+      const orientation = selectedColumns.length > 6 ? 'landscape' : 'portrait';
       const doc = new jsPDF(orientation);
       const title = `Relatório de Combustível - Exportação`;
-      const companyName = profile?.companyName || 'Rota 360';
-      const userName = profile?.name || 'Administrador';
+      const companyName = userData?.signatureInfo?.company || 'Rota 360';
+      const userName = userData?.signatureInfo?.fullName || 'Administrador';
       
       // Logo e Nome da Empresa
       try {
@@ -163,12 +269,12 @@ export function Fuel() {
           }
       }));
 
-      const tableHeaders = columnOptions
-        .filter(opt => selectedColumns.includes(opt.id))
-        .map(opt => opt.label);
+      const columnsToExport = columnOptions.filter(opt => selectedColumns.includes(opt.id));
+      const tableHeaders = columnsToExport.map(opt => opt.label);
 
       const tableData = reportRecords.map(r => {
-        return selectedColumns.map((colId: string) => {
+        return columnsToExport.map((opt) => {
+          const colId = opt.id;
           if (colId === 'date') return r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-';
           if (colId === 'liters') return r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
           if (colId === 'totalValue') return `R$ ${Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -224,8 +330,6 @@ export function Fuel() {
             if (imgData && data.cell) {
                 try {
                   doc.addImage(imgData, 'JPEG', data.cell.x + 1.5, data.cell.y + 1, 8, 6);
-                  const cell = data.cell as any;
-                  if (cell.textPos) cell.textPos.x += 10;
                 } catch (err) {
                   console.warn('Error drawing cell image', err);
                 }
@@ -289,11 +393,10 @@ export function Fuel() {
                 // Logo secundário na assinatura
                 doc.addImage('https://i.imgur.com/9iZCsf6.png', 'PNG', pageWidth - 45, finalY + 5, 25, 10);
                 
-                // Placeholder para representação do QR Code
-                doc.setDrawColor(0, 0, 0);
-                doc.rect(20, finalY + 7, 25, 25);
-                doc.setFontSize(5);
-                doc.text('QR CODE VALIDATION', 22, finalY + 20);
+                // QR Code Real (usando API pública para garantir fidelidade ao pedido)
+                const verifyUrl = `${window.location.origin}/verify/${sigId}`;
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`;
+                doc.addImage(qrUrl, 'PNG', 20, finalY + 7, 25, 25);
               } catch(e) {}
 
               doc.setFontSize(10);
@@ -360,6 +463,7 @@ export function Fuel() {
     setReportYear('Todos');
     setReportStartDate('');
     setReportEndDate('');
+    setColumnFilters({});
   }
 
   const [dialog, setDialog] = useState<{message: string, onConfirm?: () => void} | null>(null);
@@ -608,6 +712,23 @@ export function Fuel() {
   };
 
   const filteredRecords = fuelRecords.filter(r => {
+    // Check column filters
+    for (const [colId, values] of Object.entries(columnFilters)) {
+      if (values.length === 0) continue;
+      
+      let cellValue = '';
+      if (colId === 'date') cellValue = r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '';
+      else if (colId === 'liters') cellValue = r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
+      else if (colId === 'workName') {
+        const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
+        const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
+        cellValue = String(cc).replace(/logística\s*-\s*região\s*sul/gi, "").replace(/,\s*,/g, ",").replace(/^[\s,]+|[\s,]+$/g, "").trim() || 'Não informada';
+      }
+      else cellValue = String(r[colId] || '');
+      
+      if (!values.includes(cellValue)) return false;
+    }
+
     const matchesWork = filterWork === 'Todas as Obras' || r.workName === filterWork;
     const matchesSearch = searchTerm === '' || 
       String(r.vehiclePlate).toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -655,6 +776,23 @@ export function Fuel() {
 
   const reportRecords = React.useMemo(() => {
     let result = fuelRecords.filter(r => {
+      // Check column filters
+      for (const [colId, values] of Object.entries(columnFilters)) {
+        if (values.length === 0) continue;
+        
+        let cellValue = '';
+        if (colId === 'date') cellValue = r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '';
+        else if (colId === 'liters') cellValue = r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
+        else if (colId === 'workName') {
+            const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
+            const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
+            cellValue = String(cc).replace(/logística\s*-\s*região\s*sul/gi, "").replace(/,\s*,/g, ",").replace(/^[\s,]+|[\s,]+$/g, "").trim() || 'Não informada';
+        }
+        else cellValue = String(r[colId] || '');
+        
+        if (!values.includes(cellValue)) return false;
+      }
+
       const matchesWork = filterWork === 'Todas as Obras' || r.workName === filterWork;
       const matchesSearch = searchTerm === '' || 
         String(r.vehiclePlate).toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1100,34 +1238,23 @@ export function Fuel() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
-                <th className="p-0">
-                  <button onClick={() => handleSort('date')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
-                    Data <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('date')}</span>
-                  </button>
-                </th>
-                <th className="p-0">
-                  <button onClick={() => handleSort('vehiclePlate')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
-                    Veículo <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('vehiclePlate')}</span>
-                  </button>
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-tighter">Obra</th>
-                <th className="p-0">
-                  <button onClick={() => handleSort('station')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter">
-                    Posto <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('station')}</span>
-                  </button>
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-tighter">Odômetro</th>
-                <th className="p-0">
-                  <button onClick={() => handleSort('liters')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter">
-                    Litros <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('liters')}</span>
-                  </button>
-                </th>
-                <th className="p-0">
-                  <button onClick={() => handleSort('totalValue')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter">
-                    Valor <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('totalValue')}</span>
-                  </button>
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-on-surface-variant uppercase">Ações</th>
+                {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'odometer', 'liters', 'totalValue'].includes(opt.id)).map(opt => (
+                  <th key={opt.id} className="p-0 relative group">
+                    <div className="flex items-center">
+                      <button 
+                        onClick={() => handleSort(opt.id)} 
+                        className="flex-1 px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter"
+                      >
+                        {opt.label} 
+                        <span className="material-symbols-outlined text-[16px] text-on-surface-variant/30 group-hover:text-primary transition-colors">{getSortIcon(opt.id)}</span>
+                      </button>
+                      <div className="pr-2">
+                        <ColumnFilter columnId={opt.id} label={opt.label} />
+                      </div>
+                    </div>
+                  </th>
+                ))}
+                <th className="px-6 py-4 text-center text-xs font-semibold text-on-surface-variant uppercase tracking-tighter">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
@@ -1310,18 +1437,25 @@ export function Fuel() {
                     <table className="w-full min-w-max text-[11px] border-collapse">
                       <thead>
                         <tr className="bg-primary text-white">
-                          {columnOptions.filter(opt => selectedColumns.includes(opt.id)).map(opt => (
-                            <th key={opt.id} className="py-3 px-4 text-left font-black uppercase tracking-tight text-[10px]">
-                              {opt.label}
-                            </th>
-                          ))}
+                          {selectedColumns.map(colId => {
+                            const opt = columnOptions.find(o => o.id === colId);
+                            if (!opt) return null;
+                            return (
+                              <th key={colId} className="py-3 px-4 text-left font-black uppercase tracking-tight text-[10px]">
+                                {opt.label}
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-on-surface/5">
                         {reportRecords.slice(0, 50).map((r, i) => (
                           <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                            {columnOptions.filter(opt => selectedColumns.includes(opt.id)).map(opt => (
-                              <td key={opt.id} className="py-3 px-4 transition-colors">
+                            {selectedColumns.map(colId => {
+                              const opt = columnOptions.find(o => o.id === colId);
+                              if (!opt) return null;
+                              return (
+                                <td key={colId} className="py-3 px-4 transition-colors">
                                 {(() => {
                                   if (opt.id === 'date') return <span className="font-bold">{r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-'}</span>;
                                   if (opt.id === 'liters') return <span className="font-bold">{r.liters}L</span>;
@@ -1376,10 +1510,11 @@ export function Fuel() {
                                     return '-';
                                   }
 
-                                  return r[opt.id] || '-';
+                                  return (r as any)[colId] || '-';
                                 })()}
                               </td>
-                            ))}
+                            );
+                          })}
                           </tr>
                         ))}
                       </tbody>

@@ -315,11 +315,14 @@ export function AutoAlertaAdmin() {
 
             {/* Status Icon Placeholder */}
             <div style={{ width: '80px', height: '80px', backgroundColor: '#eff6ff', borderRadius: '50%', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#dbeafe' }}></div>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '12px', height: '12px', backgroundColor: 'white', borderRadius: '2px' }}></div>
+              </div>
             </div>
 
-            <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#1e293b', margin: '0 0 4px 0', textAlign: 'center', lineHeight: '1.2' }}>AutoAlerta</h2>
-            <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#1e293b', margin: '0 0 12px 0', textAlign: 'center', lineHeight: '1.2', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Emitido</h2>
+            <h2 style={{ fontSize: '32px', fontStyle: 'italic', fontWeight: '900', color: '#1e293b', margin: '0 0 16px 0', textAlign: 'center', lineHeight: '1.1', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
+              AutoAlerta <span style={{ color: '#2563eb' }}>Emitido</span>
+            </h2>
             <p style={{ fontSize: '15px', color: '#64748b', margin: '0 0 32px 0', textAlign: 'center', fontWeight: '500' }}>Seu reporte foi enviado com sucesso.</p>
 
             {/* Ticket ID Box */}
