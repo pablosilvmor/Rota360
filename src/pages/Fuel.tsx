@@ -436,7 +436,7 @@ export function Fuel() {
       <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8" variants={itemVariants}>
           <div className="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant h-[250px]">
               <h4 className="text-sm font-bold text-on-surface-variant mb-4 uppercase">Custo Diário (R$)</h4>
-              <ResponsiveContainer width="100%" height="80%">
+              <ResponsiveContainer width="100%" height="80%" minWidth={1} minHeight={1}>
                 <AreaChart data={chartData}>
                   <XAxis dataKey="date" tick={{fontSize: 12}} stroke="#888" tickLine={false} axisLine={false} />
                   <YAxis tick={{fontSize: 12}} stroke="#888" tickLine={false} axisLine={false} />
@@ -450,7 +450,7 @@ export function Fuel() {
           </div>
           <div className="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant h-[250px]">
               <h4 className="text-sm font-bold text-on-surface-variant mb-4 uppercase">Litros Diários (L)</h4>
-              <ResponsiveContainer width="100%" height="80%">
+              <ResponsiveContainer width="100%" height="80%" minWidth={1} minHeight={1}>
                 <BarChart data={chartData}>
                   <XAxis dataKey="date" tick={{fontSize: 12}} stroke="#888" tickLine={false} axisLine={false} />
                   <YAxis tick={{fontSize: 12}} stroke="#888" tickLine={false} axisLine={false} />

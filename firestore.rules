@@ -121,6 +121,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /fuel_imports/{importId} {
+      allow read, write: if isSignedIn();
+    }
+
     match /statuses/{statusId} {
       allow read, write: if isSignedIn();
     }
