@@ -20,6 +20,7 @@ const itemVariants = {
 export function Fuel() {
   const [works, setWorks] = useState<any[]>([]);
   const [fuelRecords, setFuelRecords] = useState<any[]>([]);
+  const [importLogs, setImportLogs] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [filterWork, setFilterWork] = useLocalStorageState('fuel_filterWork', 'Todas as Obras');
@@ -70,11 +71,17 @@ export function Fuel() {
       handleFirestoreError(error, OperationType.LIST, 'fuel_records');
     });
 
+    const qLogs = query(collection(db, 'fuel_imports'), orderBy('createdAt', 'desc'));
+    const unsubscribeLogs = onSnapshot(qLogs, (snapshot) => {
+      setImportLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     return () => {
       unsubscribeWorks();
       unsubscribeVehicles();
       unsubscribeDrivers();
       unsubscribeFuel();
+      unsubscribeLogs();
     };
   }, []);
 
@@ -177,12 +184,19 @@ export function Fuel() {
       const totalToImport = batchList.length;
       setImportProgress({ current: 0, total: totalToImport });
 
+      const importLog = await addDoc(collection(db, 'fuel_imports'), {
+        fileName: file.name,
+        user: 'bemongv@gmail.com',
+        createdAt: serverTimestamp(),
+        total: totalToImport
+      });
+
       const chunkSize = 400;
       for (let i = 0; i < batchList.length; i += chunkSize) {
         const chunk = batchList.slice(i, i + chunkSize);
         const batch = writeBatch(db);
         for (const item of chunk) {
-          batch.set(doc(collection(db, 'fuel_records')), item);
+          batch.set(doc(collection(db, 'fuel_records')), { ...item, importId: importLog.id });
         }
         await batch.commit();
         imported += chunk.length;
@@ -451,7 +465,7 @@ export function Fuel() {
       </motion.div>
 
       <motion.div className="flex flex-col gap-6 mb-8" variants={itemVariants}>
-          <div className="flex items-center justify-between p-4 bg-surface-container-lowest border border-outline-variant rounded-2xl flex-wrap gap-4">
+          <div className="sticky top-0 z-40 bg-surface-container-highest/95 backdrop-blur-md border border-outline-variant rounded-2xl p-4 flex items-center justify-between flex-wrap gap-4 shadow-sm">
             <div className="flex gap-4 items-center flex-wrap">
               <input 
                 type="text"
@@ -717,6 +731,44 @@ export function Fuel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <motion.div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-6 mb-10" variants={itemVariants}>
+        <h4 className="text-[18px] font-semibold text-primary mb-6">Histórico de Importações</h4>
+        <div className="space-y-4">
+            {importLogs.length === 0 && <p className="text-on-surface-variant">Nenhum histórico de importação.</p>}
+            {importLogs.map(log => (
+                <div key={log.id} className="flex justify-between items-center p-4 bg-white rounded-xl border border-outline-variant shadow-sm">
+                    <div>
+                        <p className="font-semibold text-on-surface">{log.fileName}</p>
+                        <p className="text-xs text-on-surface-variant">{log.user} • {log.createdAt?.toDate?.()?.toLocaleString() || 'Data indisponível'} • {log.total} registros</p>
+                    </div>
+                    <button 
+                        onClick={async () => {
+                            if (!window.confirm('Tem certeza que deseja excluir esta importação e todos os registros associados?')) return;
+                            setClearing(true);
+                            try {
+                                const q = query(collection(db, 'fuel_records'), where('importId', '==', log.id));
+                                const snapshot = await getDocs(q);
+                                const batch = writeBatch(db);
+                                snapshot.forEach(doc => batch.delete(doc.ref));
+                                batch.delete(doc(db, 'fuel_imports', log.id));
+                                await batch.commit();
+                            } catch (err) {
+                                console.error(err);
+                                alert('Erro ao apagar dados importados.');
+                            } finally {
+                                setClearing(false);
+                            }
+                        }}
+                        disabled={clearing}
+                        className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors"
+                    >
+                        <span className="material-symbols-outlined">delete</span>
+                    </button>
+                </div>
+            ))}
+        </div>
+      </motion.div>
 
     </motion.div>
   );
