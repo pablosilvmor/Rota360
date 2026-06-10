@@ -160,7 +160,7 @@ export function Fuel() {
         const rawData: Record<string, any> = {};
         headers.forEach((header, index) => {
           if (header) {
-            rawData[header] = row[index];
+            rawData[header] = row[index] === undefined ? null : row[index];
           }
         });
 
