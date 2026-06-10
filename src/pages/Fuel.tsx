@@ -44,6 +44,20 @@ export function Fuel() {
   const [selectedColumns, setSelectedColumns] = useLocalStorageState('fuel_selectedColumns', [
     'date', 'vehiclePlate', 'station', 'liters', 'totalValue'
   ]);
+  
+  const [reportMonth, setReportMonth] = useState('Todos');
+  const [reportYear, setReportYear] = useState('Todos');
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+
+  useEffect(() => {
+    if (showReportPreview) {
+      setReportMonth(filterMonth);
+      setReportYear(filterYear);
+      setReportStartDate('');
+      setReportEndDate('');
+    }
+  }, [showReportPreview]);
 
   const columnOptions = [
     { id: 'date', label: 'Data', width: 'auto' },
@@ -56,6 +70,9 @@ export function Fuel() {
     { id: 'odometer', label: 'Odômetro', width: 'auto' },
     { id: 'workName', label: 'Obra', width: 'auto' },
     { id: 'fuelType', label: 'Combustível', width: 'auto' },
+    { id: 'driverRegistration', label: 'Matrícula', width: 'auto' },
+    { id: 'driverName', label: 'Nome Motorista', width: 'auto' },
+    { id: 'cityState', label: 'Cidade/Estado', width: 'auto' },
   ];
 
   const handleToggleColumn = (id: string) => {
@@ -72,11 +89,11 @@ export function Fuel() {
     try {
       const orientation = selectedColumns.length > 5 ? 'landscape' : 'portrait';
       const doc = new jsPDF(orientation);
-      const title = `Relatório de Combustível - ${filterMonth}/${filterYear}`;
+      const title = `Relatório de Combustível - Exportação`;
       
       // Logo
       try {
-        const logoUrl = 'https://i.imgur.com/9gByHVv.png';
+        const logoUrl = 'https://i.imgur.com/9iZCsf6.png';
         doc.addImage(logoUrl, 'PNG', 14, 10, 40, 15);
       } catch (e) {
         doc.setFontSize(22);
@@ -89,20 +106,34 @@ export function Fuel() {
       doc.text(title, 70, 20);
       
       doc.setFontSize(10);
-      doc.text(`Filtros: Obra: ${filterWork} | Mês: ${filterMonth} | Ano: ${filterYear}`, 14, 35);
-      doc.text(`Total Gasto: R$ ${totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Total Litros: ${totalLiters.toLocaleString('pt-BR')} L`, 14, 42);
+      doc.text(`Filtros: Obra: ${filterWork} | Período Selecionado`, 14, 35);
+      doc.text(`Total Gasto: R$ ${reportTotalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Total Litros: ${reportTotalLiters.toLocaleString('pt-BR')} L`, 14, 42);
 
       const tableHeaders = columnOptions
         .filter(opt => selectedColumns.includes(opt.id))
         .map(opt => opt.label);
 
-      const tableData = sortedRecords.map(r => {
+      const tableData = reportRecords.map(r => {
         return selectedColumns.map((colId: string) => {
           if (colId === 'date') return r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-';
           if (colId === 'liters') return `${r.liters}L`;
           if (colId === 'totalValue') return `R$ ${r.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
           if (colId === 'unitPrice') return `R$ ${(r.totalValue / (r.liters || 1)).toFixed(2)}`;
           if (colId === 'odometer') return r.odometer?.toLocaleString('pt-BR') || '-';
+          
+          if (colId === 'driverRegistration') return r.driverRegistration || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('MATRICULA'))?.[1] || '-' : '-');
+          if (colId === 'driverName') return r.driverName || (r.rawData ? Object.entries(r.rawData).find(([k, v]) => String(k).toUpperCase().includes('MOTORISTA') && typeof v === 'string' && v.length > 3)?.[1] || '-' : '-');
+          if (colId === 'cityState') {
+              if (!r.rawData) return '-';
+              const cid = Object.entries(r.rawData).find(([k]) => String(k).toUpperCase() === 'CIDADE' || String(k).toUpperCase().includes('MUNICÍPIO'))?.[1];
+              const est = Object.entries(r.rawData).find(([k]) => String(k).toUpperCase() === 'ESTADO' || String(k).toUpperCase() === 'UF')?.[1];
+              const cidEst = Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('CIDADE') && String(k).toUpperCase().includes('ESTADO'))?.[1];
+              if (cid && est) return `${cid}/${est}`;
+              if (cid) return cid;
+              if (cidEst) return cidEst;
+              return '-';
+          }
+          
           return r[colId] || '-';
         });
       });
@@ -132,7 +163,7 @@ export function Fuel() {
         doc.text(`Código de verificação: ${sigId}`, 14, finalY + 5);
       }
 
-      doc.save(`Relatorio_Combustivel_${filterMonth}_${filterYear}.pdf`);
+      doc.save(`Relatorio_Combustivel_Export.pdf`);
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       alert('Erro ao gerar PDF. Verifique se o bloqueador de popups está ativo.');
@@ -428,6 +459,59 @@ export function Fuel() {
       return 0;
     });
   }
+
+  const reportRecords = React.useMemo(() => {
+    let result = fuelRecords.filter(r => {
+      const matchesWork = filterWork === 'Todas as Obras' || r.workName === filterWork;
+      const matchesSearch = searchTerm === '' || 
+        String(r.vehiclePlate).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(r.vehicleModel).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(r.driverName).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(r.station).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        Object.values(r.rawData || {}).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesWork && matchesSearch;
+    });
+
+    result = result.filter(r => {
+      const recordDate = r.date?.toDate ? r.date.toDate() : null;
+      if (!recordDate) return true;
+
+      const mMonth = reportMonth === 'Todos' || (recordDate.getMonth() + 1).toString() === reportMonth;
+      const mYear = reportYear === 'Todos' || recordDate.getFullYear().toString() === reportYear;
+      
+      let inRange = true;
+      if (reportStartDate) {
+        if (recordDate < new Date(reportStartDate + 'T00:00:00')) inRange = false;
+      }
+      if (reportEndDate) {
+        if (recordDate > new Date(reportEndDate + 'T23:59:59')) inRange = false;
+      }
+      
+      // If Start or End date are specified, they override the month/year filter for more flexibility
+      if (reportStartDate || reportEndDate) return inRange;
+      return mMonth && mYear;
+    });
+
+    if (sortConfig !== null) {
+      result.sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        if (sortConfig.key === 'date') {
+           aVal = a.date?.toDate ? a.date.toDate() : new Date(0);
+           bVal = b.date?.toDate ? b.date.toDate() : new Date(0);
+        }
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [fuelRecords, filterWork, searchTerm, reportMonth, reportYear, reportStartDate, reportEndDate, sortConfig]);
+
+  const reportTotalCost = reportRecords.reduce((acc, curr) => acc + (curr.totalValue || 0), 0);
+  const reportTotalLiters = reportRecords.reduce((acc, curr) => acc + (curr.liters || 0), 0);
+
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -809,24 +893,48 @@ export function Fuel() {
                 </div>
               </div>
 
-              {/* Column Selector */}
-              <div className="p-4 bg-white border-b border-outline-variant flex flex-wrap gap-2 justify-center">
-                {columnOptions.map(opt => (
-                  <button
-                    key={opt.id}
-                    onClick={() => handleToggleColumn(opt.id)}
-                    className={`h-9 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-2 ${
-                      selectedColumns.includes(opt.id) 
-                        ? 'bg-primary text-white border-primary shadow-md' 
-                        : 'bg-white text-on-surface-variant border-outline-variant hover:bg-surface-container'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">
-                      {selectedColumns.includes(opt.id) ? 'check_circle' : 'circle'}
-                    </span>
-                    {opt.label}
-                  </button>
-                ))}
+              {/* Column Selector & Advanced Filter */}
+              <div className="p-4 bg-white border-b border-outline-variant flex gap-4 h-auto min-h-[60px]">
+                <div className="flex-[0.7] flex flex-wrap gap-2 items-center justify-start border-r border-outline-variant pr-4">
+                  {columnOptions.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleToggleColumn(opt.id)}
+                      className={`h-8 px-3 rounded-full text-[11px] font-bold transition-all border flex items-center gap-1.5 ${
+                        selectedColumns.includes(opt.id) 
+                          ? 'bg-primary text-white border-primary shadow-sm' 
+                          : 'bg-white text-on-surface-variant border-outline-variant hover:bg-surface-container'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {selectedColumns.includes(opt.id) ? 'check_circle' : 'circle'}
+                      </span>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Date Settings for the Report */}
+                <div className="flex-[0.3] flex flex-col justify-center gap-2 pl-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] uppercase font-black tracking-widest text-primary">Intervalo do Relatório</span>
+                    <button onClick={() => { setReportStartDate(''); setReportEndDate(''); setReportMonth('Todos'); setReportYear('Todos'); }} className="text-[10px] font-bold text-error uppercase hover:underline ml-auto">Limpar</button>
+                  </div>
+                  <div className="flex gap-2">
+                     <input type="date" value={reportStartDate} onChange={(e) => setReportStartDate(e.target.value)} className="h-8 flex-1 text-[11px] font-bold px-2 border rounded-md" title="Data Inicial" />
+                     <input type="date" value={reportEndDate} onChange={(e) => setReportEndDate(e.target.value)} className="h-8 flex-1 text-[11px] font-bold px-2 border rounded-md" title="Data Final" />
+                  </div>
+                  <div className="flex gap-2">
+                     <select value={reportMonth} onChange={e => setReportMonth(e.target.value)} disabled={!!reportStartDate || !!reportEndDate} className="h-8 flex-1 text-[11px] font-bold px-2 border rounded-md disabled:opacity-50 disabled:bg-slate-50">
+                        <option value="Todos">Mês: Todos</option>
+                        {Array.from({length:12}, (_, i) => i+1).map(m => <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>)}
+                     </select>
+                     <select value={reportYear} onChange={e => setReportYear(e.target.value)} disabled={!!reportStartDate || !!reportEndDate} className="h-8 flex-1 text-[11px] font-bold px-2 border rounded-md disabled:opacity-50 disabled:bg-slate-50">
+                        <option value="Todos">Ano: Todos</option>
+                        {Array.from({length:5}, (_, i) => new Date().getFullYear()-i).map(y => <option key={y} value={y}>{y}</option>)}
+                     </select>
+                  </div>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 bg-slate-100 scrollbar-thin scrollbar-thumb-primary/20">
@@ -834,7 +942,7 @@ export function Fuel() {
                   {/* PDF header mockup */}
                   <div className="flex justify-between items-start border-b-4 border-primary/10 pb-8 mb-8">
                     <div className="flex items-center gap-4">
-                      <img src="https://i.imgur.com/9gByHVv.png" alt="Rota 360" className="h-14 object-contain" />
+                      <img src="https://i.imgur.com/9iZCsf6.png" alt="Rota 360" className="h-14 object-contain" />
                       <div className="h-10 w-px bg-outline-variant" />
                       <div>
                         <h1 className="text-xl font-black text-primary tracking-tight leading-none">GESTÃO DE COMBUSTÍVEL</h1>
@@ -855,23 +963,29 @@ export function Fuel() {
                       </p>
                       <div className="space-y-1">
                         <p className="text-sm font-bold text-on-surface uppercase">Unidade: <span className="font-medium normal-case">{filterWork}</span></p>
-                        <p className="text-sm font-bold text-on-surface uppercase">Período: <span className="font-medium normal-case">{filterMonth === 'Todos' ? 'Ano Completo' : filterMonth}/{filterYear}</span></p>
+                        <p className="text-xs font-bold text-on-surface uppercase mt-1">
+                           Filtro: <span className="font-medium normal-case text-primary">
+                             {(reportStartDate || reportEndDate) 
+                               ? `${reportStartDate ? new Date(reportStartDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'Início'} até ${reportEndDate ? new Date(reportEndDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'Hoje'}` 
+                               : `${reportMonth === 'Todos' ? 'Ano Completo' : reportMonth}/${reportYear}`}
+                           </span>
+                        </p>
                       </div>
                     </div>
                     <div className="bg-primary rounded-[24px] p-6 shadow-xl shadow-primary/10 flex justify-between items-center text-white">
                       <div>
                         <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Consumo Total</p>
-                        <p className="text-2xl font-black leading-none">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-2xl font-black leading-none">R$ {reportTotalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Litros</p>
-                        <p className="text-xl font-bold leading-none">{totalLiters.toLocaleString('pt-BR')} L</p>
+                        <p className="text-xl font-bold leading-none">{reportTotalLiters.toLocaleString('pt-BR')} L</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[11px] border-collapse">
+                    <table className="w-full min-w-max text-[11px] border-collapse">
                       <thead>
                         <tr className="bg-primary text-white">
                           {columnOptions.filter(opt => selectedColumns.includes(opt.id)).map(opt => (
@@ -882,7 +996,7 @@ export function Fuel() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-on-surface/5">
-                        {sortedRecords.slice(0, 50).map((r, i) => (
+                        {reportRecords.slice(0, 50).map((r, i) => (
                           <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                             {columnOptions.filter(opt => selectedColumns.includes(opt.id)).map(opt => (
                               <td key={opt.id} className="py-3 px-4 transition-colors">
@@ -893,6 +1007,20 @@ export function Fuel() {
                                   if (opt.id === 'unitPrice') return `R$ ${(r.totalValue / (r.liters || 1)).toFixed(2)}`;
                                   if (opt.id === 'odometer') return r.odometer?.toLocaleString('pt-BR') || '-';
                                   if (opt.id === 'vehiclePlate') return <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-black">{r.vehiclePlate}</span>;
+                                  
+                                  if (opt.id === 'driverRegistration') return r.driverRegistration || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('MATRICULA'))?.[1] || '-' : '-');
+                                  if (opt.id === 'driverName') return r.driverName || (r.rawData ? Object.entries(r.rawData).find(([k, v]) => String(k).toUpperCase().includes('MOTORISTA') && typeof v === 'string' && v.length > 3)?.[1] || '-' : '-');
+                                  if (opt.id === 'cityState') {
+                                    if (!r.rawData) return '-';
+                                    const cid = Object.entries(r.rawData).find(([k]) => String(k).toUpperCase() === 'CIDADE' || String(k).toUpperCase().includes('MUNICÍPIO'))?.[1];
+                                    const est = Object.entries(r.rawData).find(([k]) => String(k).toUpperCase() === 'ESTADO' || String(k).toUpperCase() === 'UF')?.[1];
+                                    const cidEst = Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('CIDADE') && String(k).toUpperCase().includes('ESTADO'))?.[1];
+                                    if (cid && est) return `${cid}/${est}`;
+                                    if (cid) return String(cid);
+                                    if (cidEst) return String(cidEst);
+                                    return '-';
+                                  }
+
                                   return r[opt.id] || '-';
                                 })()}
                               </td>
@@ -903,9 +1031,9 @@ export function Fuel() {
                     </table>
                   </div>
                   
-                  {sortedRecords.length > 50 && (
+                  {reportRecords.length > 50 && (
                     <div className="py-8 text-center border-t border-dashed mt-4">
-                      <p className="text-[11px] font-bold text-on-surface-variant italic">Mostrando prévia dos primeiros 50 de {sortedRecords.length} registros...</p>
+                      <p className="text-[11px] font-bold text-on-surface-variant italic">Mostrando prévia dos primeiros 50 de {reportRecords.length} registros...</p>
                     </div>
                   )}
 
@@ -922,7 +1050,7 @@ export function Fuel() {
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-tighter mb-1">Total Consolidado</p>
-                      <p className="text-3xl font-black text-primary leading-none">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-3xl font-black text-primary leading-none">R$ {reportTotalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                 </div>
@@ -970,16 +1098,17 @@ export function Fuel() {
                     {(() => {
                         const vehicleDoc = vehicles.find(v => String(v.plate).toUpperCase().replace(/[^A-Z0-9]/g, '') === String(selectedRecord.vehiclePlate).toUpperCase().replace(/[^A-Z0-9]/g, ''));
                         
-                        // Melhorado: Busca o nome do motorista nos dados brutos ou no registro
-                        const allRawValues = selectedRecord.rawData ? Object.values(selectedRecord.rawData).map(v => String(v).toLowerCase().trim()) : [];
+                        let extractedDriverName = selectedRecord.driverName || '';
+                        if (!extractedDriverName && selectedRecord.rawData) {
+                            const entry = Object.entries(selectedRecord.rawData).find(([k, v]) => String(k).toUpperCase().includes('MOTORISTA') && typeof v === 'string' && v.trim().length > 2);
+                            if (entry) extractedDriverName = String(entry[1]);
+                        }
                         
-                        // Busca o driver no banco pelo nome que esteja presente em algum campo da rawData ou no driverName
-                        const driverDoc = drivers.find(d => {
-                            const dName = String(d.name).toLowerCase().trim();
-                            const matchesRaw = allRawValues.some(val => val === dName || val.includes(dName) || dName.includes(val));
-                            const matchesDirect = selectedRecord.driverName && (String(selectedRecord.driverName).toLowerCase().trim() === dName || String(selectedRecord.driverName).toLowerCase().includes(dName));
-                            return matchesRaw || matchesDirect;
-                        });
+                        const driverDoc = extractedDriverName ? drivers.find(d => {
+                             const target = extractedDriverName.toLowerCase().trim();
+                             const dName = String(d.name).toLowerCase().trim();
+                             return target === dName || target.includes(dName) || dName.includes(target);
+                        }) : null;
                         
                         return (
                            <div className="flex gap-4 md:w-1/3">
