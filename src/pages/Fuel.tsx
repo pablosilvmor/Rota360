@@ -502,6 +502,12 @@ export function Fuel() {
                   <span className="material-symbols-outlined text-[18px]">upload_file</span>
                   {importing ? 'Importando...' : 'Importar Excel'}
               </button>
+              <button 
+                onClick={() => setShowClearConfirm(true)}
+                className="h-11 px-6 rounded-xl border border-error/50 text-sm font-semibold text-error hover:bg-error/10"
+              >
+                Limpar Importações
+              </button>
               <button onClick={clearFilters} className="h-11 px-6 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface hover:bg-surface-container">Limpar Filtros</button>
               <button 
                  onClick={() => window.location.href = '/reports'}
@@ -511,6 +517,21 @@ export function Fuel() {
                 Exportar Relatório
               </button>
             </div>
+            
+            {showClearConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+                        <h4 className="text-lg font-bold text-on-surface mb-4">Confirmar exclusão</h4>
+                        <p className="text-on-surface-variant mb-6">Tem certeza que deseja excluir todos os dados importados? Esta ação não pode ser desfeita.</p>
+                        <div className="flex justify-end gap-2">
+                            <button onClick={() => setShowClearConfirm(false)} className="px-4 py-2 rounded-lg text-on-surface">Cancelar</button>
+                            <button onClick={handleClearData} className="px-4 py-2 rounded-lg bg-error text-white font-semibold flex items-center gap-2" disabled={clearing}>
+                                {clearing ? 'Excluindo...' : 'Confirmar Exclusão'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             <input 
                 type="file" 
