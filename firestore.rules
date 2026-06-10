@@ -117,11 +117,11 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
-    match /fuel_records/{fuelId} {
+    match /fuel_records/{document=**} {
       allow read, write: if isSignedIn();
     }
 
-    match /fuel_imports/{importId} {
+    match /fuel_imports/{document=**} {
       allow read, write: if isSignedIn();
     }
 

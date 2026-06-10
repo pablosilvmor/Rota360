@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs, where, writeBatch, doc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { PrivateValue } from '../contexts/PrivacyContext';
 import * as xlsx from 'xlsx';
@@ -74,6 +74,8 @@ export function Fuel() {
     const qLogs = query(collection(db, 'fuel_imports'), orderBy('createdAt', 'desc'));
     const unsubscribeLogs = onSnapshot(qLogs, (snapshot) => {
       setImportLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'fuel_imports');
     });
 
     return () => {
@@ -186,7 +188,7 @@ export function Fuel() {
 
       const importLog = await addDoc(collection(db, 'fuel_imports'), {
         fileName: file.name,
-        user: 'bemongv@gmail.com',
+        user: auth.currentUser?.email || 'Desconhecido',
         createdAt: serverTimestamp(),
         total: totalToImport
       });
