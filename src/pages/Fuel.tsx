@@ -6,6 +6,9 @@ import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { PrivateValue } from '../contexts/PrivacyContext';
 import * as xlsx from 'xlsx';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area } from 'recharts';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { createSignature } from '../utils/pdfSignature';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -36,6 +39,105 @@ export function Fuel() {
   const [clearing, setClearing] = useState(false);
   
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+  const [showReportPreview, setShowReportPreview] = useState(false);
+  
+  const [selectedColumns, setSelectedColumns] = useLocalStorageState('fuel_selectedColumns', [
+    'date', 'vehiclePlate', 'station', 'liters', 'totalValue'
+  ]);
+
+  const columnOptions = [
+    { id: 'date', label: 'Data', width: 'auto' },
+    { id: 'vehiclePlate', label: 'Placa', width: 'auto' },
+    { id: 'vehicleModel', label: 'Veículo', width: 'auto' },
+    { id: 'station', label: 'Posto', width: 'auto' },
+    { id: 'liters', label: 'Litros', width: 'auto' },
+    { id: 'unitPrice', label: 'V. Unitário', width: 'auto' },
+    { id: 'totalValue', label: 'Total', width: 'auto' },
+    { id: 'odometer', label: 'Odômetro', width: 'auto' },
+    { id: 'workName', label: 'Obra', width: 'auto' },
+    { id: 'fuelType', label: 'Combustível', width: 'auto' },
+  ];
+
+  const handleToggleColumn = (id: string) => {
+    if (selectedColumns.includes(id)) {
+      if (selectedColumns.length > 1) {
+        setSelectedColumns(selectedColumns.filter((c: string) => c !== id));
+      }
+    } else {
+      setSelectedColumns([...selectedColumns, id]);
+    }
+  };
+
+  const exportPDF = async () => {
+    try {
+      const orientation = selectedColumns.length > 5 ? 'landscape' : 'portrait';
+      const doc = new jsPDF(orientation);
+      const title = `Relatório de Combustível - ${filterMonth}/${filterYear}`;
+      
+      // Logo
+      try {
+        const logoUrl = 'https://i.imgur.com/9gByHVv.png';
+        doc.addImage(logoUrl, 'PNG', 14, 10, 40, 15);
+      } catch (e) {
+        doc.setFontSize(22);
+        doc.setTextColor(103, 80, 164);
+        doc.text('ROTA 360', 14, 20);
+      }
+      
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text(title, 70, 20);
+      
+      doc.setFontSize(10);
+      doc.text(`Filtros: Obra: ${filterWork} | Mês: ${filterMonth} | Ano: ${filterYear}`, 14, 35);
+      doc.text(`Total Gasto: R$ ${totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Total Litros: ${totalLiters.toLocaleString('pt-BR')} L`, 14, 42);
+
+      const tableHeaders = columnOptions
+        .filter(opt => selectedColumns.includes(opt.id))
+        .map(opt => opt.label);
+
+      const tableData = sortedRecords.map(r => {
+        return selectedColumns.map((colId: string) => {
+          if (colId === 'date') return r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-';
+          if (colId === 'liters') return `${r.liters}L`;
+          if (colId === 'totalValue') return `R$ ${r.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+          if (colId === 'unitPrice') return `R$ ${(r.totalValue / (r.liters || 1)).toFixed(2)}`;
+          if (colId === 'odometer') return r.odometer?.toLocaleString('pt-BR') || '-';
+          return r[colId] || '-';
+        });
+      });
+
+      autoTable(doc, {
+        head: [tableHeaders],
+        body: tableData,
+        startY: 50,
+        theme: 'striped',
+        headStyles: { fillStyle: '6750a4' as any, textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 250] },
+        styles: { fontSize: 8 },
+        margin: { top: 50 }
+      });
+
+      // Assinatura Eletrônica
+      const sigId = await createSignature({
+        documentType: 'FUEL_REPORT',
+        documentTitle: title
+      });
+      
+      if (sigId) {
+        const finalY = (doc as any).lastAutoTable.finalY + 20;
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Documento assinado eletronicamente por ROTA 360`, 14, finalY);
+        doc.text(`Código de verificação: ${sigId}`, 14, finalY + 5);
+      }
+
+      doc.save(`Relatorio_Combustivel_${filterMonth}_${filterYear}.pdf`);
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      alert('Erro ao gerar PDF. Verifique se o bloqueador de popups está ativo.');
+    }
+  };
 
   const clearFilters = () => {
     setFilterWork('Todas as Obras');
@@ -43,6 +145,25 @@ export function Fuel() {
     setFilterMonth('Todos');
     setFilterYear('Todos');
   }
+
+  const [dialog, setDialog] = useState<{message: string, onConfirm?: () => void} | null>(null);
+
+  const MessageDialog = () => !dialog ? null : (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+        <h4 className="text-lg font-bold text-on-surface mb-2">Rota 360 diz:</h4>
+        <p className="text-on-surface-variant mb-6">{dialog.message}</p>
+        <div className="flex justify-end gap-2">
+            <button onClick={() => setDialog(null)} className="px-4 py-2 rounded-lg text-on-surface">OK</button>
+            {dialog.onConfirm && (
+                <button onClick={() => { dialog.onConfirm!(); setDialog(null); }} className="px-4 py-2 rounded-lg bg-error text-white font-semibold flex items-center gap-2">
+                    Confirmar
+                </button>
+            )}
+        </div>
+      </div>
+    </div>
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -206,11 +327,11 @@ export function Fuel() {
       }
       
       setImportProgress({ current: totalToImport, total: totalToImport });
-      setTimeout(() => alert(`Importação concluída: ${imported} registros novos.\n(Ignorados: ${duplicates} duplicados)`), 100);
+      setDialog({ message: `Importação concluída: ${imported} registros novos.\n(Ignorados: ${duplicates} duplicados)` });
       
     } catch (err: any) {
       console.error(err);
-      alert(`Erro ao importar arquivo Excel: ${err?.message || err}`);
+      setDialog({ message: `Erro ao importar arquivo Excel: ${err?.message || err}` });
     } finally {
       setImporting(false);
       setImportProgress({ current: 0, total: 0 });
@@ -368,6 +489,7 @@ export function Fuel() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <MessageDialog />
       <AnimatePresence>
         {isDragging && (
           <motion.div
@@ -561,7 +683,13 @@ export function Fuel() {
       <motion.div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden mb-10" variants={itemVariants}>
         <div className="p-6 border-b border-outline-variant bg-white flex justify-between items-center">
           <h4 className="text-[18px] font-semibold text-primary">Histórico de Abastecimentos</h4>
-          <button className="text-sm font-semibold text-primary hover:underline">Ver Relatório Completo</button>
+          <button 
+            onClick={() => setShowReportPreview(true)}
+            className="text-sm font-semibold text-primary hover:underline flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">visibility</span>
+            Ver Relatório Completo
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -636,6 +764,175 @@ export function Fuel() {
 
 
       <AnimatePresence>
+        {showReportPreview && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+            onClick={() => setShowReportPreview(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[32px] w-full max-w-5xl h-[85vh] shadow-2xl flex flex-col overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+                <div>
+                  <h3 className="text-xl font-bold text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined">description</span>
+                    Relatório Customizado
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${selectedColumns.length > 5 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                      Formato {selectedColumns.length > 5 ? 'Paisagem' : 'Retrato'}
+                    </span>
+                    <span className="text-xs text-on-surface-variant font-medium">• Escolha as colunas abaixo</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={exportPDF}
+                    className="h-11 px-6 bg-primary text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">verified</span>
+                    Exportar com Assinatura
+                  </button>
+                  <button 
+                    onClick={() => setShowReportPreview(false)}
+                    className="w-10 h-10 rounded-full hover:bg-black/5 flex items-center justify-center transition-colors"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Column Selector */}
+              <div className="p-4 bg-white border-b border-outline-variant flex flex-wrap gap-2 justify-center">
+                {columnOptions.map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleToggleColumn(opt.id)}
+                    className={`h-9 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-2 ${
+                      selectedColumns.includes(opt.id) 
+                        ? 'bg-primary text-white border-primary shadow-md' 
+                        : 'bg-white text-on-surface-variant border-outline-variant hover:bg-surface-container'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      {selectedColumns.includes(opt.id) ? 'check_circle' : 'circle'}
+                    </span>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 bg-slate-100 scrollbar-thin scrollbar-thumb-primary/20">
+                <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-12 min-h-full border border-outline-variant ${selectedColumns.length > 5 ? 'max-w-[1100px]' : 'max-w-[800px]'}`}>
+                  {/* PDF header mockup */}
+                  <div className="flex justify-between items-start border-b-4 border-primary/10 pb-8 mb-8">
+                    <div className="flex items-center gap-4">
+                      <img src="https://i.imgur.com/9gByHVv.png" alt="Rota 360" className="h-14 object-contain" />
+                      <div className="h-10 w-px bg-outline-variant" />
+                      <div>
+                        <h1 className="text-xl font-black text-primary tracking-tight leading-none">GESTÃO DE COMBUSTÍVEL</h1>
+                        <p className="text-[10px] font-bold text-on-surface-variant uppercase mt-1 tracking-widest">Documento Operacional Oficial</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">Data de Emissão</p>
+                      <p className="text-lg font-black text-on-surface leading-none">{new Date().toLocaleDateString('pt-BR')}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-8 mb-10">
+                    <div className="bg-primary/5 rounded-[24px] p-6 border border-primary/10">
+                      <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[14px]">filter_list</span>
+                        Contexto do Relatório
+                      </p>
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-on-surface uppercase">Unidade: <span className="font-medium normal-case">{filterWork}</span></p>
+                        <p className="text-sm font-bold text-on-surface uppercase">Período: <span className="font-medium normal-case">{filterMonth === 'Todos' ? 'Ano Completo' : filterMonth}/{filterYear}</span></p>
+                      </div>
+                    </div>
+                    <div className="bg-primary rounded-[24px] p-6 shadow-xl shadow-primary/10 flex justify-between items-center text-white">
+                      <div>
+                        <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Consumo Total</p>
+                        <p className="text-2xl font-black leading-none">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Litros</p>
+                        <p className="text-xl font-bold leading-none">{totalLiters.toLocaleString('pt-BR')} L</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px] border-collapse">
+                      <thead>
+                        <tr className="bg-primary text-white">
+                          {columnOptions.filter(opt => selectedColumns.includes(opt.id)).map(opt => (
+                            <th key={opt.id} className="py-3 px-4 text-left font-black uppercase tracking-tight text-[10px]">
+                              {opt.label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-on-surface/5">
+                        {sortedRecords.slice(0, 50).map((r, i) => (
+                          <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            {columnOptions.filter(opt => selectedColumns.includes(opt.id)).map(opt => (
+                              <td key={opt.id} className="py-3 px-4 transition-colors">
+                                {(() => {
+                                  if (opt.id === 'date') return <span className="font-bold">{r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-'}</span>;
+                                  if (opt.id === 'liters') return <span className="font-bold">{r.liters}L</span>;
+                                  if (opt.id === 'totalValue') return <span className="font-black text-primary">R$ {r.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
+                                  if (opt.id === 'unitPrice') return `R$ ${(r.totalValue / (r.liters || 1)).toFixed(2)}`;
+                                  if (opt.id === 'odometer') return r.odometer?.toLocaleString('pt-BR') || '-';
+                                  if (opt.id === 'vehiclePlate') return <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-black">{r.vehiclePlate}</span>;
+                                  return r[opt.id] || '-';
+                                })()}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {sortedRecords.length > 50 && (
+                    <div className="py-8 text-center border-t border-dashed mt-4">
+                      <p className="text-[11px] font-bold text-on-surface-variant italic">Mostrando prévia dos primeiros 50 de {sortedRecords.length} registros...</p>
+                    </div>
+                  )}
+
+                  <div className="mt-12 pt-12 border-t-4 border-primary/5 flex justify-between items-start">
+                    <div className="flex gap-4">
+                      <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center border border-primary/10">
+                         <span className="material-symbols-outlined text-primary text-[32px]">verified</span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest">Segurança</p>
+                        <p className="text-xs font-bold text-on-surface mt-1">Este documento contém assinatura digital ROTA 360</p>
+                        <p className="text-[10px] text-on-surface-variant font-medium mt-1">ID: verification-code-preview</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-tighter mb-1">Total Consolidado</p>
+                      <p className="text-3xl font-black text-primary leading-none">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {selectedRecord && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -667,35 +964,41 @@ export function Fuel() {
                 </button>
               </div>
 
-              <div className="p-6 overflow-y-auto max-h-[70vh]">
+              <div className="p-6 overflow-y-auto max-h-[70vh] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20" style={{ scrollbarColor: 'rgba(255,255,255,0.1) transparent', backgroundColor: '#121212' }}>
                 <div className="flex flex-col md:flex-row gap-6 mb-8">
                     {/* Vehicle & Driver Images Check */}
                     {(() => {
                         const vehicleDoc = vehicles.find(v => String(v.plate).toUpperCase().replace(/[^A-Z0-9]/g, '') === String(selectedRecord.vehiclePlate).toUpperCase().replace(/[^A-Z0-9]/g, ''));
-                        const rawDriverName = typeof selectedRecord.rawData === 'object' && selectedRecord.rawData !== null ? 
-                            Object.values(selectedRecord.rawData).find(val => typeof val === 'string' && val.includes('MOTORISTA') || (val && typeof val === 'string' && val.length > 5 && drivers.some(d => String(d.name).toLowerCase() === val.toLowerCase()))) 
-                            : null;
-                        const matchingDriverStr = typeof rawDriverName === 'string' ? rawDriverName : selectedRecord.driverName;
-                        const driverDoc = matchingDriverStr ? drivers.find(d => String(d.name).toLowerCase().includes(matchingDriverStr.toLowerCase()) || matchingDriverStr.toLowerCase().includes(String(d.name).toLowerCase())) : null;
-
+                        
+                        // Melhorado: Busca o nome do motorista nos dados brutos ou no registro
+                        const allRawValues = selectedRecord.rawData ? Object.values(selectedRecord.rawData).map(v => String(v).toLowerCase().trim()) : [];
+                        
+                        // Busca o driver no banco pelo nome que esteja presente em algum campo da rawData ou no driverName
+                        const driverDoc = drivers.find(d => {
+                            const dName = String(d.name).toLowerCase().trim();
+                            const matchesRaw = allRawValues.some(val => val === dName || val.includes(dName) || dName.includes(val));
+                            const matchesDirect = selectedRecord.driverName && (String(selectedRecord.driverName).toLowerCase().trim() === dName || String(selectedRecord.driverName).toLowerCase().includes(dName));
+                            return matchesRaw || matchesDirect;
+                        });
+                        
                         return (
                            <div className="flex gap-4 md:w-1/3">
                               {(vehicleDoc?.imageUrl) && (
                                   <div className="flex-1 flex flex-col items-center">
-                                      <div className="w-full aspect-square rounded-2xl bg-white/5 border border-white/10 overflow-hidden relative group">
-                                          <img src={vehicleDoc.imageUrl} alt="Veículo" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                      <div className="w-full aspect-square rounded-2xl bg-white border border-white/10 overflow-hidden relative group flex items-center justify-center">
+                                          <img src={vehicleDoc.imageUrl} alt="Veículo" className="max-w-[90%] max-h-[90%] object-contain group-hover:scale-105 transition-transform duration-500" />
                                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                       </div>
-                                      <span className="text-white/70 text-xs font-semibold mt-2 uppercase tracking-widest text-center">{vehicleDoc.plate}</span>
+                                      <span className="text-white/70 text-[10px] font-bold mt-2 uppercase tracking-widest text-center">{vehicleDoc.plate}</span>
                                   </div>
                               )}
                               {(driverDoc?.photoUrl) && (
                                   <div className="flex-1 flex flex-col items-center">
-                                      <div className="w-full aspect-square rounded-2xl bg-white/5 border border-white/10 overflow-hidden relative group">
-                                          <img src={driverDoc.photoUrl} alt="Motorista" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                      <div className="w-full aspect-square rounded-2xl bg-white border border-white/10 overflow-hidden relative group flex items-center justify-center">
+                                          <img src={driverDoc.photoUrl} alt="Motorista" className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500" />
                                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                       </div>
-                                      <span className="text-white/70 text-xs font-semibold mt-2 uppercase tracking-widest text-center">{driverDoc.name.split(' ')[0]}</span>
+                                      <span className="text-white/70 text-[10px] font-bold mt-2 uppercase tracking-widest text-center">{driverDoc.name.split(' ')[0]}</span>
                                   </div>
                               )}
                               {!vehicleDoc?.imageUrl && !driverDoc?.photoUrl && (
@@ -767,21 +1070,25 @@ export function Fuel() {
                     </div>
                     <button 
                         onClick={async () => {
-                            if (!window.confirm('Tem certeza que deseja excluir esta importação e todos os registros associados?')) return;
-                            setClearing(true);
-                            try {
-                                const q = query(collection(db, 'fuel_records'), where('importId', '==', log.id));
-                                const snapshot = await getDocs(q);
-                                const batch = writeBatch(db);
-                                snapshot.forEach(doc => batch.delete(doc.ref));
-                                batch.delete(doc(db, 'fuel_imports', log.id));
-                                await batch.commit();
-                            } catch (err) {
-                                console.error(err);
-                                alert('Erro ao apagar dados importados.');
-                            } finally {
-                                setClearing(false);
-                            }
+                            setDialog({ 
+                                message: 'Tem certeza que deseja excluir esta importação e todos os registros associados?',
+                                onConfirm: async () => {
+                                    setClearing(true);
+                                    try {
+                                        const q = query(collection(db, 'fuel_records'), where('importId', '==', log.id));
+                                        const snapshot = await getDocs(q);
+                                        const batch = writeBatch(db);
+                                        snapshot.forEach(doc => batch.delete(doc.ref));
+                                        batch.delete(doc(db, 'fuel_imports', log.id));
+                                        await batch.commit();
+                                    } catch (err) {
+                                        console.error(err);
+                                        setDialog({ message: 'Erro ao apagar dados importados.' });
+                                    } finally {
+                                        setClearing(false);
+                                    }
+                                }
+                            });
                         }}
                         disabled={clearing}
                         className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors"
