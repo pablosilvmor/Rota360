@@ -46,6 +46,21 @@ export function Fuel() {
             const cc = (Array.isArray(veh?.costCenter) ? veh.costCenter.join(', ') : veh?.costCenter) || veh?.workName || r.workName || 'Não informada';
             v = String(cc).replace(/logística\s*-\s*região\s*sul/gi, "").replace(/,\s*,/g, ",").replace(/^[\s,]+|[\s,]+$/g, "").trim() || 'Não informada';
         }
+        else if (columnId === 'station') {
+          if (r.rawData) {
+            const keys = Object.keys(r.rawData);
+            const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
+            if (stationKey && r.rawData[stationKey]) v = String(r.rawData[stationKey]);
+            else v = String(r.station || 'Não informado');
+          } else {
+            v = String(r.station || 'Não informado');
+          }
+        }
+        else if (columnId === 'vehiclePlate') {
+          const veh = vehicles.find(v => v.plate === r.vehiclePlate);
+          const model = r.vehicleModel || veh?.name || '';
+          v = model ? `${model} - ${r.vehiclePlate}` : String(r.vehiclePlate || 'N/A');
+        }
         else v = String(r[columnId] || 'Não informado');
         if (v) vals.add(v);
       });
@@ -275,7 +290,7 @@ export function Fuel() {
       const tableData = reportRecords.map(r => {
         return columnsToExport.map((opt) => {
           const colId = opt.id;
-          if (colId === 'vehiclePlate') return `      ${r.vehiclePlate || '-'}`;
+          if (colId === 'vehiclePlate') return r.vehiclePlate ? `            ${r.vehiclePlate}` : '-';
           if (colId === 'date') return r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-';
           if (colId === 'liters') return r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
           if (colId === 'totalValue') return `R$ ${Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -729,6 +744,21 @@ export function Fuel() {
       let cellValue = '';
       if (colId === 'date') cellValue = r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '';
       else if (colId === 'liters') cellValue = r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
+      else if (colId === 'station') {
+        if (r.rawData) {
+          const keys = Object.keys(r.rawData);
+          const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
+          if (stationKey && r.rawData[stationKey]) cellValue = String(r.rawData[stationKey]);
+          else cellValue = String(r.station || '');
+        } else {
+          cellValue = String(r.station || '');
+        }
+      }
+      else if (colId === 'vehiclePlate') {
+        const veh = vehicles.find(v => v.plate === r.vehiclePlate);
+        const model = r.vehicleModel || veh?.name || '';
+        cellValue = model ? `${model} - ${r.vehiclePlate}` : String(r.vehiclePlate || '');
+      }
       else if (colId === 'workName') {
         const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
         const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
@@ -793,6 +823,21 @@ export function Fuel() {
         let cellValue = '';
         if (colId === 'date') cellValue = r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '';
         else if (colId === 'liters') cellValue = r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
+        else if (colId === 'station') {
+          if (r.rawData) {
+            const keys = Object.keys(r.rawData);
+            const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
+            if (stationKey && r.rawData[stationKey]) cellValue = String(r.rawData[stationKey]);
+            else cellValue = String(r.station || '');
+          } else {
+            cellValue = String(r.station || '');
+          }
+        }
+        else if (colId === 'vehiclePlate') {
+          const veh = vehicles.find(v => v.plate === r.vehiclePlate);
+          const model = r.vehicleModel || veh?.name || '';
+          cellValue = model ? `${model} - ${r.vehiclePlate}` : String(r.vehiclePlate || '');
+        }
         else if (colId === 'workName') {
             const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
             const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || r.workName || 'Não informada';
@@ -1281,61 +1326,83 @@ export function Fuel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
-              {sortedRecords.map((item) => (
-                <tr key={item.id} className="hover:bg-surface-container/50 transition-colors group cursor-pointer" onClick={() => setSelectedRecord(item)}>
-                  <td className="px-6 py-4 text-[13px] font-semibold">
-                    {item.date?.toDate ? item.date.toDate().toLocaleDateString('pt-BR') : '-'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm text-primary leading-none mb-1">{item.vehicleModel || 'N/A'}</span>
-                      <span className="font-mono text-xs text-on-surface-variant font-bold tracking-widest"><PrivateValue value={item.vehiclePlate} /></span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>
-                    {(() => {
-                      if (item.rawData) {
-                         const keys = Object.keys(item.rawData);
-                         const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
-                         if (stationKey && item.rawData[stationKey]) return item.rawData[stationKey];
-                      }
-                      return item.station || '-';
-                    })()}
-                  </td>
-                  <td className="px-6 py-4">
-                     <div className="flex flex-col">
-                      <span className="font-bold text-sm text-on-surface">{item.liters} L</span>
-                      <span className="text-[10px] uppercase font-black text-on-surface-variant opacity-60 leading-none">{item.fuelType || '-'}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[13px] font-bold text-on-surface whitespace-nowrap">
-                    R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
-                  </td>
-                  <td className="px-6 py-4 text-[13px] font-mono text-on-surface">{item.odometer?.toLocaleString('pt-BR') || '-'}</td>
-                  <td className="px-6 py-4 text-[13px] text-on-surface">
-                    {(() => {
-                        const v = vehicles.find(v => v.plate === item.vehiclePlate);
-                        const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || item.workName || 'Não informada';
-                        return String(cc)
-                          .replace(/logística\s*-\s*região\s*sul/gi, "")
-                          .replace(/,\s*,/g, ",")
-                          .replace(/^[\s,]+|[\s,]+$/g, "")
-                          .trim() || 'Não informada';
-                    })()}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                       <button 
-                         onClick={(e) => { e.stopPropagation(); handleDeleteRecord(item.id); }}
-                         className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
-                         title="Excluir abastecimento"
-                       >
-                         <span className="material-symbols-outlined text-[18px]">delete</span>
-                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {sortedRecords.map((item) => {
+                const cols = columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'odometer', 'liters', 'totalValue'].includes(opt.id));
+                return (
+                  <tr key={item.id} className="hover:bg-surface-container/50 transition-colors group cursor-pointer" onClick={() => setSelectedRecord(item)}>
+                    {cols.map(col => {
+                      if (col.id === 'date') return (
+                        <td key={col.id} className="px-6 py-4 text-[13px] font-semibold">
+                          {item.date?.toDate ? item.date.toDate().toLocaleDateString('pt-BR') : '-'}
+                        </td>
+                      );
+                      if (col.id === 'vehiclePlate') return (
+                        <td key={col.id} className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm text-primary leading-none mb-1">{item.vehicleModel || 'N/A'}</span>
+                            <span className="font-mono text-xs text-on-surface-variant font-bold tracking-widest"><PrivateValue value={item.vehiclePlate} /></span>
+                          </div>
+                        </td>
+                      );
+                      if (col.id === 'workName') return (
+                        <td key={col.id} className="px-6 py-4 text-[13px] text-on-surface">
+                          {(() => {
+                              const v = vehicles.find(v => v.plate === item.vehiclePlate);
+                              const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || item.workName || 'Não informada';
+                              return String(cc)
+                                .replace(/logística\s*-\s*região\s*sul/gi, "")
+                                .replace(/,\s*,/g, ",")
+                                .replace(/^[\s,]+|[\s,]+$/g, "")
+                                .trim() || 'Não informada';
+                          })()}
+                        </td>
+                      );
+                      if (col.id === 'station') return (
+                        <td key={col.id} className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>
+                          {(() => {
+                            if (item.rawData) {
+                               const keys = Object.keys(item.rawData);
+                               const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
+                               if (stationKey && item.rawData[stationKey]) return item.rawData[stationKey];
+                            }
+                            return item.station || '-';
+                          })()}
+                        </td>
+                      );
+                      if (col.id === 'odometer') return (
+                        <td key={col.id} className="px-6 py-4 text-[13px] font-mono text-on-surface">
+                          {item.odometer?.toLocaleString('pt-BR') || '-'}
+                        </td>
+                      );
+                      if (col.id === 'liters') return (
+                        <td key={col.id} className="px-6 py-4">
+                          <div className="flex flex-col">
+                             <span className="font-bold text-sm text-on-surface">{item.liters} L</span>
+                             <span className="text-[10px] uppercase font-black text-on-surface-variant opacity-60 leading-none">{item.fuelType || '-'}</span>
+                           </div>
+                        </td>
+                      );
+                      if (col.id === 'totalValue') return (
+                        <td key={col.id} className="px-6 py-4 text-[13px] font-bold text-on-surface whitespace-nowrap">
+                          R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
+                        </td>
+                      );
+                      return <td key={col.id} className="px-6 py-4">-</td>;
+                    })}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button 
+                           onClick={(e) => { e.stopPropagation(); handleDeleteRecord(item.id); }}
+                           className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
+                           title="Excluir abastecimento"
+                         >
+                           <span className="material-symbols-outlined text-[18px]">delete</span>
+                         </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {sortedRecords.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-on-surface-variant font-medium">
