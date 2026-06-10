@@ -1280,7 +1280,16 @@ export function Fuel() {
                           .trim() || 'Não informada';
                     })()}
                   </td>
-                  <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>{item.station || '-'}</td>
+                  <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>
+                    {(() => {
+                      if (item.rawData) {
+                         const keys = Object.keys(item.rawData);
+                         const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO') || k.toUpperCase().includes('ESTABELECIMENTO') || k.toUpperCase().includes('POSTO'));
+                         if (stationKey && item.rawData[stationKey]) return item.rawData[stationKey];
+                      }
+                      return item.station || '-';
+                    })()}
+                  </td>
                   <td className="px-6 py-4 text-[13px] font-mono text-on-surface">{item.odometer?.toLocaleString('pt-BR') || '-'}</td>
                   <td className="px-6 py-4">
                      <div className="flex flex-col">
@@ -1492,7 +1501,16 @@ export function Fuel() {
                                   
                                   if (opt.id === 'totalValue') return <span className="font-bold text-primary">R$ {Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
                                   if (opt.id === 'unitPrice') return <span className="">R$ {(Number(r.totalValue || 0) / (Number(r.liters) || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
-                                  if (opt.id === 'station') return r.station || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('POSTO') || String(k).toUpperCase().includes('ESTABELECIMENTO'))?.[1] || '-' : '-');
+                                  if (opt.id === 'station') {
+                                    if (r.rawData) {
+                                        const keys = Object.keys(r.rawData);
+                                        const nameEstKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
+                                        if (nameEstKey && r.rawData[nameEstKey]) return r.rawData[nameEstKey];
+                                        const stationKey = keys.find(k => k.toUpperCase().includes('ESTABELECIMENTO') || k.toUpperCase().includes('POSTO'));
+                                        if (stationKey && r.rawData[stationKey]) return r.rawData[stationKey];
+                                    }
+                                    return r.station || '-';
+                                  }
                                   
                                   if (opt.id === 'vehicleModel') return r.vehicleModel || '-';
 
