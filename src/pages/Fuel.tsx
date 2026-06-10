@@ -112,17 +112,18 @@ export function Fuel() {
       try {
         const logoUrl = 'https://i.imgur.com/9iZCsf6.png';
         doc.addImage(logoUrl, 'PNG', 14, 10, 40, 15);
-        doc.setFontSize(7);
-        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(8);
+        doc.setTextColor(15, 140, 220); // #0f8cdc
+        doc.setFont('helvetica', 'bold');
         doc.text(companyName, 14, 28);
       } catch (e) {
         doc.setFontSize(22);
-        doc.setTextColor(103, 80, 164);
+        doc.setTextColor(15, 140, 220);
         doc.text('ROTA 360', 14, 20);
       }
       
       doc.setFontSize(14);
-      doc.setTextColor(0, 0, 0);
+      doc.setTextColor(50, 50, 50);
       doc.text(title, 70, 20);
       
       doc.setFontSize(10);
@@ -138,11 +139,12 @@ export function Fuel() {
       const uniquePlates = [...new Set(reportRecords.map(r => r.vehiclePlate))];
       await Promise.all(uniquePlates.map(async (plate) => {
           const v = vehicles.find(veh => veh.plate === plate);
-          if (v?.photoUrl) {
+          const imgUrl = v?.imageUrl || v?.photoUrl;
+          if (imgUrl) {
               try {
                   const img = new Image();
                   img.crossOrigin = 'Anonymous';
-                  img.src = v.photoUrl;
+                  img.src = imgUrl;
                   await new Promise((resolve, reject) => {
                       img.onload = resolve;
                       img.onerror = reject;
@@ -171,9 +173,8 @@ export function Fuel() {
           if (colId === 'unitPrice') return `R$ ${(r.totalValue / (r.liters || 1)).toFixed(2)}`;
           if (colId === 'odometer') return r.odometer?.toLocaleString('pt-BR') || '-';
           if (colId === 'workName') {
-            if (r.workName && r.workName !== 'Não informada') return r.workName;
-            const v = vehicles.find(v => v.plate === r.vehiclePlate);
-            return v?.workName || 'Não informada';
+            const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
+            return v?.costCenter || v?.workName || r.workName || 'Não informada';
           }
           
           if (colId === 'driverRegistration') return r.driverRegistration || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('MATRICULA'))?.[1] || '-' : '-');
@@ -198,7 +199,7 @@ export function Fuel() {
         body: tableData,
         startY: 50,
         theme: 'striped',
-        headStyles: { fillColor: [103, 80, 164], textColor: [255, 255, 255], fontStyle: 'bold' },
+        headStyles: { fillColor: [15, 140, 220], textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 250] },
         styles: { fontSize: 7, cellPadding: 2, valign: 'middle' },
         margin: { top: 50, bottom: 40 },
@@ -208,14 +209,12 @@ export function Fuel() {
             const record = reportRecords[rowIndex];
             const imgData = vehicleImages[record.vehiclePlate];
             if (imgData) {
-                doc.addImage(imgData, 'JPEG', data.cell.x + 2, data.cell.y + 1, 8, 6);
-                // Indentar o texto para não encavalar na imagem
+                doc.addImage(imgData, 'JPEG', data.cell.x + 1.5, data.cell.y + 1, 8, 6);
                 data.cell.textPos.x += 10;
             }
           }
         },
         didDrawPage: (data) => {
-          // Footer
           const pageSize = doc.internal.pageSize;
           const pageWidth = pageSize.width ? pageSize.width : pageSize.getWidth();
           const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
@@ -223,11 +222,18 @@ export function Fuel() {
           doc.setFontSize(8);
           doc.setTextColor(150, 150, 150);
           doc.text('By Pablo Moreira', 14, pageHeight - 10);
-          
-          const totalPages = (doc as any).internal.getNumberOfPages();
-          doc.text(`Pág ${String(data.pageNumber).padStart(2, '0')}/${String(totalPages).padStart(2, '0')}`, pageWidth - 25, pageHeight - 10);
         }
       });
+
+      const totalPagesOverall = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalPagesOverall; i++) {
+        doc.setPage(i);
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Pág. ${i}/${totalPagesOverall}`, pageWidth - 25, pageHeight - 10);
+      }
 
       // Assinatura Eletrônica Avançada
       const sigId = await createSignature({
@@ -296,11 +302,25 @@ export function Fuel() {
     }
   };
 
+  const handleDeleteRecord = async (recordId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este registro de abastecimento?')) return;
+    try {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'fuel_records', recordId));
+      await batch.commit();
+    } catch (err) {
+      console.error('Erro ao excluir registro:', err);
+      alert('Erro ao excluir registro do sistema.');
+    }
+  };
+
   const clearFilters = () => {
     setFilterWork('Todas as Obras');
     setSearchTerm('');
-    setFilterMonth('Todos');
-    setFilterYear('Todos');
+    setReportMonth('Todos');
+    setReportYear('Todos');
+    setReportStartDate('');
+    setReportEndDate('');
   }
 
   const [dialog, setDialog] = useState<{message: string, onConfirm?: () => void} | null>(null);
@@ -677,10 +697,10 @@ export function Fuel() {
 
   const chartData = React.useMemo(() => {
     const dataByDate: Record<string, { liters: number, totalValue: number }> = {};
-    const reversed = [...sortedRecords].reverse();
+    const reversed = [...reportRecords].reverse();
     reversed.forEach(r => {
       const d = r.date?.toDate ? r.date.toDate() : new Date(0);
-      const k = reportMonth === 'Todos' && reportYear === 'Todos' ?
+      const k = reportMonth === 'Todos' && reportYear === 'Todos' && !reportStartDate ?
           `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}` :
           `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
       
@@ -695,7 +715,7 @@ export function Fuel() {
        liters: Number(dataByDate[date].liters.toFixed(2)),
        totalValue: Number(dataByDate[date].totalValue.toFixed(2))
     }));
-  }, [sortedRecords, reportMonth, reportYear]);
+  }, [reportRecords, reportMonth, reportYear, reportStartDate]);
 
   return (
     <motion.div 
@@ -840,17 +860,47 @@ export function Fuel() {
                   </select>
               </div>
 
-              <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 h-[44px]">
-                 <div className="flex flex-col">
-                   <span className="text-[9px] font-black uppercase text-primary/60 leading-none">Início</span>
-                   <input type="date" value={reportStartDate} onChange={e => setReportStartDate(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none h-4" />
-                 </div>
-                 <div className="w-px h-6 bg-primary/10" />
-                 <div className="flex flex-col">
-                   <span className="text-[9px] font-black uppercase text-primary/60 leading-none">Fim</span>
-                   <input type="date" value={reportEndDate} onChange={e => setReportEndDate(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none h-4" />
-                 </div>
-                 <button onClick={() => { setReportStartDate(''); setReportEndDate(''); }} className="material-symbols-outlined text-[16px] text-error hover:scale-110">close</button>
+              <div className="flex items-center gap-3 bg-surface-container border border-outline-variant rounded-2xl px-5 h-[52px] shadow-sm group hover:border-primary/40 transition-all duration-300">
+                 <motion.div 
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="flex flex-col min-w-[80px]"
+                 >
+                   <span className="text-[8px] font-black uppercase text-primary tracking-wider leading-none mb-1 opacity-60">Início</span>
+                   <input 
+                      type="date" 
+                      value={reportStartDate} 
+                      onChange={e => setReportStartDate(e.target.value)} 
+                      className="bg-transparent text-[11px] font-bold outline-none h-4 appearance-none text-on-surface hover:text-primary transition-colors" 
+                   />
+                 </motion.div>
+                 <div className="w-px h-8 bg-outline-variant group-hover:bg-primary/20 transition-colors" />
+                 <motion.div 
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="flex flex-col min-w-[80px]"
+                 >
+                   <span className="text-[8px] font-black uppercase text-primary tracking-wider leading-none mb-1 opacity-60">Fim</span>
+                   <input 
+                      type="date" 
+                      value={reportEndDate} 
+                      onChange={e => setReportEndDate(e.target.value)} 
+                      className="bg-transparent text-[11px] font-bold outline-none h-4 appearance-none text-on-surface hover:text-primary transition-colors" 
+                   />
+                 </motion.div>
+                 <AnimatePresence>
+                   {(reportStartDate || reportEndDate) && (
+                     <motion.button 
+                       initial={{ opacity: 0, x: 10 }}
+                       animate={{ opacity: 1, x: 0 }}
+                       exit={{ opacity: 0, x: 10 }}
+                       onClick={() => { setReportStartDate(''); setReportEndDate(''); }} 
+                       className="material-symbols-outlined text-[18px] text-error p-1 rounded-full hover:bg-error/10 transition-all ml-2"
+                     >
+                       backspace
+                     </motion.button>
+                   )}
+                 </AnimatePresence>
               </div>
             </div>
 
@@ -942,54 +992,65 @@ export function Fuel() {
                     Veículo <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('vehiclePlate')}</span>
                   </button>
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase">Obra</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-tighter">Obra</th>
                 <th className="p-0">
-                  <button onClick={() => handleSort('station')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
-                    Posto / Local <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('station')}</span>
+                  <button onClick={() => handleSort('station')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter">
+                    Posto <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('station')}</span>
                   </button>
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase">Odômetro</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-tighter">Odômetro</th>
                 <th className="p-0">
-                  <button onClick={() => handleSort('liters')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
-                    Quantidade <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('liters')}</span>
+                  <button onClick={() => handleSort('liters')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter">
+                    Litros <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('liters')}</span>
                   </button>
                 </th>
                 <th className="p-0">
-                  <button onClick={() => handleSort('totalValue')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                  <button onClick={() => handleSort('totalValue')} className="w-full px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter">
                     Valor <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">{getSortIcon('totalValue')}</span>
                   </button>
                 </th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-on-surface-variant uppercase">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
               {sortedRecords.map((item) => (
-                <tr key={item.id} className="hover:bg-surface-container transition-colors group cursor-pointer" onClick={() => setSelectedRecord(item)}>
-                  <td className="px-6 py-4 text-sm font-semibold">
+                <tr key={item.id} className="hover:bg-surface-container/50 transition-colors group cursor-pointer" onClick={() => setSelectedRecord(item)}>
+                  <td className="px-6 py-4 text-[13px] font-semibold">
                     {item.date?.toDate ? item.date.toDate().toLocaleDateString('pt-BR') : '-'}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-semibold text-sm text-primary">{item.vehicleModel || 'N/A'}</span>
-                      <span className="font-mono text-xs text-on-surface-variant"><PrivateValue value={item.vehiclePlate} /></span>
+                      <span className="font-semibold text-sm text-primary leading-none mb-1">{item.vehicleModel || 'N/A'}</span>
+                      <span className="font-mono text-xs text-on-surface-variant font-bold tracking-widest"><PrivateValue value={item.vehiclePlate} /></span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-on-surface">
+                  <td className="px-6 py-4 text-[13px] text-on-surface">
                     {(() => {
-                        if (item.workName && item.workName !== 'Não informada') return item.workName;
                         const v = vehicles.find(v => v.plate === item.vehiclePlate);
-                        return v?.workName || 'Não informada';
+                        return v?.costCenter || v?.workName || item.workName || 'Não informada';
                     })()}
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium">{item.station || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-on-surface">{item.odometer?.toLocaleString('pt-BR') || '-'}</td>
+                  <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>{item.station || '-'}</td>
+                  <td className="px-6 py-4 text-[13px] font-mono text-on-surface">{item.odometer?.toLocaleString('pt-BR') || '-'}</td>
                   <td className="px-6 py-4">
                      <div className="flex flex-col">
                       <span className="font-bold text-sm text-on-surface">{item.liters} L</span>
-                      <span className="text-xs text-on-surface-variant">{item.fuelType || '-'}</span>
+                      <span className="text-[10px] uppercase font-black text-on-surface-variant opacity-60 leading-none">{item.fuelType || '-'}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-bold text-on-surface">
+                  <td className="px-6 py-4 text-[13px] font-bold text-on-surface whitespace-nowrap">
                     R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <button 
+                         onClick={(e) => { e.stopPropagation(); handleDeleteRecord(item.id); }}
+                         className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
+                         title="Excluir abastecimento"
+                       >
+                         <span className="material-symbols-outlined text-[18px]">delete</span>
+                       </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1122,7 +1183,7 @@ export function Fuel() {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent">
                     <table className="w-full min-w-max text-[11px] border-collapse">
                       <thead>
                         <tr className="bg-primary text-white">
@@ -1141,15 +1202,22 @@ export function Fuel() {
                                 {(() => {
                                   if (opt.id === 'date') return <span className="font-bold">{r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-'}</span>;
                                   if (opt.id === 'liters') return <span className="font-bold">{r.liters}L</span>;
-                                  if (opt.id === 'totalValue') return <span className="font-black text-primary">R$ {r.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
-                                  if (opt.id === 'unitPrice') return `R$ ${(r.totalValue / (r.liters || 1)).toFixed(2)}`;
-                                  if (opt.id === 'odometer') return r.odometer?.toLocaleString('pt-BR') || '-';
+                                  if (opt.id === 'workName') return (
+                                    <span>
+                                      {(() => {
+                                          const v = vehicles.find(v => v.plate === r.vehiclePlate);
+                                          return v?.costCenter || v?.workName || r.workName || 'Não informada';
+                                      })()}
+                                    </span>
+                                  );
+
                                   if (opt.id === 'vehiclePlate') return (
                                     <div className="flex items-center gap-2">
                                       {(() => {
                                          const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
-                                         return v?.photoUrl ? (
-                                           <img src={v.photoUrl} className="w-8 h-6 object-cover rounded shadow-sm border border-slate-200" alt="Veículo" />
+                                         const imgUrl = v?.imageUrl || v?.photoUrl;
+                                         return imgUrl ? (
+                                           <img src={imgUrl} className="w-8 h-6 object-cover rounded shadow-sm border border-slate-200" alt="Veículo" />
                                          ) : (
                                            <div className="w-8 h-6 bg-slate-100 rounded flex items-center justify-center border border-slate-200">
                                               <span className="material-symbols-outlined text-[14px] text-slate-400">directions_car</span>
@@ -1159,16 +1227,9 @@ export function Fuel() {
                                       <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-black">{r.vehiclePlate}</span>
                                     </div>
                                   );
+                                  
+                                  if (opt.id === 'vehicleModel') return r.vehicleModel || '-';
 
-                                  if (opt.id === 'workName') return (
-                                    <span>
-                                      {(() => {
-                                          if (r.workName && r.workName !== 'Não informada') return r.workName;
-                                          const v = vehicles.find(v => v.plate === r.vehiclePlate);
-                                          return v?.workName || 'Não informada';
-                                      })()}
-                                    </span>
-                                  );
                                   
                                   if (opt.id === 'driverRegistration') return r.driverRegistration || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('MATRICULA'))?.[1] || '-' : '-');
                                   if (opt.id === 'driverName') return r.driverName || (r.rawData ? Object.entries(r.rawData).find(([k, v]) => String(k).toUpperCase().includes('MOTORISTA') && typeof v === 'string' && v.length > 3)?.[1] || '-' : '-');
@@ -1276,25 +1337,25 @@ export function Fuel() {
                         
                         return (
                            <div className="flex gap-4 md:w-1/3">
-                              {(vehicleDoc?.imageUrl) && (
+                              {(vehicleDoc?.imageUrl || vehicleDoc?.photoUrl) && (
                                   <div className="flex-1 flex flex-col items-center">
                                       <div className="w-full aspect-square rounded-2xl bg-white border border-white/10 overflow-hidden relative group flex items-center justify-center">
-                                          <img src={vehicleDoc.imageUrl} alt="Veículo" className="max-w-[90%] max-h-[90%] object-contain group-hover:scale-105 transition-transform duration-500" />
+                                          <img src={vehicleDoc.imageUrl || vehicleDoc.photoUrl} alt="Veículo" className="max-w-[90%] max-h-[90%] object-contain group-hover:scale-105 transition-transform duration-500" />
                                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                       </div>
                                       <span className="text-white/70 text-[10px] font-bold mt-2 uppercase tracking-widest text-center">{vehicleDoc.plate}</span>
                                   </div>
                               )}
-                              {(driverDoc?.photoUrl) && (
+                              {(driverDoc?.imageUrl || driverDoc?.photoUrl) && (
                                   <div className="flex-1 flex flex-col items-center">
                                       <div className="w-full aspect-square rounded-2xl bg-white border border-white/10 overflow-hidden relative group flex items-center justify-center">
-                                          <img src={driverDoc.photoUrl} alt="Motorista" className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500" />
+                                          <img src={driverDoc.imageUrl || driverDoc.photoUrl} alt="Motorista" className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500" />
                                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                       </div>
                                       <span className="text-white/70 text-[10px] font-bold mt-2 uppercase tracking-widest text-center">{driverDoc.name.split(' ')[0]}</span>
                                   </div>
                               )}
-                              {!vehicleDoc?.imageUrl && !driverDoc?.photoUrl && (
+                              {!(vehicleDoc?.imageUrl || vehicleDoc?.photoUrl) && !(driverDoc?.imageUrl || driverDoc?.photoUrl) && (
                                   <div className="w-full h-32 rounded-2xl border border-white/10 border-dashed flex items-center justify-center text-white/30 text-sm font-medium">
                                       Sem imagens associadas
                                   </div>

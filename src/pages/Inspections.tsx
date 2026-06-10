@@ -14,6 +14,7 @@ import {
   where,
   orderBy,
   limit,
+  addDoc
 } from "firebase/firestore";
 import { db, handleFirestoreError, OperationType } from "../lib/firebase";
 import { useParams, useNavigate, Link } from "react-router";
@@ -1258,6 +1259,58 @@ function InspectionForm({
     }
   };
 
+  const handleGenerateAutoAlerta = async () => {
+    // get items that are >= 90%
+    const criticalItems = items.filter(item => {
+        const record = records[item.id] || {};
+        const { progressPercent } = calculateProgress(item, record, currentVehicleKM);
+        return progressPercent >= 90;
+    });
+
+    if (criticalItems.length === 0) {
+        alert("Nenhum item com progresso >= 90%.");
+        return;
+    }
+
+    try {
+        let driverName = "Não definido";
+        let driverId = "";
+        
+        // Find driver assigned to this vehicle
+        const driversRef = collection(db, 'drivers');
+        const driverSnap = await getDocs(query(driversRef, where('vehicleAssigned', 'array-contains', vehicle?.plate)));
+        if (!driverSnap.empty) {
+            driverName = driverSnap.docs[0].data().name;
+            driverId = driverSnap.docs[0].id;
+        }
+
+        const observation = criticalItems.map(i => {
+           const record = records[i.id] || {};
+           const { progressPercent } = calculateProgress(i, record, currentVehicleKM);
+           return `- ${i.name} (${Math.round(progressPercent)}%)`;
+        }).join('\n');
+
+        const number = `AA-${Math.floor(1000 + Math.random() * 9000)}`;
+        await addDoc(collection(db, 'auto_alertas'), {
+            number,
+            plate: vehicle?.plate || '',
+            vehicleId: vehicle?.id || '',
+            driverName,
+            driverId,
+            observation: "Manutenções Preventivas Críticas (>= 90%):\n\n" + observation,
+            status: 'pending',
+            createdAt: Date.now(),
+            resolvedAt: null,
+            fromSystem: true
+        });
+
+        alert("AutoAlerta gerado com sucesso para este veículo!");
+    } catch (e) {
+        console.error("Erro ao gerar auto alerta", e);
+        alert("Erro ao gerar auto alerta: " + (e as Error).message);
+    }
+  };
+
   if (loadingForm || loadingVehicle) {
     return <div className="p-8 text-center">Carregando formulário...</div>;
   }
@@ -1408,6 +1461,15 @@ function InspectionForm({
           className="flex flex-wrap items-center gap-2 w-full md:w-auto"
           data-html2canvas-ignore="true"
         >
+          <button
+            onClick={handleGenerateAutoAlerta}
+            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg font-bold shadow-sm transition-all text-sm text-primary"
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              campaign
+            </span>
+            Gerar AutoAlerta
+          </button>
           <button
             onClick={exportToPDF}
             disabled={isExporting}

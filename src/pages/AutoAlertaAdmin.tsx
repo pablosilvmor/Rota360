@@ -4,6 +4,7 @@ import { db } from "../lib/firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { useNavigate } from "react-router";
 import { usePrivacy } from "../contexts/PrivacyContext";
+import { toBlob } from 'html-to-image';
 
 export function AutoAlertaAdmin() {
   const { isPrivacyMode } = usePrivacy();
@@ -180,6 +181,40 @@ export function AutoAlertaAdmin() {
           </div>
 
           <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-error-container/20">
+             <button 
+               onClick={async () => {
+                 const element = document.getElementById('autoalerta-receipt-share');
+                 if (!element) return;
+                 try {
+                   element.style.display = 'block';
+                   const blob = await toBlob(element, {
+                     cacheBust: true,
+                     backgroundColor: '#ffffff',
+                     filter: (node) => {
+                       if (node instanceof HTMLElement && node.classList.contains('material-symbols-outlined')) {
+                         return false;
+                       }
+                       return true;
+                     }
+                   });
+                   if (blob) {
+                     await navigator.clipboard.write([
+                         new ClipboardItem({ 'image/png': blob })
+                     ]);
+                     alert('Imagem copiada para a área de transferência!');
+                   }
+                 } catch (err) {
+                   console.error('Failed to copy image', err);
+                   alert('Não foi possível copiar a imagem.');
+                 } finally {
+                   element.style.display = 'none';
+                 }
+               }}
+               className="px-4 py-2 bg-surface-container text-on-surface font-bold rounded-lg hover:bg-surface-container-high transition-colors flex items-center gap-2"
+             >
+               <span className="material-symbols-outlined text-[20px]">share</span>
+               Compartilhar
+             </button>
              {selectedAlerta.status === 'pending' && (
                 <button 
                   onClick={() => handleUpdateStatus(selectedAlerta.id, 'rejected')}
@@ -208,6 +243,52 @@ export function AutoAlertaAdmin() {
              )}
           </div>
         </div>
+
+        {/* Hidden element for sharing */}
+        <div id="autoalerta-receipt-share" style={{ display: 'none', position: 'absolute', top: '-9999px', left: '-9999px', width: '500px', backgroundColor: '#ffffff', color: '#000000', borderColor: '#d1d5db', padding: '2rem', borderRadius: '1.5rem', border: '1px solid #d1d5db', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '1.5rem', borderBottom: '1px solid #d1d5db', paddingBottom: '2rem' }}>
+            <img 
+              src="https://i.imgur.com/9iZCsf6.png" 
+              alt="Rota 360" 
+              style={{ 
+                height: '10rem', 
+                width: 'auto',
+                objectFit: 'contain', 
+                marginBottom: '1rem',
+                filter: 'drop-shadow(0 20px 40px rgba(0, 0, 0, 0.7))'
+              }} 
+            />
+            <div style={{ width: '5rem', height: '5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff', color: '#2563eb' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '2.5rem' }}>campaign</span>
+            </div>
+            <div>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#000000', margin: 0 }}>AutoAlerta Emitido</h2>
+              <p style={{ color: '#666666', marginTop: '0.5rem' }}>Reporte da equipe.</p>
+            </div>
+            <div style={{ padding: '0.75rem 2rem', borderRadius: '0.75rem', backgroundColor: '#f3f4f6' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#666666' }}>Nº do Pedido</span>
+              <p style={{ fontSize: '1.5rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#2563eb', margin: 0 }}>{selectedAlerta.number}</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
+              <div style={{ padding: '1rem', borderRadius: '0.75rem', backgroundColor: '#f9fafb' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666666', textTransform: 'uppercase' }}>Veículo</span>
+                <p style={{ fontWeight: '500', color: '#000000', marginTop: '0.25rem' }}>{selectedAlerta.plate}</p>
+              </div>
+              <div style={{ padding: '1rem', borderRadius: '0.75rem', backgroundColor: '#f9fafb' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666666', textTransform: 'uppercase' }}>Motorista</span>
+                <p style={{ fontWeight: '500', color: '#000000', marginTop: '0.25rem' }}>{selectedAlerta.driverName}</p>
+              </div>
+            </div>
+            <div style={{ padding: '1rem', borderRadius: '0.75rem', backgroundColor: '#f9fafb' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666666', textTransform: 'uppercase' }}>Observação</span>
+              <p style={{ fontSize: '0.875rem', color: '#000000', marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>{selectedAlerta.observation}</p>
+            </div>
+          </div>
+        </div>
+
       </div>
     );
   }

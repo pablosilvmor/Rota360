@@ -108,7 +108,7 @@ export function AutoAlerta() {
         <div id="autoalerta-receipt" style={{ backgroundColor: '#ffffff', color: '#000000', borderColor: '#d1d5db', padding: '2rem', borderRadius: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', border: '1px solid #d1d5db', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '1.5rem', borderBottom: '1px solid #d1d5db', paddingBottom: '2rem' }}>
             <img 
-              src="https://i.imgur.com/tIPJCgH.png" 
+              src="https://i.imgur.com/9iZCsf6.png" 
               alt="Rota 360" 
               style={{ 
                 height: '10rem', 
