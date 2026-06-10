@@ -275,6 +275,7 @@ export function Fuel() {
       const tableData = reportRecords.map(r => {
         return columnsToExport.map((opt) => {
           const colId = opt.id;
+          if (colId === 'vehiclePlate') return `      ${r.vehiclePlate || '-'}`;
           if (colId === 'date') return r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-';
           if (colId === 'liters') return r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
           if (colId === 'totalValue') return `R$ ${Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -293,6 +294,15 @@ export function Fuel() {
               .replace(/,\s*,/g, ",") // Fix double commas
               .replace(/^[\s,]+|[\s,]+$/g, "") // Clean edges
               .trim() || 'Não informada';
+          }
+          
+          if (colId === 'station') {
+            if (r.rawData) {
+                const keys = Object.keys(r.rawData);
+                const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
+                if (stationKey && r.rawData[stationKey]) return r.rawData[stationKey];
+            }
+            return r.station || '-';
           }
           
           if (colId === 'driverRegistration') return r.driverRegistration || (r.rawData ? Object.entries(r.rawData).find(([k]) => String(k).toUpperCase().includes('MATRICULA'))?.[1] || '-' : '-');
@@ -894,6 +904,15 @@ export function Fuel() {
     }));
   }, [reportRecords, reportMonth, reportYear, reportStartDate]);
 
+  const isAnyFilterActive = 
+    filterWork !== 'Todas as Obras' || 
+    searchTerm !== '' || 
+    reportMonth !== 'Todos' || 
+    reportYear !== 'Todos' || 
+    reportStartDate !== '' || 
+    reportEndDate !== '' || 
+    Object.keys(columnFilters).length > 0;
+
   return (
     <motion.div 
       className="pb-12 relative"
@@ -1130,7 +1149,11 @@ export function Fuel() {
             <div className="flex gap-2 items-center">
               <button 
                 onClick={clearFilters} 
-                className="h-11 px-6 rounded-xl border border-outline-variant text-[13px] font-semibold text-on-surface hover:bg-surface-container transition-all flex items-center gap-2"
+                className={`h-11 px-6 rounded-xl border transition-all flex items-center gap-2 text-[13px] font-bold ${
+                  isAnyFilterActive 
+                    ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 ring-2 ring-primary/20 scale-[1.02]' 
+                    : 'bg-white border-outline-variant text-on-surface hover:bg-surface-container'
+                }`}
               >
                 <span className="material-symbols-outlined text-[20px]">filter_alt_off</span>
                 Limpar Filtros
@@ -1269,6 +1292,26 @@ export function Fuel() {
                       <span className="font-mono text-xs text-on-surface-variant font-bold tracking-widest"><PrivateValue value={item.vehiclePlate} /></span>
                     </div>
                   </td>
+                  <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>
+                    {(() => {
+                      if (item.rawData) {
+                         const keys = Object.keys(item.rawData);
+                         const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
+                         if (stationKey && item.rawData[stationKey]) return item.rawData[stationKey];
+                      }
+                      return item.station || '-';
+                    })()}
+                  </td>
+                  <td className="px-6 py-4">
+                     <div className="flex flex-col">
+                      <span className="font-bold text-sm text-on-surface">{item.liters} L</span>
+                      <span className="text-[10px] uppercase font-black text-on-surface-variant opacity-60 leading-none">{item.fuelType || '-'}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-[13px] font-bold text-on-surface whitespace-nowrap">
+                    R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
+                  </td>
+                  <td className="px-6 py-4 text-[13px] font-mono text-on-surface">{item.odometer?.toLocaleString('pt-BR') || '-'}</td>
                   <td className="px-6 py-4 text-[13px] text-on-surface">
                     {(() => {
                         const v = vehicles.find(v => v.plate === item.vehiclePlate);
@@ -1279,26 +1322,6 @@ export function Fuel() {
                           .replace(/^[\s,]+|[\s,]+$/g, "")
                           .trim() || 'Não informada';
                     })()}
-                  </td>
-                  <td className="px-6 py-4 text-[13px] font-medium truncate max-w-[120px]" title={item.station}>
-                    {(() => {
-                      if (item.rawData) {
-                         const keys = Object.keys(item.rawData);
-                         const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO') || k.toUpperCase().includes('ESTABELECIMENTO') || k.toUpperCase().includes('POSTO'));
-                         if (stationKey && item.rawData[stationKey]) return item.rawData[stationKey];
-                      }
-                      return item.station || '-';
-                    })()}
-                  </td>
-                  <td className="px-6 py-4 text-[13px] font-mono text-on-surface">{item.odometer?.toLocaleString('pt-BR') || '-'}</td>
-                  <td className="px-6 py-4">
-                     <div className="flex flex-col">
-                      <span className="font-bold text-sm text-on-surface">{item.liters} L</span>
-                      <span className="text-[10px] uppercase font-black text-on-surface-variant opacity-60 leading-none">{item.fuelType || '-'}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[13px] font-bold text-on-surface whitespace-nowrap">
-                    R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1392,8 +1415,8 @@ export function Fuel() {
                 ))}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 bg-slate-100 scrollbar-thin scrollbar-thumb-primary/20">
-                <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-12 min-h-full border border-outline-variant ${selectedColumns.length > 5 ? 'max-w-[1100px]' : 'max-w-[800px]'}`}>
+              <div className="flex-1 overflow-auto p-8 bg-slate-100 scrollbar-thin scrollbar-thumb-primary/20">
+                <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-12 min-h-full border border-outline-variant ${selectedColumns.length > 5 ? 'w-fit min-w-[1000px]' : 'max-w-[800px]'}`}>
                   {/* PDF header mockup */}
                   <div className="flex justify-between items-start border-b-4 border-primary/10 pb-8 mb-8">
                     <div className="flex flex-col items-start gap-1">
@@ -1504,9 +1527,7 @@ export function Fuel() {
                                   if (opt.id === 'station') {
                                     if (r.rawData) {
                                         const keys = Object.keys(r.rawData);
-                                        const nameEstKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
-                                        if (nameEstKey && r.rawData[nameEstKey]) return r.rawData[nameEstKey];
-                                        const stationKey = keys.find(k => k.toUpperCase().includes('ESTABELECIMENTO') || k.toUpperCase().includes('POSTO'));
+                                        const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
                                         if (stationKey && r.rawData[stationKey]) return r.rawData[stationKey];
                                     }
                                     return r.station || '-';

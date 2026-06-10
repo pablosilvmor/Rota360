@@ -118,7 +118,8 @@ service cloud.firestore {
     }
 
     match /fuel_records/{document=**} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.token.email_verified == true;
     }
 
     match /fuel_imports/{document=**} {
@@ -178,7 +179,8 @@ service cloud.firestore {
     }
     
     match /preApprovedAccess/{accessId} {
-      allow read, write: if isAdmin();
+      allow read: if isSignedIn() && resource.data.email == request.auth.token.email;
+      allow write: if isAdmin();
     }
     
     match /config/{configId} {
