@@ -49,12 +49,23 @@ export function Fuel() {
         else if (columnId === 'station') {
           if (r.rawData) {
             const keys = Object.keys(r.rawData);
-            const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
-            if (stationKey && r.rawData[stationKey]) v = String(r.rawData[stationKey]);
-            else v = String(r.station || 'Não informado');
+            // Prioritize finding a key that isn't just a code if multiple established keys exist
+            const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO')) || 
+                               keys.find(k => k.toUpperCase().includes('POSTO') || k.toUpperCase().includes('ESTABELECIMENTO'));
+            
+            const rawVal = stationKey ? String(r.rawData[stationKey] || '') : '';
+            // If the rawVal looks like just an ID code (all numbers and > 5 chars), fallback to r.station
+            if (rawVal && /^\d+$/.test(rawVal) && rawVal.length > 5) {
+                v = String(r.station || 'Não informado');
+            } else {
+                v = rawVal || String(r.station || 'Não informado');
+            }
           } else {
             v = String(r.station || 'Não informado');
           }
+        }
+        else if (columnId === 'transactionCode') {
+          v = String(r.transactionId || (r.rawData ? r.rawData['CODIGO TRANSACAO'] || r.rawData['CÓDIGO TRANSAÇÃO'] : '') || 'Não informado');
         }
         else if (columnId === 'vehiclePlate') {
           const veh = vehicles.find(v => v.plate === r.vehiclePlate);
@@ -165,13 +176,61 @@ export function Fuel() {
   
   const { userData } = useAuth();
   const [selectedColumns, setSelectedColumns] = useLocalStorageState('fuel_selectedColumns', [
-    'date', 'vehiclePlate', 'station', 'liters', 'totalValue'
+    'date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'liters', 'totalValue'
   ]);
   
   const [reportMonth, setReportMonth] = useLocalStorageState('fuel_reportMonth', 'Todos');
   const [reportYear, setReportYear] = useLocalStorageState('fuel_reportYear', 'Todos');
   const [reportStartDate, setReportStartDate] = useLocalStorageState('fuel_reportStartDate', '');
   const [reportEndDate, setReportEndDate] = useLocalStorageState('fuel_reportEndDate', '');
+
+  type ReportProfile = {
+    id: string;
+    name: string;
+    columns: string[];
+    filters: {
+      work: string;
+      month: string;
+      year: string;
+      startDate: string;
+      endDate: string;
+    };
+  };
+  const [reportProfiles, setReportProfiles] = useLocalStorageState<ReportProfile[]>('fuel_reportProfiles', []);
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [editingProfileName, setEditingProfileName] = useState('');
+
+  const handleSaveProfile = () => {
+    if (!editingProfileName.trim()) return;
+    
+    if (editingProfileId) {
+      setReportProfiles(prev => prev.map(p => 
+        p.id === editingProfileId 
+          ? { ...p, name: editingProfileName, columns: selectedColumns, filters: { work: filterWork, month: reportMonth, year: reportYear, startDate: reportStartDate, endDate: reportEndDate } }
+          : p
+      ));
+    } else {
+      const newProfile: ReportProfile = {
+        id: Date.now().toString(),
+        name: editingProfileName,
+        columns: selectedColumns,
+        filters: { work: filterWork, month: reportMonth, year: reportYear, startDate: reportStartDate, endDate: reportEndDate }
+      };
+      setReportProfiles(prev => [...prev, newProfile]);
+    }
+    setEditingProfileId(null);
+    setEditingProfileName('');
+  };
+
+  const handleApplyProfile = (profile: ReportProfile) => {
+    setSelectedColumns(profile.columns);
+    setFilterWork(profile.filters.work);
+    setReportMonth(profile.filters.month);
+    setReportYear(profile.filters.year);
+    setReportStartDate(profile.filters.startDate);
+    setReportEndDate(profile.filters.endDate);
+  };
+
   const [profile, setProfile] = useState<any>(null);
 
   const monthsNominal = [
@@ -201,12 +260,14 @@ export function Fuel() {
     { id: 'date', label: 'Data', width: 'auto' },
     { id: 'vehiclePlate', label: 'Placa', width: 'auto' },
     { id: 'vehicleModel', label: 'Veículo', width: 'auto' },
+    { id: 'workName', label: 'Obra', width: 'auto' },
     { id: 'station', label: 'Posto', width: 'auto' },
+    { id: 'fuelType', label: 'Tipo Combustível', width: 'auto' },
     { id: 'liters', label: 'Litros', width: 'auto' },
     { id: 'unitPrice', label: 'V. Unitário', width: 'auto' },
     { id: 'totalValue', label: 'Total', width: 'auto' },
+    { id: 'transactionCode', label: 'CODIGO', width: 'auto' },
     { id: 'odometer', label: 'Odômetro', width: 'auto' },
-    { id: 'workName', label: 'Obra', width: 'auto' },
     { id: 'fuelType', label: 'Combustível', width: 'auto' },
     { id: 'driverRegistration', label: 'Matrícula', width: 'auto' },
     { id: 'driverName', label: 'Nome Motorista', width: 'auto' },
@@ -285,14 +346,15 @@ export function Fuel() {
       }));
 
       const columnsToExport = columnOptions.filter(opt => selectedColumns.includes(opt.id));
-      const tableHeaders = columnsToExport.map(opt => opt.label);
+      const tableHeaders = columnsToExport.map(opt => opt.label.toUpperCase());
 
       const tableData = reportRecords.map(r => {
         return columnsToExport.map((opt) => {
           const colId = opt.id;
-          if (colId === 'vehiclePlate') return r.vehiclePlate ? `            ${r.vehiclePlate}` : '-';
+          if (colId === 'vehiclePlate') return '';
           if (colId === 'date') return r.date?.toDate ? r.date.toDate().toLocaleDateString('pt-BR') : '-';
           if (colId === 'liters') return r.liters ? `${r.liters.toLocaleString('pt-BR')}L` : '0L';
+          if (colId === 'transactionCode') return r.transactionId || (r.rawData ? r.rawData['CODIGO TRANSACAO'] || r.rawData['CÓDIGO TRANSAÇÃO'] || '-' : '-');
           if (colId === 'totalValue') return `R$ ${Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
           if (colId === 'unitPrice') {
             const val = Number(r.totalValue || 0);
@@ -345,20 +407,59 @@ export function Fuel() {
         headStyles: { fillColor: [15, 140, 220], textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 250] },
         styles: { fontSize: 7, cellPadding: 2, valign: 'middle' },
+        columnStyles: {
+            vehiclePlate: { cellWidth: 55 }
+        },
         margin: { top: 50, bottom: 40 },
         didDrawCell: (data) => {
-          if (data && data.section === 'body' && selectedColumns[data.column.index] === 'vehiclePlate') {
+          if (data && data.section === 'body' && columnsToExport[data.column.index].id === 'vehiclePlate') {
             const rowIndex = data.row.index;
             const record = reportRecords[rowIndex];
             if (!record) return;
+
+            const { x, y, width, height } = data.cell;
+            
+            // 1. Draw Image Box
+            const imgBoxSize = 10;
+            const imgBoxX = x + 2;
+            const imgBoxY = y + (height - 8) / 2;
+            
+            doc.setDrawColor(0, 0, 0, 0); // Fully transparent border
+            doc.setLineWidth(0);
+            doc.setFillColor(255, 255, 255);
+            doc.rect(imgBoxX, imgBoxY, 12, 8, 'F'); // Fill only
+
             const imgData = vehicleImages[record.vehiclePlate];
-            if (imgData && data.cell) {
+            if (imgData) {
                 try {
-                  doc.addImage(imgData, 'JPEG', data.cell.x + 1.5, data.cell.y + 1, 8, 6);
+                    doc.addImage(imgData, 'JPEG', imgBoxX + 1, imgBoxY + 1, 10, 6);
                 } catch (err) {
-                  console.warn('Error drawing cell image', err);
+                    console.warn('Error drawing cell image', err);
                 }
             }
+
+            // 2. Draw Plate Text Box
+            const plateBoxX = imgBoxX + 14;
+            const plateBoxY = imgBoxY + 1;
+            const plateBoxW = 16;
+            const plateBoxH = 6;
+
+            doc.setFillColor(240, 244, 248);
+            doc.setDrawColor(220, 225, 235);
+            // roundedRect(x, y, w, h, rx, ry, style)
+            (doc as any).roundedRect(plateBoxX, plateBoxY, plateBoxW, plateBoxH, 1, 1, 'FD');
+
+            // 3. Draw Plate Text
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(50, 60, 80);
+            const plateText = record.vehiclePlate || '-';
+            const textWidth = doc.getTextWidth(plateText);
+            doc.text(plateText, plateBoxX + (plateBoxW - textWidth) / 2, plateBoxY + 4.2);
+            
+            // Reset for other cells
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(0, 0, 0);
           }
         },
         didDrawPage: (data) => {
@@ -398,21 +499,22 @@ export function Fuel() {
           doc.setPage(i);
           if (i === pageCount && sigId) {
               const tableInfo = (doc as any).lastAutoTable;
-              const finalY = tableInfo ? tableInfo.finalY + 15 : 70;
+              let finalY = tableInfo ? tableInfo.finalY + 15 : 70;
               const pageWidth = doc.internal.pageSize.getWidth();
+              const pageHeight = doc.internal.pageSize.getHeight();
               
               const boxHeight = 45;
-              const boxY = finalY;
               
-              // Ajuste automático se ultrapassar página
-              if (boxY + boxHeight > doc.internal.pageSize.getHeight() - 20) {
+              // Ajuste automático inteligente: se ultrapassar página ou estiver muito próximo ao fim (20mm de margem)
+              if (finalY + boxHeight > pageHeight - 20) {
                   doc.addPage();
+                  finalY = 20;
               }
 
               // Caixa de assinatura estilo Rota 360
               doc.setDrawColor(230, 230, 230);
               doc.setFillColor(248, 250, 252);
-              doc.roundedRect(14, finalY, pageWidth - 28, 45, 3, 3, 'FD');
+              doc.roundedRect(14, finalY, pageWidth - 28, boxHeight, 3, 3, 'FD');
               
               try {
                 // Logo secundário na assinatura
@@ -747,12 +849,21 @@ export function Fuel() {
       else if (colId === 'station') {
         if (r.rawData) {
           const keys = Object.keys(r.rawData);
-          const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
-          if (stationKey && r.rawData[stationKey]) cellValue = String(r.rawData[stationKey]);
-          else cellValue = String(r.station || '');
+          const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO')) || 
+                             keys.find(k => k.toUpperCase().includes('POSTO') || k.toUpperCase().includes('ESTABELECIMENTO'));
+          
+          const rawVal = stationKey ? String(r.rawData[stationKey] || '') : '';
+          if (rawVal && /^\d+$/.test(rawVal) && rawVal.length > 5) {
+              cellValue = String(r.station || '');
+          } else {
+              cellValue = rawVal || String(r.station || '');
+          }
         } else {
           cellValue = String(r.station || '');
         }
+      }
+      else if (colId === 'transactionCode') {
+        cellValue = String(r.transactionId || (r.rawData ? r.rawData['CODIGO TRANSACAO'] || r.rawData['CÓDIGO TRANSAÇÃO'] : '') || '');
       }
       else if (colId === 'vehiclePlate') {
         const veh = vehicles.find(v => v.plate === r.vehiclePlate);
@@ -826,12 +937,21 @@ export function Fuel() {
         else if (colId === 'station') {
           if (r.rawData) {
             const keys = Object.keys(r.rawData);
-            const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO'));
-            if (stationKey && r.rawData[stationKey]) cellValue = String(r.rawData[stationKey]);
-            else cellValue = String(r.station || '');
+            const stationKey = keys.find(k => k.toUpperCase().includes('NOME ESTABELECIMENTO')) || 
+                               keys.find(k => k.toUpperCase().includes('POSTO') || k.toUpperCase().includes('ESTABELECIMENTO'));
+            
+            const rawVal = stationKey ? String(r.rawData[stationKey] || '') : '';
+            if (rawVal && /^\d+$/.test(rawVal) && rawVal.length > 5) {
+                cellValue = String(r.station || '');
+            } else {
+                cellValue = rawVal || String(r.station || '');
+            }
           } else {
             cellValue = String(r.station || '');
           }
+        }
+        else if (colId === 'transactionCode') {
+          cellValue = String(r.transactionId || (r.rawData ? r.rawData['CODIGO TRANSACAO'] || r.rawData['CÓDIGO TRANSAÇÃO'] : '') || '');
         }
         else if (colId === 'vehiclePlate') {
           const veh = vehicles.find(v => v.plate === r.vehiclePlate);
@@ -1291,7 +1411,7 @@ export function Fuel() {
             )}
           </div>
       </motion.div>
-      <motion.div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden mb-10" variants={itemVariants}>
+      <motion.div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm mb-10" variants={itemVariants}>
         <div className="p-6 border-b border-outline-variant bg-white flex justify-between items-center">
           <h4 className="text-[18px] font-semibold text-primary">Histórico de Abastecimentos</h4>
           <button 
@@ -1302,11 +1422,11 @@ export function Fuel() {
             Ver Relatório Completo
           </button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[450px] scrollbar-thin">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
-                {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'odometer', 'liters', 'totalValue'].includes(opt.id)).map(opt => (
+                {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'liters', 'totalValue'].includes(opt.id)).map(opt => (
                   <th key={opt.id} className="p-0 relative group">
                     <div className="flex items-center">
                       <button 
@@ -1327,7 +1447,7 @@ export function Fuel() {
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
               {sortedRecords.map((item) => {
-                const cols = columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'odometer', 'liters', 'totalValue'].includes(opt.id));
+                const cols = columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'liters', 'totalValue'].includes(opt.id));
                 return (
                   <tr key={item.id} className="hover:bg-surface-container/50 transition-colors group cursor-pointer" onClick={() => setSelectedRecord(item)}>
                     {cols.map(col => {
@@ -1342,6 +1462,11 @@ export function Fuel() {
                             <span className="font-semibold text-sm text-primary leading-none mb-1">{item.vehicleModel || 'N/A'}</span>
                             <span className="font-mono text-xs text-on-surface-variant font-bold tracking-widest"><PrivateValue value={item.vehiclePlate} /></span>
                           </div>
+                        </td>
+                      );
+                      if (col.id === 'transactionCode') return (
+                        <td key={col.id} className="px-6 py-4 text-[13px] font-mono text-on-surface">
+                          {item.transactionId || (item.rawData ? item.rawData['CODIGO TRANSACAO'] || item.rawData['CÓDIGO TRANSAÇÃO'] || '-' : '-')}
                         </td>
                       );
                       if (col.id === 'workName') return (
@@ -1482,8 +1607,82 @@ export function Fuel() {
                 ))}
               </div>
 
-              <div className="flex-1 overflow-auto p-8 bg-slate-100 scrollbar-thin scrollbar-thumb-primary/20">
-                <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-12 min-h-full border border-outline-variant ${selectedColumns.length > 5 ? 'w-fit min-w-[1000px]' : 'max-w-[800px]'}`}>
+              <div className="flex flex-1 overflow-hidden">
+                {/* Profiles Sidebar */}
+                <div className="w-[300px] bg-white border-r border-outline-variant flex flex-col p-6 overflow-y-auto custom-scrollbar">
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="text-lg font-bold text-on-surface flex items-center gap-2">
+                       <span className="material-symbols-outlined text-primary">bookmark</span>
+                       Perfis Salvos
+                    </h4>
+                    <button 
+                      onClick={() => { setEditingProfileId(null); setEditingProfileName('Novo Perfil'); }}
+                      className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors"
+                    >
+                       <span className="material-symbols-outlined text-[20px]">add</span>
+                    </button>
+                  </div>
+
+                  {editingProfileName !== '' && (
+                    <div className="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-4">
+                       <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Editar Nome do Perfil</label>
+                       <input 
+                         type="text" 
+                         value={editingProfileName}
+                         onChange={e => setEditingProfileName(e.target.value)}
+                         autoFocus
+                         className="w-full h-10 px-3 border border-outline-variant rounded-lg text-sm mb-3 focus:outline-none focus:border-primary"
+                       />
+                       <div className="flex gap-2">
+                          <button onClick={handleSaveProfile} className="flex-1 h-9 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-dark transition-colors">
+                              Atualizar Perfil
+                          </button>
+                          <button onClick={() => { setEditingProfileId(null); setEditingProfileName(''); }} className="flex-1 h-9 bg-surface-container-high text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-highest transition-colors">
+                              Cancelar
+                          </button>
+                       </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {reportProfiles.map(p => (
+                      <div 
+                        key={p.id}
+                        className="group bg-surface-container border border-primary/20 rounded-xl p-4 cursor-pointer hover:bg-primary/5 hover:border-primary transition-all relative overflow-hidden"
+                        onClick={() => handleApplyProfile(p)}
+                      >
+                         <div className="flex justify-between items-start mb-1">
+                           <h5 className="font-bold text-on-surface text-sm">{p.name}</h5>
+                           <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); setEditingProfileId(p.id); setEditingProfileName(p.name); }}
+                               className="p-1 text-primary hover:bg-primary/10 rounded"
+                             >
+                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                             </button>
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); setReportProfiles(prev => prev.filter(x => x.id !== p.id)); }}
+                               className="p-1 text-error hover:bg-error/10 rounded"
+                             >
+                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                             </button>
+                           </div>
+                         </div>
+                         <p className="text-[11px] text-on-surface-variant">
+                           {p.columns.length} campos • {p.columns.length > 5 ? 'Paisagem' : 'Retrato'}
+                         </p>
+                      </div>
+                    ))}
+                    {reportProfiles.length === 0 && editingProfileName === '' && (
+                      <p className="text-center text-sm text-on-surface-variant italic py-10 opacity-70">
+                         Nenhum perfil salvo
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-auto p-8 bg-slate-100 scrollbar-thin scrollbar-thumb-primary/20">
+                  <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-12 min-h-full border border-outline-variant ${selectedColumns.length > 5 ? 'w-fit min-w-[1000px]' : 'max-w-[800px]'}`}>
                   {/* PDF header mockup */}
                   <div className="flex justify-between items-start border-b-4 border-primary/10 pb-8 mb-8">
                     <div className="flex flex-col items-start gap-1">
@@ -1590,6 +1789,7 @@ export function Fuel() {
                                   );
                                   
                                   if (opt.id === 'totalValue') return <span className="font-bold text-primary">R$ {Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
+                                  if (opt.id === 'transactionCode') return <span className="font-mono">{r.transactionId || (r.rawData ? r.rawData['CODIGO TRANSACAO'] || r.rawData['CÓDIGO TRANSAÇÃO'] || '-' : '-')}</span>;
                                   if (opt.id === 'unitPrice') return <span className="">R$ {(Number(r.totalValue || 0) / (Number(r.liters) || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
                                   if (opt.id === 'station') {
                                     if (r.rawData) {
@@ -1652,6 +1852,7 @@ export function Fuel() {
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             </motion.div>
           </motion.div>

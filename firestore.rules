@@ -89,11 +89,7 @@ service cloud.firestore {
     }
 
     // --- Rules ---
-    match /occurrences/{occurrenceId} {
-       allow read: if isSignedIn();
-       allow write: if isSignedIn();
-    }
-    
+    // --- Rules ---
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == userId;
@@ -101,7 +97,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /vehicles/{allVehicles=**} {
+    match /vehicles/{document=**} {
       allow read, write, delete: if isSignedIn();
     }
 
@@ -119,7 +115,7 @@ service cloud.firestore {
 
     match /fuel_records/{document=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.token.email_verified == true;
+      allow write: if isSignedIn();
     }
 
     match /fuel_imports/{document=**} {
@@ -134,7 +130,15 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /maintenances/{maintenanceId} {
+      allow read, write: if isSignedIn();
+    }
+
     match /maintenance_history/{historyId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /checklist_history/{checklistId} {
       allow read, write: if isSignedIn();
     }
 
@@ -143,52 +147,57 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    match /maintenances/{maintenanceId} {
-      allow read, write: if isSignedIn();
-    }
-
     match /inspections/{docId} {
       allow read, write: if isSignedIn();
       match /{allChildren=**} {
         allow read, write: if isSignedIn();
       }
     }
-    match /{path=**}/maintenances/{doc} {
-      allow read: if isSignedIn();
+
+    match /auto_alertas/{alertaId} {
+      allow read, create, update, delete: if isSignedIn();
     }
+
+    match /preApprovedAccess/{accessId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.email == request.auth.token.email);
+      allow write: if isAdmin();
+    }
+
+    match /config/{configId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /profiles/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /notifications/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /invoices/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /occurrences/{occurrenceId} {
+      allow read, write: if isSignedIn();
+    }
+
     match /{path=**}/records/{record} {
       allow read: if true;
     }
     match /{path=**}/items/{item} {
       allow read: if true;
     }
+    match /{path=**}/maintenances/{doc} {
+      allow read: if isSignedIn();
+    }
     match /{path=**}/signatures/{sig} {
       allow read: if true;
-    }
-
-    match /checklist_history/{checklistId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    match /autoAlerts/{alertaId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-    
-    match /auto_alertas/{alertaId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-    
-    match /preApprovedAccess/{accessId} {
-      allow read: if isSignedIn() && resource.data.email == request.auth.token.email;
-      allow write: if isAdmin();
-    }
-    
-    match /config/{configId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    match /settings/{settingId} {
-      allow read, write: if isSignedIn();
     }
   }
 }

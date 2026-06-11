@@ -122,12 +122,12 @@ export function AutoAlerta() {
               <span className="material-symbols-outlined" style={{ fontSize: '2.5rem' }}>campaign</span>
             </div>
             <div>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#000000', margin: 0 }}>AutoAlerta Emitido</h2>
-              <p style={{ color: '#666666', marginTop: '0.5rem' }}>Seu reporte foi enviado com sucesso.</p>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#000000', margin: 0 }}>AUTOALERTA EMITIDO</h2>
+              <p style={{ color: '#666666', marginTop: '0.75rem', fontSize: '1.1rem' }}>Seu reporte foi enviado com sucesso.</p>
             </div>
-            <div style={{ padding: '0.75rem 2rem', borderRadius: '0.75rem', backgroundColor: '#f3f4f6' }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#666666' }}>Nº do Pedido</span>
-              <p style={{ fontSize: '1.5rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#2563eb', margin: 0 }}>{successData.number}</p>
+            <div style={{ padding: '1rem 3rem', borderRadius: '1rem', backgroundColor: '#f3f4f6', marginTop: '1rem' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#666666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nº DO PEDIDO</span>
+              <p style={{ fontSize: '2rem', fontFamily: 'monospace', fontWeight: 'bold', color: '#2563eb', margin: '0.5rem 0 0 0' }}>{successData.number}</p>
             </div>
           </div>
 

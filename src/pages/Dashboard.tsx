@@ -13,8 +13,8 @@ import {
   limit
 } from "firebase/firestore";
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -511,7 +511,7 @@ export function Dashboard() {
             Alertas Ativos
           </h3>
           <p className="text-[48px] font-bold text-on-surface mt-1 leading-[1.2] tracking-[-0.02em]">
-            {alerts.length + expiredInspections.filter(i => i.type === 'expired').length}
+            {alerts.length + expiredInspections.length + nextServices.filter(os => os.priority === 'Crítica' || os.priority === 'Alta' || os.priority === 'Média').length}
           </p>
         </motion.div>
       </motion.div>
@@ -539,51 +539,54 @@ export function Dashboard() {
                 minWidth={0}
                 minHeight={0}
               >
-                <BarChart
+                <AreaChart
                   data={costCenterStats}
                   margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
                 >
                   <CartesianGrid
-                    strokeDasharray="3 3"
-                    horizontal={true}
-                    vertical={false}
-                    stroke="#E2E8F0"
-                  />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fontSize: 10, fontWeight: 600, fill: "#64748B" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10, fontWeight: 600, fill: "#64748B" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(0,0,0,0.02)" }}
-                    contentStyle={{
-                      borderRadius: "12px",
-                      border: "1px solid #E2E8F0",
-                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                    }}
-                    labelStyle={{ fontWeight: "bold", marginBottom: "4px" }}
-                  />
-                  <Bar
-                    dataKey="value"
-                    radius={[4, 4, 0, 0]}
-                    barSize={40}
-                    name="Veículos"
-                  >
-                    {costCenterStats.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                  strokeDasharray="3 3"
+                  horizontal={true}
+                  vertical={false}
+                  stroke="#E2E8F0"
+                />
+                <defs>
+                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fontSize: 10, fontWeight: 600, fill: "#64748B" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fontWeight: 600, fill: "#64748B" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  cursor={{ stroke: '#0ea5e9', strokeWidth: 2 }}
+                  contentStyle={{
+                    borderRadius: "12px",
+                    border: "1px solid #E2E8F0",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                  labelStyle={{ fontWeight: "bold", marginBottom: "4px" }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#0ea5e9"
+                  strokeWidth={4}
+                  fillOpacity={1}
+                  fill="url(#colorValue)"
+                  animationDuration={1500}
+                  name="Veículos"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center border-2 border-dashed border-outline-variant/30 rounded-xl">
                 <p className="text-on-surface-variant italic text-sm text-center px-10">
@@ -695,7 +698,7 @@ export function Dashboard() {
             </div>
           </div>
           <button
-            onClick={() => setIsAlertCenterOpen(true)}
+            onClick={() => navigate('/autoalerta-admin')}
             className="mt-8 bg-primary-fixed text-on-primary-fixed w-full py-4 rounded-lg font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform"
           >
             Ver Central de Alertas
