@@ -10,7 +10,8 @@ import {
   collectionGroup,
   getDocs,
   query,
-  limit
+  limit,
+  where
 } from "firebase/firestore";
 import {
   AreaChart,
@@ -101,9 +102,9 @@ export function Dashboard() {
         const itemsQ = query(collectionGroup(db, "items"), limit(200));
         const recordsQ = query(collectionGroup(db, "records"), limit(200));
         
-        // Auto Alertas "open" or "pendente" (assuming status !== "resolvido")
-        const autoAlertsQ = query(collection(db, "auto_alertas"), where("status", "in", ["open", "pendente"]));
-        // Maintenance where origin is "auto_alerta" and status !== "Concluído"
+        // Capturando todos os AutoAlertas que não foram tratados ou ignorados
+        const autoAlertsQ = query(collection(db, "auto_alertas"));
+        // Maintenance where status !== "Concluída"
         const maintenanceQ = query(collection(db, "maintenance"), where("status", "!=", "Concluída"));
 
         const [itemsSnap, recordsSnap, autoAlertsSnap, maintenanceSnap] = await Promise.all([
@@ -115,11 +116,20 @@ export function Dashboard() {
         
         if (!isMounted) return;
 
-        setOpenAutoAlertsCount(autoAlertsSnap.size);
+        // Filtro em memória para ser mais resiliente a variações de status (capitalização, etc)
+        const activeAlerts = autoAlertsSnap.docs.filter(doc => {
+          const s = (doc.data().status || "").toLowerCase();
+          return s === 'pendente' || s === 'open' || s === 'pending' || s === 'atendimento';
+        });
+        setOpenAutoAlertsCount(activeAlerts.length);
+
         let openOsCount = 0;
         maintenanceSnap.forEach(doc => {
-            if (doc.data().origin === 'auto_alerta') openOsCount++;
-            if (doc.data().autoAlertaId) openOsCount++; // check both possibilities
+            const data = doc.data();
+            // Conta se a origem for auto_alerta OU se tiver vínculo com um autoAlertaId
+            if (data.origin === 'auto_alerta' || data.autoAlertaId) {
+              openOsCount++;
+            }
         });
         setOpenAutoOSCount(openOsCount);
 
