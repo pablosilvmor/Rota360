@@ -1224,6 +1224,7 @@ export function Fuel() {
                   <XAxis dataKey="date" tick={{fontSize: 12}} stroke="#888" tickLine={false} axisLine={false} />
                   <YAxis tick={{fontSize: 12}} stroke="#888" tickLine={false} axisLine={false} />
                   <Tooltip 
+                    cursor={{ fill: 'transparent' }}
                     formatter={(value: any) => [`${Number(value).toLocaleString('pt-BR')} L`, 'Litros']}
                     labelFormatter={(label) => `Data: ${label}`}
                   />
@@ -1426,7 +1427,7 @@ export function Fuel() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
-                {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'liters', 'totalValue'].includes(opt.id)).map(opt => (
+                {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'fuelType', 'liters', 'totalValue'].includes(opt.id) && opt.label !== 'Combustível').map(opt => (
                   <th key={opt.id} className="p-0 relative group">
                     <div className="flex items-center">
                       <button 
@@ -1447,7 +1448,7 @@ export function Fuel() {
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
               {sortedRecords.map((item) => {
-                const cols = columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'liters', 'totalValue'].includes(opt.id));
+                const cols = columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'fuelType', 'liters', 'totalValue'].includes(opt.id) && opt.label !== 'Combustível');
                 return (
                   <tr key={item.id} className="hover:bg-surface-container/50 transition-colors group cursor-pointer" onClick={() => setSelectedRecord(item)}>
                     {cols.map(col => {
@@ -1497,6 +1498,11 @@ export function Fuel() {
                       if (col.id === 'odometer') return (
                         <td key={col.id} className="px-6 py-4 text-[13px] font-mono text-on-surface">
                           {item.odometer?.toLocaleString('pt-BR') || '-'}
+                        </td>
+                      );
+                      if (col.id === 'fuelType') return (
+                        <td key={col.id} className="px-6 py-4 text-[13px] text-on-surface">
+                          {item.fuelType || '-'}
                         </td>
                       );
                       if (col.id === 'liters') return (

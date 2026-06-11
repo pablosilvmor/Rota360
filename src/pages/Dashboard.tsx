@@ -21,6 +21,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  BarChart,
+  Bar,
 } from "recharts";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -87,6 +89,8 @@ export function Dashboard() {
 
   const [nextServices, setNextServices] = useState<any[]>([]);
   const [costCenterStats, setCostCenterStats] = useState<any[]>([]);
+  const [openAutoAlertsCount, setOpenAutoAlertsCount] = useState(0);
+  const [openAutoOSCount, setOpenAutoOSCount] = useState(0);
 
   // 1. Fetch dynamic data initially
   useEffect(() => {
@@ -96,13 +100,28 @@ export function Dashboard() {
       try {
         const itemsQ = query(collectionGroup(db, "items"), limit(200));
         const recordsQ = query(collectionGroup(db, "records"), limit(200));
+        
+        // Auto Alertas "open" or "pendente" (assuming status !== "resolvido")
+        const autoAlertsQ = query(collection(db, "auto_alertas"), where("status", "in", ["open", "pendente"]));
+        // Maintenance where origin is "auto_alerta" and status !== "Concluído"
+        const maintenanceQ = query(collection(db, "maintenance"), where("status", "!=", "Concluída"));
 
-        const [itemsSnap, recordsSnap] = await Promise.all([
+        const [itemsSnap, recordsSnap, autoAlertsSnap, maintenanceSnap] = await Promise.all([
           getDocs(itemsQ),
-          getDocs(recordsQ)
+          getDocs(recordsQ),
+          getDocs(autoAlertsQ),
+          getDocs(maintenanceQ)
         ]);
         
         if (!isMounted) return;
+
+        setOpenAutoAlertsCount(autoAlertsSnap.size);
+        let openOsCount = 0;
+        maintenanceSnap.forEach(doc => {
+            if (doc.data().origin === 'auto_alerta') openOsCount++;
+            if (doc.data().autoAlertaId) openOsCount++; // check both possibilities
+        });
+        setOpenAutoOSCount(openOsCount);
 
         const iMap: Record<string, any> = {};
         itemsSnap.forEach((doc) => {
@@ -520,7 +539,7 @@ export function Dashboard() {
         className="grid grid-cols-12 gap-6 mb-6"
         variants={itemVariants}
       >
-        <div className="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div className="col-span-12 lg:col-span-6 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-outline-variant flex items-center justify-between">
             <div>
               <h3 className="text-[20px] font-semibold">
@@ -539,7 +558,7 @@ export function Dashboard() {
                 minWidth={0}
                 minHeight={0}
               >
-                <AreaChart
+                <BarChart
                   data={costCenterStats}
                   margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
                 >
@@ -549,12 +568,6 @@ export function Dashboard() {
                   vertical={false}
                   stroke="#E2E8F0"
                 />
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
                 <XAxis 
                   dataKey="name" 
                   tick={{ fontSize: 10, fontWeight: 600, fill: "#64748B" }}
@@ -567,7 +580,7 @@ export function Dashboard() {
                   tickLine={false}
                 />
                 <Tooltip
-                  cursor={{ stroke: '#0ea5e9', strokeWidth: 2 }}
+                  cursor={{ fill: 'transparent' }}
                   contentStyle={{
                     borderRadius: "12px",
                     border: "1px solid #E2E8F0",
@@ -575,18 +588,20 @@ export function Dashboard() {
                   }}
                   labelStyle={{ fontWeight: "bold", marginBottom: "4px" }}
                 />
-                <Area
-                  type="monotone"
+                <Bar
                   dataKey="value"
-                  stroke="#0ea5e9"
-                  strokeWidth={4}
-                  fillOpacity={1}
-                  fill="url(#colorValue)"
+                  fill="#0ea5e9"
+                  radius={[6, 6, 0, 0]}
                   animationDuration={1500}
-                  name="Veículos"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+                >
+                  {
+                    costCenterStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={`hsl(199, 89%, ${48 + (index * 5)}%)`} />
+                    ))
+                  }
+                </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center border-2 border-dashed border-outline-variant/30 rounded-xl">
                 <p className="text-on-surface-variant italic text-sm text-center px-10">
@@ -594,6 +609,23 @@ export function Dashboard() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="col-span-12 lg:col-span-2 flex flex-col gap-6">
+          <div className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm text-center flex-1 flex flex-col items-center justify-center group hover:-translate-y-1 transition-transform duration-300">
+             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+               <span className="material-symbols-outlined text-primary text-2xl">build_circle</span>
+             </div>
+             <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">OS Automáticas</p>
+             <h2 className="text-4xl font-black text-on-surface mt-1">{openAutoOSCount}</h2>
+          </div>
+          <div className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm text-center flex-1 flex flex-col items-center justify-center group hover:-translate-y-1 transition-transform duration-300">
+             <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+               <span className="material-symbols-outlined text-error text-2xl">warning</span>
+             </div>
+             <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">AutoAlertas</p>
+             <h2 className="text-4xl font-black text-on-surface mt-1">{openAutoAlertsCount}</h2>
           </div>
         </div>
 

@@ -154,6 +154,9 @@ service cloud.firestore {
       }
     }
 
+    match /alerts/{docId} {
+      allow read, write: if isSignedIn();
+    }
     match /auto_alertas/{alertaId} {
       allow read, create, update, delete: if isSignedIn();
     }

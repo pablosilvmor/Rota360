@@ -126,22 +126,6 @@ const MODULES: ModuleData[] = [
       { key: 'phone', label: 'Telefone', renderer: (val) => <PrivateValue value={val} /> },
       { key: 'vehicleAssigned', label: 'Veículo Atribuído' },
     ]
-  },
-  {
-    id: 'inspections',
-    name: 'Inspeções',
-    collectionId: 'inspections',
-    icon: 'fact_check',
-    columns: [
-      { key: 'vehiclePlate', label: 'Placa', renderer: (val) => <PrivateValue value={val} /> },
-      { key: 'driverName', label: 'Motorista', renderer: (val) => <PrivateValue value={val} /> },
-      { key: 'date', label: 'Data', renderer: formatDate },
-      { key: 'type', label: 'Tipo' },
-      { key: 'odometer', label: 'Odômetro' },
-      { key: 'fuelLevel', label: 'Nível' },
-      { key: 'status', label: 'Status' },
-      { key: 'finalStatus', label: 'Diagnóstico' },
-    ]
   }
 ];
 
@@ -239,6 +223,57 @@ export function Reports() {
   const [footerLogo, setFooterLogo] = useState<{src: string, ratio: number} | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [exportProgress, setExportProgress] = useState(0);
+  type ReportProfile = {
+    id: string;
+    name: string;
+    moduleId: string | null;
+    columns: string[];
+    filters: {
+      searchTerm: string;
+      work: string[];
+      status: string[];
+    };
+  };
+  const [reportProfiles, setReportProfiles] = useLocalStorageState<ReportProfile[]>('reports_savedProfiles', []);
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [editingProfileName, setEditingProfileName] = useState('');
+
+  const handleSaveProfile = () => {
+    if (!editingProfileName.trim()) return;
+    
+    if (editingProfileId) {
+      setReportProfiles(prev => prev.map(p => 
+        p.id === editingProfileId 
+          ? { ...p, name: editingProfileName, moduleId: selectedModuleId, columns: selectedColumns, filters: { searchTerm: reportSearchTerm, work: filterWork, status: filterStatus } }
+          : p
+      ));
+    } else {
+      const newProfile: ReportProfile = {
+        id: Date.now().toString(),
+        name: editingProfileName,
+        moduleId: selectedModuleId,
+        columns: selectedColumns,
+        filters: { searchTerm: reportSearchTerm, work: filterWork, status: filterStatus }
+      };
+      setReportProfiles(prev => [...prev, newProfile]);
+    }
+    setEditingProfileId(null);
+    setEditingProfileName('');
+  };
+
+  const handleApplyProfile = (profile: ReportProfile) => {
+    if (profile.moduleId && profile.moduleId !== selectedModuleId) {
+       const mod = MODULES.find(m => m.id === profile.moduleId);
+       if (mod) {
+         setSelectedModuleId(mod.id);
+         fetchModuleData(mod);
+       }
+    }
+    setSelectedColumns(profile.columns);
+    setReportSearchTerm(profile.filters.searchTerm);
+    setFilterWork(profile.filters.work);
+    setFilterStatus(profile.filters.status);
+  };
 
   useEffect(() => {
     const qWorks = query(collection(db, 'works'), orderBy('name', 'asc'));
@@ -827,9 +862,88 @@ export function Reports() {
           ) : (
             <motion.div 
               initial="hidden" animate="visible" variants={itemVariants}
-              className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col"
+              className="flex border border-outline-variant rounded-2xl shadow-sm overflow-hidden bg-surface-container-lowest flex-col xl:flex-row"
             >
-              <div className="p-4 border-b border-outline-variant bg-surface-container-low/30 flex justify-between items-center flex-wrap gap-4">
+              {/* Profiles Sidebar */}
+              <div className="w-full xl:w-[300px] border-b xl:border-b-0 xl:border-r border-outline-variant flex flex-col p-6 overflow-y-auto bg-white custom-scrollbar flex-shrink-0 relative">
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="text-lg font-bold text-on-surface flex items-center gap-2">
+                       <span className="material-symbols-outlined text-primary">bookmark</span>
+                       Perfis Salvos
+                    </h4>
+                    <button 
+                      onClick={() => { setEditingProfileId(null); setEditingProfileName('Novo Perfil'); }}
+                      className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors"
+                    >
+                       <span className="material-symbols-outlined text-[20px]">add</span>
+                    </button>
+                  </div>
+
+                  {editingProfileName !== '' && (
+                    <div className="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-4">
+                       <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Editar Nome do Perfil</label>
+                       <input 
+                         type="text" 
+                         value={editingProfileName}
+                         onChange={e => setEditingProfileName(e.target.value)}
+                         autoFocus
+                         className="w-full h-10 px-3 border border-outline-variant rounded-lg text-sm mb-3 focus:outline-none focus:border-primary"
+                       />
+                       <div className="flex gap-2">
+                          <button onClick={handleSaveProfile} className="flex-1 h-9 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-dark transition-colors">
+                              Atualizar
+                          </button>
+                          <button onClick={() => { setEditingProfileId(null); setEditingProfileName(''); }} className="flex-1 h-9 bg-surface-container-high text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-highest transition-colors">
+                              Cancelar
+                          </button>
+                       </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {reportProfiles.map(p => {
+                      const mod = MODULES.find(m => m.id === p.moduleId);
+                      return (
+                      <div 
+                        key={p.id}
+                        className="group bg-surface-container border border-primary/20 rounded-xl p-4 cursor-pointer hover:bg-primary/5 hover:border-primary transition-all relative overflow-hidden"
+                        onClick={() => handleApplyProfile(p)}
+                      >
+                         <div className="flex justify-between items-start mb-1">
+                           <h5 className="font-bold text-on-surface text-sm">{p.name}</h5>
+                           <div className="flex gap-1 opacity-100 xl:opacity-0 group-hover:opacity-100 transition-opacity">
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); setEditingProfileId(p.id); setEditingProfileName(p.name); }}
+                               className="p-1 text-primary hover:bg-primary/10 rounded"
+                             >
+                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                             </button>
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); setReportProfiles(prev => prev.filter(x => x.id !== p.id)); }}
+                               className="p-1 text-error hover:bg-error/10 rounded"
+                             >
+                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                             </button>
+                           </div>
+                         </div>
+                         <p className="text-[11px] text-on-surface-variant font-medium">
+                           {mod?.name || 'Base Desconhecida'}
+                         </p>
+                         <p className="text-[10px] text-on-surface-variant mt-1">
+                           {p.columns.length} campos • {p.columns.length > 5 ? 'Paisagem' : 'Retrato'}
+                         </p>
+                      </div>
+                    )})}
+                    {reportProfiles.length === 0 && editingProfileName === '' && (
+                      <p className="text-center text-sm text-on-surface-variant italic py-10 opacity-70">
+                         Nenhum perfil salvo
+                      </p>
+                    )}
+                  </div>
+              </div>
+
+              <div className="flex-1 flex flex-col bg-surface-container-lowest overflow-hidden min-w-0">
+                <div className="p-4 border-b border-outline-variant bg-surface-container-low/30 flex justify-between items-center flex-wrap gap-4">
                 <div>
                   <h3 className="font-bold text-on-surface text-lg">Pré-visualização</h3>
                   <p className="text-sm text-on-surface-variant flex items-center gap-1">
@@ -957,6 +1071,7 @@ export function Reports() {
                   Mostrando os primeiros 15 de {data.length} registros. O PDF incluirá todos os registros.
                 </div>
               )}
+              </div>
             </motion.div>
           )}
         </div>
