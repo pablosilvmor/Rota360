@@ -1,6 +1,6 @@
 {
   "name": "Rota 360",
-  "description": "",
+  "description": "Sistema de gestão de frotas e logística com controle de notas fiscais, abastecimentos e manutenções.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

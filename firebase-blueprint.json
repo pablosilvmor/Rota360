@@ -143,6 +143,22 @@
     "/statuses/{statusId}": {
       "schema": { "$ref": "#/entities/Status" },
       "description": "Managed statuses"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": { "type": "object" },
+      "description": "Stored invoices"
+    },
+    "/invoice_drafts/{draftId}": {
+      "schema": { "type": "object" },
+      "description": "Invoices saved as drafts"
+    },
+    "/invoice_imports/{importId}": {
+      "schema": { "type": "object" },
+      "description": "History of invoice imports"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "type": "object" },
+      "description": "System audit logs"
     }
   }
 }

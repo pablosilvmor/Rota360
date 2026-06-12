@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { collection, query, orderBy, onSnapshot, where, writeBatch, doc, deleteDoc } from 'firebase/firestore';
-import { auditDelete } from '../lib/audit';
-import { db } from '../lib/firebase';
+import { collection, query, orderBy, onSnapshot, where, writeBatch, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { auditDelete, logAudit } from '../lib/audit';
+import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from 'html2canvas';
@@ -22,6 +22,8 @@ export interface Invoice {
   linkedVehicle?: string;
   xmlContent?: string;
   key?: string;
+  importId?: string;
+  importDate?: string;
 }
 
 const extractXmlTag = (xml: string, tag: string) => {
@@ -75,6 +77,9 @@ export function Invoices() {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [invoiceNotes, setInvoiceNotes] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'invoices' | 'history' | 'draft'>('invoices');
+  const [importHistory, setImportHistory] = useState<any[]>([]);
+  const [drafts, setDrafts] = useState<Invoice[]>([]);
   const invoicePreviewRef = useRef<HTMLDivElement>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,6 +93,113 @@ export function Invoices() {
   const [columnFilters, setColumnFilters] = useLocalStorageState('invoice_columnFilters', {} as Record<string, string[]>);
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [filterSearch, setFilterSearch] = useState('');
+
+  const handleMassDelete = async () => {
+    if (selectedInvoices.length === 0) return;
+    const targetCollection = activeTab === 'draft' ? 'invoice_drafts' : 'invoices';
+    
+    setConfirmMassDelete(false);
+    setSyncing(true);
+    try {
+      console.log(`Iniciando exclusão em massa de ${selectedInvoices.length} itens da coleção ${targetCollection}`);
+      const batch = writeBatch(db);
+      
+      // Obter dados para auditoria antes de deletar
+      const auditPromises = selectedInvoices.map(id => getDoc(doc(db, targetCollection, id)));
+      const snapshots = await Promise.all(auditPromises);
+      
+      for (const snapshot of snapshots) {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          const id = snapshot.id;
+          batch.delete(doc(db, targetCollection, id));
+          
+          // Registrar auditoria em segundo plano (não bloqueante para o batch)
+          logAudit('DELETE', 'Notas Fiscais (Massa)', targetCollection, id, data).catch(err => 
+            console.warn(`Erro ao auditar exclusão de ${id}:`, err)
+          );
+        }
+      }
+      
+      await batch.commit();
+      console.log('Exclusão em massa concluída com sucesso');
+      
+      setNotification({ message: `${selectedInvoices.length} notas excluídas com sucesso!`, type: 'success' });
+      setSelectedInvoices([]);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, targetCollection);
+      console.error('Erro ao excluir em massa:', error);
+      setNotification({ message: 'Erro de permissão ou conexão ao excluir notas.', type: 'error' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleCopyToDraft = async (invoice: Invoice) => {
+    try {
+      const draftId = `DRAFT-${invoice.id}`;
+      const draftRef = doc(db, 'invoice_drafts', draftId);
+      
+      const draftData = {
+        ...invoice,
+        id: draftId,
+        originalId: invoice.id,
+        isDraft: true,
+        importDate: new Date().toISOString()
+      };
+
+      await writeBatch(db).set(draftRef, draftData).commit();
+      
+      setNotification({ message: 'Nota copiada para o rascunho!', type: 'success' });
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.WRITE, 'invoice_drafts');
+      console.error('Erro ao copiar para rascunho:', error);
+      const errorMsg = error.code === 'permission-denied' 
+        ? 'Erro de permissão ao salvar rascunho.' 
+        : 'Erro ao copiar nota.';
+      setNotification({ message: errorMsg, type: 'error' });
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('all');
+    setFilterLinkedOnly(false);
+    setFilterMonth('Todos');
+    setFilterYear('Todos');
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setColumnFilters({});
+    setCurrentPage(1);
+  };
+
+  const handleTabChange = (tab: 'invoices' | 'history' | 'draft') => {
+    setActiveTab(tab);
+    setSelectedInvoices([]);
+    setCurrentPage(1);
+    setSearchTerm('');
+  };
+
+  const handleDeleteImport = async (importId: string) => {
+    setConfirmDeleteImportId(null);
+    setSyncing(true);
+    try {
+      const batch = writeBatch(db);
+      const importedInvoices = invoices.filter(inv => inv.importId === importId);
+      for (const inv of importedInvoices) {
+        batch.delete(doc(db, 'invoices', inv.id));
+      }
+      batch.delete(doc(db, 'invoice_imports', importId));
+      await batch.commit();
+      setNotification({ message: 'Importação e notas associadas excluídas.', type: 'success' });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'invoice_imports');
+      console.error('Erro ao excluir importação:', error);
+      setNotification({ message: 'Erro ao excluir importação.', type: 'error' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const ColumnFilter = ({ columnId, label }: { columnId: string, label: string }) => {
     const uniqueValues = React.useMemo(() => {
@@ -203,13 +315,17 @@ export function Invoices() {
   };
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmMassDelete, setConfirmMassDelete] = useState(false);
+  const [confirmDeleteImportId, setConfirmDeleteImportId] = useState<string | null>(null);
 
   const handleDeleteInvoice = async (id: string) => {
     try {
-      await auditDelete('invoices', id, 'Geral');
+      const targetCollection = activeTab === 'draft' ? 'invoice_drafts' : 'invoices';
+      await auditDelete(targetCollection, id, 'Geral');
       setNotification({ message: 'Nota fiscal excluída com sucesso!', type: 'success' });
       setConfirmDeleteId(null);
     } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, activeTab === 'draft' ? 'invoice_drafts' : 'invoices');
       console.error('Erro ao excluir nota fiscal:', error);
       setNotification({ message: 'Erro ao excluir nota fiscal. Verifique sua conexão ou permissões.', type: 'error' });
     }
@@ -228,6 +344,17 @@ export function Invoices() {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice));
       setInvoices(docs);
       setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'invoices');
+      setLoading(false);
+    });
+
+    const qDrafts = query(collection(db, 'invoice_drafts'), orderBy('issueDate', 'desc'));
+    const unsubscribeDrafts = onSnapshot(qDrafts, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice));
+      setDrafts(docs);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'invoice_drafts');
     });
 
     const handleSyncStatus = (e: any) => {
@@ -239,8 +366,18 @@ export function Invoices() {
 
     return () => {
       unsubscribe();
+      unsubscribeDrafts();
       window.removeEventListener('SYNC_STATUS_CHANGE', handleSyncStatus);
     };
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'invoice_imports'), orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setImportHistory(docs);
+    });
+    return unsubscribe;
   }, []);
 
   const handleManualSync = () => {
@@ -260,6 +397,9 @@ export function Invoices() {
     // Obter todas as chaves existentes para verificação rápida de duplicidade
     const existingKeys = new Set(invoices.map(inv => inv.key));
     
+    const importId = `IMPORT-${Date.now()}`;
+    const importDate = new Date().toISOString();
+
     try {
       for (const file of files) {
         if (!file.name.toLowerCase().endsWith('.xml')) {
@@ -301,13 +441,24 @@ export function Invoices() {
           status: 'autorizada',
           key: finalKey,
           xmlContent: content,
-          lastSync: new Date().toISOString(),
-          importMode: 'manual'
+          lastSync: importDate,
+          importMode: 'manual',
+          importId: importId,
+          importDate: importDate
         });
         importedCount++;
       }
       
       if (importedCount > 0) {
+        // Record import history
+        const importHistoryRef = doc(collection(db, 'invoice_imports'), importId);
+        batch.set(importHistoryRef, {
+          id: importId,
+          date: importDate,
+          count: importedCount,
+          fileName: files.length === 1 ? files[0].name : `${files.length} arquivos`,
+          userEmail: userData?.email || 'unknown'
+        });
         await batch.commit();
       }
 
@@ -730,8 +881,9 @@ export function Invoices() {
      setIsExporting(true);
      try {
        const zip = new JSZip();
+       const dataPool = activeTab === 'draft' ? drafts : invoices;
        for (const id of selectedInvoices) {
-          const invoice = invoices.find(i => i.id === id);
+          const invoice = dataPool.find(i => i.id === id);
           if (invoice) {
              const blob = await executePDFExport(invoice);
              zip.file(getExportFilename(invoice), blob);
@@ -751,7 +903,9 @@ export function Invoices() {
      setIsExporting(false);
   };
 
-  const filteredInvoices = invoices.filter(invoice => {
+  const currentDataSource = activeTab === 'draft' ? drafts : invoices;
+
+  const filteredInvoices = currentDataSource.filter(invoice => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
       searchTerm === '' ||
@@ -761,6 +915,8 @@ export function Invoices() {
       (invoice.key && invoice.key.includes(searchTerm)) ||
       invoice.value.toString().includes(searchTerm) ||
       (invoice.linkedVehicle && invoice.linkedVehicle.toLowerCase().includes(searchLower));
+    
+    if (activeTab === 'history') return true; // History uses different rendering
     
     const matchesStatus = filterStatus === 'all' || invoice.status === filterStatus;
     const matchesLinked = !filterLinkedOnly || !!invoice.linkedVehicle;
@@ -920,6 +1076,78 @@ export function Invoices() {
         )}
       </AnimatePresence>
 
+      {/* Import Delete Confirmation Modal */}
+      <AnimatePresence>
+        {confirmDeleteImportId && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-outline-variant"
+            >
+              <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <span className="material-symbols-outlined text-error text-[32px]">folder_delete</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface text-center mb-2">Excluir Lote Inteiro</h3>
+              <p className="text-on-surface-variant text-center mb-8 font-medium">
+                Deseja realmente excluir toda esta importação? Todas as notas associadas serão removidas permanentemente.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setConfirmDeleteImportId(null)}
+                  className="flex-1 px-6 py-3 border border-outline-variant text-on-surface font-bold rounded-2xl hover:bg-surface-container transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => handleDeleteImport(confirmDeleteImportId)}
+                  className="flex-1 px-6 py-3 bg-error text-white font-bold rounded-2xl hover:bg-error/90 shadow-lg shadow-error/20 transition-all font-bold"
+                >
+                  Excluir Lote
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Mass Delete Confirmation Modal */}
+      <AnimatePresence>
+        {confirmMassDelete && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-outline-variant"
+            >
+              <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <span className="material-symbols-outlined text-error text-[32px]">delete_sweep</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface text-center mb-2">Confirmar Exclusão em Massa</h3>
+              <p className="text-on-surface-variant text-center mb-8 font-medium">
+                Deseja realmente excluir {selectedInvoices.length} notas da aba {activeTab === 'draft' ? 'Rascunho' : 'Notas Fiscais'}? Esta ação é irreversível.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setConfirmMassDelete(false)}
+                  className="flex-1 px-6 py-3 border border-outline-variant text-on-surface font-bold rounded-2xl hover:bg-surface-container transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleMassDelete}
+                  className="flex-1 px-6 py-3 bg-error text-white font-bold rounded-2xl hover:bg-error/90 shadow-lg shadow-error/20 transition-all font-bold"
+                >
+                  Excluir Tudo
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {confirmDeleteId && (
@@ -962,14 +1190,24 @@ export function Invoices() {
              <span className="material-symbols-outlined text-[32px] text-primary">description</span>
           </div>
           <div>
-            <h1 className="text-[28px] font-bold text-on-surface tracking-tight leading-none mb-1">Notas Fiscais (NFe)</h1>
+            <h1 className="text-[28px] font-bold text-on-surface tracking-tight leading-none mb-1">
+              {activeTab === 'invoices' ? 'Notas Fiscais (NFe)' : activeTab === 'draft' ? 'Rascunho de Notas' : 'Histórico de Importação'}
+            </h1>
             <div className="flex items-center gap-3 text-on-surface-variant font-medium text-xs">
-               <span className="bg-surface-container px-2 py-0.5 rounded flex items-center gap-1">
-                 <span className="text-primary font-black">{filteredInvoices.length}</span> notas
-               </span>
-               <span className="bg-surface-container px-2 py-0.5 rounded flex items-center gap-1">
-                 Total <span className="text-primary font-black">{filteredInvoices.reduce((acc, inv) => acc + inv.value, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-               </span>
+               {(activeTab === 'invoices' || activeTab === 'draft') ? (
+                 <>
+                   <span className="bg-surface-container px-2 py-0.5 rounded flex items-center gap-1">
+                     <span className="text-primary font-black">{filteredInvoices.length}</span> notas
+                   </span>
+                   <span className="bg-surface-container px-2 py-0.5 rounded flex items-center gap-1">
+                     Total <span className="text-primary font-black">{filteredInvoices.reduce((acc, inv) => acc + inv.value, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                   </span>
+                 </>
+               ) : (
+                 <span className="bg-surface-container px-2 py-0.5 rounded flex items-center gap-1">
+                   <span className="text-primary font-black">{importHistory.length}</span> importações no total
+                 </span>
+               )}
                <span className="text-outline-variant">|</span>
                <span className="flex items-center gap-1">
                  <span className="material-symbols-outlined text-[14px]">calendar_today</span>
@@ -1138,24 +1376,68 @@ export function Invoices() {
               <option value="cancelada">CANCELADA</option>
               <option value="rejeitada">REJEITADA</option>
             </select>
-            {selectedInvoices.length > 0 && (
+
+            <button
+              onClick={handleClearFilters}
+              className="px-3 py-1.5 flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-all text-[10px] font-black uppercase tracking-tighter bg-surface-container-low border border-outline-variant/50 rounded-lg hover:border-primary/30"
+              title="Limpar Filtros"
+            >
+              <span className="material-symbols-outlined text-[14px]">filter_alt_off</span>
+              LIMPAR FILTROS
+            </button>
+
+          </div>
+        </div>
+
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-2 border-b border-outline-variant bg-surface-container-lowest">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleTabChange('invoices')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'invoices' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
+            >
+              Notas Fiscais
+            </button>
+            <button
+              onClick={() => handleTabChange('draft')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'draft' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
+            >
+              Rascunho
+            </button>
+            <button
+              onClick={() => handleTabChange('history')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
+            >
+              Histórico de Importação
+            </button>
+          </div>
+
+          {(activeTab === 'invoices' || activeTab === 'draft') && selectedInvoices.length > 0 && (
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleMassExport}
                 disabled={isExporting}
-                className="ml-2 px-4 py-2.5 bg-primary text-white font-bold rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-primary text-white font-bold rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-md"
               >
                 <span className={`material-symbols-outlined text-[18px] ${isExporting ? 'animate-spin' : ''}`}>
                   {isExporting ? 'progress_activity' : 'file_download'}
                 </span>
                 Exportar ({selectedInvoices.length})
               </button>
-            )}
-          </div>
+              <button
+                onClick={() => setConfirmMassDelete(true)}
+                className="px-4 py-2 bg-error text-white font-bold rounded-xl flex items-center gap-2 hover:bg-error/90 transition-colors shadow-md"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                Excluir ({selectedInvoices.length})
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="overflow-visible min-h-[500px]">
-          <table className="w-full text-left border-collapse table-auto">
-            <thead className="sticky top-[73px] z-[40] bg-surface-container-low shadow-sm">
+        {(activeTab === 'invoices' || activeTab === 'draft') ? (
+          <div className="overflow-visible min-h-[500px]">
+            <table className="w-full text-left border-collapse table-auto">
+              <thead className="sticky top-[73px] z-[40] bg-surface-container-low shadow-sm">
               <tr className="border-b border-outline-variant">
                 <th className="p-4 w-12 text-center">
                   <input
@@ -1264,6 +1546,19 @@ export function Invoices() {
                   </td>
                   <td className="p-4">
                      <div className="flex items-center justify-center gap-2">
+                       {activeTab === 'invoices' && (
+                         <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleCopyToDraft(invoice);
+                          }}
+                          className="p-1.5 text-on-surface-variant hover:text-secondary hover:bg-secondary/10 rounded-lg transition-colors" 
+                          title="Copiar para Rascunho"
+                         >
+                           <span className="material-symbols-outlined text-[20px] pointer-events-none">content_copy</span>
+                         </button>
+                       )}
                        <button 
                         onClick={(e) => {
                           e.preventDefault();
@@ -1381,7 +1676,10 @@ export function Invoices() {
                   setFilterStatus('all');
                   setFilterLinkedOnly(false);
                   setColumnFilters({});
-                  setSelectedPeriod('all');
+                  setFilterMonth('Todos');
+                  setFilterYear('Todos');
+                  setFilterStartDate('');
+                  setFilterEndDate('');
                   setCurrentPage(1);
                 }}
                 className="mt-6 text-primary font-bold hover:underline"
@@ -1391,7 +1689,69 @@ export function Invoices() {
             </div>
           )}
         </div>
-      </div>
+      ) : (
+        <div className="overflow-visible min-h-[500px]">
+           {/* History Table */}
+           <table className="w-full text-left border-collapse table-auto">
+             <thead className="sticky top-[73px] z-[40] bg-surface-container-low shadow-sm">
+               <tr className="border-b border-outline-variant">
+                 <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Lote / ID</th>
+                 <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Data da Importação</th>
+                 <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant text-center">Qtde</th>
+                 <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Arquivos / Origem</th>
+                 <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Usuário</th>
+                 <th className="p-4 text-center font-bold text-[11px] uppercase tracking-wider text-on-surface-variant">Ações</th>
+               </tr>
+             </thead>
+             <tbody className="divide-y divide-outline-variant/30">
+               {importHistory.filter(imp => {
+                 const searchLower = searchTerm.toLowerCase();
+                 return !searchTerm || 
+                   imp.id.toLowerCase().includes(searchLower) || 
+                   imp.fileName.toLowerCase().includes(searchLower) ||
+                   imp.userEmail.toLowerCase().includes(searchLower);
+               }).map((imp) => (
+                 <tr key={imp.id} className="hover:bg-surface-container-low transition-colors group">
+                   <td className="p-4">
+                     <div className="text-sm font-bold text-on-surface">{imp.id}</div>
+                   </td>
+                   <td className="p-4 text-sm text-on-surface-variant">
+                     {new Date(imp.date).toLocaleString('pt-BR')}
+                   </td>
+                   <td className="p-4 text-center">
+                     <span className="px-2 py-1 rounded-md bg-secondary/10 text-secondary text-xs font-bold font-mono">
+                       {imp.count} notas
+                     </span>
+                   </td>
+                   <td className="p-4 text-sm font-medium text-on-surface break-all max-w-[200px]">
+                     {imp.fileName}
+                   </td>
+                   <td className="p-4 text-xs font-semibold text-on-surface-variant italic">
+                     {imp.userEmail}
+                   </td>
+                   <td className="p-4 text-center">
+                     <button 
+                       onClick={() => handleDeleteImport(imp.id)}
+                       className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-colors"
+                       title="Excluir Lote Inteiro"
+                     >
+                       <span className="material-symbols-outlined text-[20px]">delete_sweep</span>
+                     </button>
+                   </td>
+                 </tr>
+               ))}
+               {importHistory.length === 0 && (
+                 <tr>
+                   <td colSpan={6} className="p-12 text-center text-on-surface-variant italic">
+                     Nenhum histórico de importação encontrado.
+                   </td>
+                 </tr>
+               )}
+             </tbody>
+           </table>
+        </div>
+      )}
+    </div>
 
       {previewInvoice && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 lg:p-8">
@@ -1403,30 +1763,30 @@ export function Invoices() {
           >
             {/* Modal Header */}
             <div className="p-4 border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary">picture_as_pdf</span>
-                 </div>
-                 <div>
-                   <h2 className="text-lg font-bold text-on-surface">Visualização de DANFE / Edição</h2>
-                   <p className="text-xs text-on-surface-variant font-medium">NF {previewInvoice.number} • {previewInvoice.issuerName}</p>
-                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                 <button 
-                  onClick={handleExportSingle}
-                  disabled={isExporting}
-                  className="px-6 py-2 bg-primary text-white text-sm font-bold rounded-full hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
-                 >
-                   <span className={`material-symbols-outlined text-[18px] ${isExporting ? 'animate-spin' : ''}`}>
-                     {isExporting ? 'progress_activity' : 'save'}
-                   </span>
-                   {isExporting ? 'Salvando...' : 'Salvar com Edições / Exportar PDF'}
-                 </button>
-                 <button onClick={() => setPreviewInvoice(null)} className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors">
-                   <span className="material-symbols-outlined text-[18px]">close</span>
-                 </button>
-              </div>
+               <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                     <span className="material-symbols-outlined text-primary">picture_as_pdf</span>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-on-surface">Visualização de DANFE / Edição</h2>
+                    <p className="text-xs text-on-surface-variant font-medium">NF {previewInvoice.number} • {previewInvoice.issuerName}</p>
+                  </div>
+               </div>
+               <div className="flex items-center gap-3">
+                  <button 
+                   onClick={handleExportSingle}
+                   disabled={isExporting}
+                   className="px-6 py-2 bg-primary text-white text-sm font-bold rounded-full hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <span className={`material-symbols-outlined text-[18px] ${isExporting ? 'animate-spin' : ''}`}>
+                      {isExporting ? 'progress_activity' : 'save'}
+                    </span>
+                    {isExporting ? 'Salvando...' : 'Salvar com Edições / Exportar PDF'}
+                  </button>
+                  <button onClick={() => setPreviewInvoice(null)} className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors">
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+               </div>
             </div>
 
             <div className="flex flex-1 overflow-hidden">

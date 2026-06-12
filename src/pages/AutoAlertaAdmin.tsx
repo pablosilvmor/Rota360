@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { collection, getDocs, query, orderBy, doc, updateDoc, deleteDoc, getDoc, where, limit, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { logAudit, auditDelete } from "../lib/audit";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { useNavigate } from "react-router";
 import { usePrivacy } from "../contexts/PrivacyContext";

@@ -17,6 +17,7 @@ import {
   addDoc
 } from "firebase/firestore";
 import { db, handleFirestoreError, OperationType } from "../lib/firebase";
+import { auditDelete } from "../lib/audit";
 import { useParams, useNavigate, Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { SearchableSelect } from "../components/SearchableSelect";

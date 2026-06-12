@@ -89,7 +89,14 @@ service cloud.firestore {
     }
 
     // --- Rules ---
-    // --- Rules ---
+    match /invoice_drafts/{document=**} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /invoices/{document=**} {
+      allow read, write: if isSignedIn();
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == userId;
@@ -119,6 +126,10 @@ service cloud.firestore {
     }
 
     match /fuel_imports/{document=**} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /invoice_imports/{document=**} {
       allow read, write: if isSignedIn();
     }
 
@@ -154,9 +165,6 @@ service cloud.firestore {
       }
     }
 
-    match /alerts/{docId} {
-      allow read, write: if isSignedIn();
-    }
     match /auto_alertas/{alertaId} {
       allow read, create, update, delete: if isSignedIn();
     }
@@ -182,8 +190,9 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
-    match /invoices/{docId} {
-      allow read, write: if isSignedIn();
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
     }
 
     match /occurrences/{occurrenceId} {
