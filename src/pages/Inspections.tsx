@@ -2482,7 +2482,7 @@ export function Inspections() {
     if (!checklist?.id) return;
     setIsDeletingChecklist(true);
     try {
-      await deleteDoc(doc(db, "checklist_history", checklist.id));
+      await auditDelete('checklist_history', checklist.id, 'Geral');
       setChecklistToDelete(null);
     } catch (error) {
       console.error("Error deleting checklist:", error);

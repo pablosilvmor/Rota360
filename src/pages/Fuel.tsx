@@ -1432,7 +1432,7 @@ export function Fuel() {
                     <div className="flex items-center">
                       <button 
                         onClick={() => handleSort(opt.id)} 
-                        className="flex-1 px-4 py-3 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter"
+                        className="flex-1 px-2 py-2 text-left text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer tracking-tighter"
                       >
                         {opt.label} 
                         <span className="material-symbols-outlined text-[16px] text-on-surface-variant/30 group-hover:text-primary transition-colors">{getSortIcon(opt.id)}</span>
@@ -1443,7 +1443,7 @@ export function Fuel() {
                     </div>
                   </th>
                 ))}
-                <th className="px-4 py-3 text-center text-xs font-semibold text-on-surface-variant uppercase tracking-tighter">Ações</th>
+                <th className="px-2 py-2 text-center text-xs font-semibold text-on-surface-variant uppercase tracking-tighter">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
@@ -1453,12 +1453,12 @@ export function Fuel() {
                   <tr key={item.id} className="hover:bg-surface-container/50 transition-colors group cursor-pointer" onClick={() => setSelectedRecord(item)}>
                     {cols.map(col => {
                       if (col.id === 'date') return (
-                        <td key={col.id} className="px-4 py-3 text-[13px] font-semibold whitespace-nowrap">
+                        <td key={col.id} className="px-2 py-2 text-[13px] font-semibold whitespace-nowrap">
                           {item.date?.toDate ? item.date.toDate().toLocaleDateString('pt-BR') : '-'}
                         </td>
                       );
                       if (col.id === 'vehiclePlate') return (
-                        <td key={col.id} className="px-4 py-3">
+                        <td key={col.id} className="px-2 py-2">
                           <div className="flex flex-col">
                             <span className="font-semibold text-sm text-primary leading-none mb-1">{item.vehicleModel || 'N/A'}</span>
                             <span className="font-mono text-xs text-on-surface-variant font-bold tracking-widest"><PrivateValue value={item.vehiclePlate} /></span>
@@ -1466,12 +1466,12 @@ export function Fuel() {
                         </td>
                       );
                       if (col.id === 'transactionCode') return (
-                        <td key={col.id} className="px-4 py-3 text-[13px] font-mono text-on-surface whitespace-nowrap">
+                        <td key={col.id} className="px-2 py-2 text-[13px] font-mono text-on-surface max-w-[100px] truncate">
                           {item.transactionId || (item.rawData ? item.rawData['CODIGO TRANSACAO'] || item.rawData['CÓDIGO TRANSAÇÃO'] || '-' : '-')}
                         </td>
                       );
                       if (col.id === 'workName') return (
-                        <td key={col.id} className="px-4 py-3 text-[13px] text-on-surface max-w-[150px] truncate">
+                        <td key={col.id} className="px-2 py-2 text-[13px] text-on-surface max-w-[130px] truncate">
                           {(() => {
                               const v = vehicles.find(v => v.plate === item.vehiclePlate);
                               const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || item.workName || 'Não informada';
@@ -1484,7 +1484,7 @@ export function Fuel() {
                         </td>
                       );
                       if (col.id === 'station') return (
-                        <td key={col.id} className="px-4 py-3 text-[13px] font-medium truncate max-w-[150px]" title={item.station}>
+                        <td key={col.id} className="px-2 py-2 text-[13px] font-medium truncate max-w-[130px]" title={item.station}>
                           {(() => {
                             if (item.rawData) {
                                const keys = Object.keys(item.rawData);
@@ -1496,17 +1496,17 @@ export function Fuel() {
                         </td>
                       );
                       if (col.id === 'odometer') return (
-                        <td key={col.id} className="px-4 py-3 text-[13px] font-mono text-on-surface whitespace-nowrap">
+                        <td key={col.id} className="px-2 py-2 text-[13px] font-mono text-on-surface whitespace-nowrap">
                           {item.odometer?.toLocaleString('pt-BR') || '-'}
                         </td>
                       );
                       if (col.id === 'fuelType') return (
-                        <td key={col.id} className="px-4 py-3 text-[13px] text-on-surface whitespace-nowrap">
+                        <td key={col.id} className="px-2 py-2 text-[13px] text-on-surface whitespace-nowrap">
                           {item.fuelType || '-'}
                         </td>
                       );
                       if (col.id === 'liters') return (
-                        <td key={col.id} className="px-4 py-3">
+                        <td key={col.id} className="px-2 py-2">
                           <div className="flex flex-col">
                              <span className="font-bold text-sm text-on-surface">{item.liters} L</span>
                              <span className="text-[10px] uppercase font-black text-on-surface-variant opacity-60 leading-none">{item.fuelType || '-'}</span>
@@ -1514,13 +1514,13 @@ export function Fuel() {
                         </td>
                       );
                       if (col.id === 'totalValue') return (
-                        <td key={col.id} className="px-4 py-3 text-[13px] font-bold text-on-surface whitespace-nowrap">
+                        <td key={col.id} className="px-2 py-2 text-[13px] font-bold text-on-surface whitespace-nowrap">
                           R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
                         </td>
                       );
-                      return <td key={col.id} className="px-4 py-3">-</td>;
+                      return <td key={col.id} className="px-2 py-2">-</td>;
                     })}
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-2">
                       <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                          <button 
                            onClick={(e) => { e.stopPropagation(); handleDeleteRecord(item.id); }}

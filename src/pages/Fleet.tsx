@@ -7,6 +7,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { auditDelete } from '../lib/audit';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { PrivateValue } from '../contexts/PrivacyContext';
@@ -132,7 +133,7 @@ export function Fleet() {
   const confirmDelete = async () => {
     if (!vehicleToDelete) return;
     try {
-      await deleteDoc(doc(db, 'vehicles', vehicleToDelete));
+      await auditDelete('vehicles', vehicleToDelete, 'Geral');
       setVehicleToDelete(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, 'vehicles');

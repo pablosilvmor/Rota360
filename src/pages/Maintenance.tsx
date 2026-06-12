@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MaintenanceAlertsConfig } from '../components/MaintenanceAlertsConfig';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, getDoc, getDocs, updateDoc, serverTimestamp, collectionGroup, limit } from 'firebase/firestore';
+import { auditDelete } from '../lib/audit';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { useAuth } from '../contexts/AuthContext';
 import { PrivateValue } from '../contexts/PrivacyContext';
@@ -1106,7 +1107,7 @@ export function Maintenance() {
                             <button 
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                await deleteDoc(doc(db, 'maintenance', os.id));
+                                await auditDelete('maintenance', os.id, 'Geral');
                                 setDeletingId(null);
                               }}
                               className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all"

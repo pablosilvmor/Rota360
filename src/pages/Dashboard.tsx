@@ -116,11 +116,8 @@ export function Dashboard() {
         
         if (!isMounted) return;
 
-        // Filtro em memória para ser mais resiliente a variações de status (capitalização, etc)
-        const activeAlerts = autoAlertsSnap.docs.filter(doc => {
-          const s = (doc.data().status || "").toLowerCase();
-          return s === 'pendente' || s === 'open' || s === 'pending' || s === 'atendimento';
-        });
+        // Filtro em memória para incluir todos os AutoAlertas (remover o filtro de status para coincidir com a página de gestão)
+        const activeAlerts = autoAlertsSnap.docs;
         setOpenAutoAlertsCount(activeAlerts.length);
 
         let openOsCount = 0;

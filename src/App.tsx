@@ -24,6 +24,8 @@ import { AutoAlertaAdmin } from './pages/AutoAlertaAdmin';
 import { VerifySignature } from './pages/VerifySignature';
 import { Profile } from './pages/Profile';
 import { Invoices } from './pages/Invoices';
+import { AuditLogs } from './pages/AuditLogs';
+import { ToastProvider } from './contexts/ToastContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function ProtectedRoute({ children, path }: { children: ReactNode, path: string }) {
@@ -54,6 +56,18 @@ function ProtectedRoute({ children, path }: { children: ReactNode, path: string 
       </div>
     );
   }
+  if (path === '/audit' && userData?.role?.toLowerCase() !== 'admin') {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-full text-center">
+          <span className="material-symbols-outlined text-[64px] text-error mb-4">gpp_maybe</span>
+          <h2 className="text-xl font-bold text-on-surface mb-2">Acesso Restrito a Administrador</h2>
+          <p className="text-on-surface-variant font-medium mb-6">Apenas administradores podem acessar a auditoria.</p>
+        </div>
+      </Layout>
+    );
+  }
+
   if (userData && path !== '/' && path !== '/profile' && !(userData.allowedScreens ?? []).includes(path) && userData.role?.toLowerCase() !== 'admin') {
     return (
       <Layout>
@@ -83,8 +97,9 @@ export default function App() {
     <AuthProvider>
       <PrivacyProvider>
         <BrowserRouter>
-          <ErrorBoundary>
-            <Routes>
+          <ToastProvider>
+            <ErrorBoundary>
+              <Routes>
             <Route path="/checklist" element={<Checklist />} />
             <Route path="/autoalerta" element={<ProtectedRoute path="/autoalerta"><AutoAlerta /></ProtectedRoute>} />
             <Route path="/autoalerta-admin" element={<ProtectedRoute path="/autoalerta-admin"><AutoAlertaAdmin /></ProtectedRoute>} />
@@ -103,6 +118,7 @@ export default function App() {
             <Route path="/works" element={<ProtectedRoute path="/works"><Works /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute path="/reports"><Reports /></ProtectedRoute>} />
             <Route path="/invoices" element={<ProtectedRoute path="/invoices"><Invoices /></ProtectedRoute>} />
+            <Route path="/audit" element={<ProtectedRoute path="/audit"><AuditLogs /></ProtectedRoute>} />
             
             <Route path="/suppliers" element={<ProtectedRoute path="/suppliers"><PlaceholderPage title="Fornecedores e Oficinas" description="Gestão de parceiros de manutenção e serviços externos." icon="build" /></ProtectedRoute>} />
             <Route path="/parts" element={<ProtectedRoute path="/parts"><PlaceholderPage title="Peças e Estoque" description="Controle de Insumos e peças de manutenção." icon="inventory" /></ProtectedRoute>} />
@@ -111,6 +127,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ErrorBoundary>
+        </ToastProvider>
       </BrowserRouter>
     </PrivacyProvider>
   </AuthProvider>

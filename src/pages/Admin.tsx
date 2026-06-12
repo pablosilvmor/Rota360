@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { auditDelete } from '../lib/audit';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserData, useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router';
@@ -187,7 +188,7 @@ export function Admin() {
 
   const deleteUser = async (uid: string) => {
     try {
-      await deleteDoc(doc(db, 'users', uid));
+      await auditDelete('users', uid, 'Geral');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
     }
@@ -222,7 +223,7 @@ export function Admin() {
 
   const deletePreApproved = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'preApprovedAccess', id));
+      await auditDelete('preApprovedAccess', id, 'Geral');
     } catch (error) {
       console.error('Error deleting pre-approved:', error);
     }
@@ -353,7 +354,7 @@ export function Admin() {
 
   const deleteWork = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'works', id));
+      await auditDelete('works', id, 'Geral');
       setDeletingId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `works/${id}`);
@@ -411,7 +412,7 @@ export function Admin() {
 
   const deleteVehicle = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'vehicles', id));
+      await auditDelete('vehicles', id, 'Geral');
       setDeletingId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `vehicles/${id}`);
@@ -420,7 +421,7 @@ export function Admin() {
 
   const deleteDriver = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'drivers', id));
+      await auditDelete('drivers', id, 'Geral');
       setDeletingId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `drivers/${id}`);
@@ -453,7 +454,7 @@ export function Admin() {
 
   const deleteStatus = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'statuses', id));
+      await auditDelete('statuses', id, 'Geral');
       setDeletingId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `statuses/${id}`);
@@ -594,6 +595,32 @@ export function Admin() {
       {(activeTab === 'adm' && isAdmin) && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-6 mb-6">
+            <h3 className="text-[20px] font-bold text-on-surface mb-4">Níveis de Permissão</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 border border-outline-variant bg-surface-container-low rounded-xl">
+                <div className="text-sm font-bold text-primary mb-1 uppercase tracking-wider">Visitante</div>
+                <p className="text-sm text-on-surface-variant font-medium">Visualização temporária restrita (24h). Não pode realizar edições ou exportações.</p>
+              </div>
+              <div className="p-4 border border-outline-variant bg-surface-container-low rounded-xl">
+                <div className="text-sm font-bold text-primary mb-1 uppercase tracking-wider">Operador</div>
+                <p className="text-sm text-on-surface-variant font-medium">Visualização e edição permitidas apenas nas telas liberadas pelo Administrador. Não exporta relatórios master.</p>
+              </div>
+              <div className="p-4 border border-outline-variant bg-surface-container-low rounded-xl">
+                <div className="text-sm font-bold text-primary mb-1 uppercase tracking-wider">Auditor</div>
+                <p className="text-sm text-on-surface-variant font-medium">Acesso somente para leitura/visualização e exportação de relatórios. Não realiza edições nas telas.</p>
+              </div>
+              <div className="p-4 border border-outline-variant bg-surface-container-low rounded-xl">
+                <div className="text-sm font-bold text-primary mb-1 uppercase tracking-wider">Gestor</div>
+                <p className="text-sm text-on-surface-variant font-medium">Acesso amplo para edição, inserção e exportação, exceto as telas de gestão de usuários e configurações.</p>
+              </div>
+              <div className="p-4 border border-outline-variant border-primary/30 bg-primary/5 rounded-xl">
+                <div className="text-sm font-bold text-primary mb-1 uppercase tracking-wider flex items-center gap-2"><span className="material-symbols-outlined text-[16px]">admin_panel_settings</span> Admin</div>
+                <p className="text-sm text-on-surface-variant font-medium">Controle total. Acesso completo, edição, exclusão, visualização do histórico (auditoria) e gestão de acessos.</p>
+              </div>
+            </div>
+          </div>
+
           {/* Acessos Prévios Section */}
           <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-6">
             <h3 className="text-[20px] font-bold text-on-surface mb-2">Liberação de Acesso Prévia</h3>

@@ -86,7 +86,7 @@ export function AutoAlertaAdmin() {
   const handleDelete = async () => {
     if (alertaToDelete) {
       try {
-        await deleteDoc(doc(db, "auto_alertas", alertaToDelete));
+        await auditDelete('auto_alertas', alertaToDelete, 'Geral');
         setSelectedAlerta(null);
         setAlertaToDelete(null);
       } catch (e) {

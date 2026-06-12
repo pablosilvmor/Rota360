@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { collection, query, orderBy, onSnapshot, where, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, writeBatch, doc, deleteDoc } from 'firebase/firestore';
+import { auditDelete } from '../lib/audit';
 import { db } from '../lib/firebase';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from 'html2canvas';
 import JSZip from 'jszip';
+import { useAuth } from '../contexts/AuthContext';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
 
 export interface Invoice {
   id: string;
@@ -20,7 +24,43 @@ export interface Invoice {
   key?: string;
 }
 
+const extractXmlTag = (xml: string, tag: string) => {
+  const tagRegex = new RegExp(`<${tag}>((?:.|\\s)*?)</${tag}>`);
+  const val = xml.match(tagRegex);
+  return val ? val[1] : '';
+};
+
+const getInvoiceItems = (xmlContent?: string, defaultValue: number = 0) => {
+  const defaultItems = [{
+      xProd: 'Serviço/Peça Genérica',
+      qCom: '1.0000',
+      uCom: 'UN',
+      vUnCom: defaultValue.toFixed(2),
+      vProd: defaultValue.toFixed(2),
+  }];
+
+  if (!xmlContent) {
+     return defaultItems;
+  }
+  
+  const items = [];
+  const regex = /<det nItem="\d+">([\s\S]*?)<\/det>/g;
+  let match;
+  while ((match = regex.exec(xmlContent)) !== null) {
+    const detXml = match[1];
+    items.push({
+      xProd: extractXmlTag(detXml, 'xProd') || 'Serviço/Peça Genérica',
+      qCom: extractXmlTag(detXml, 'qCom') || '1.0000',
+      uCom: extractXmlTag(detXml, 'uCom') || 'UN',
+      vUnCom: extractXmlTag(detXml, 'vUnCom') || '0.00',
+      vProd: extractXmlTag(detXml, 'vProd') || '0.00',
+    });
+  }
+  return items.length > 0 ? items : defaultItems;
+};
+
 export function Invoices() {
+  const { userData } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -36,6 +76,144 @@ export function Invoices() {
   const [invoiceNotes, setInvoiceNotes] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const invoicePreviewRef = useRef<HTMLDivElement>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(25);
+  const [filterMonth, setFilterMonth] = useLocalStorageState('invoice_filterMonth', 'Todos');
+  const [filterYear, setFilterYear] = useLocalStorageState('invoice_filterYear', 'Todos');
+  const [filterStartDate, setFilterStartDate] = useLocalStorageState('invoice_filterStartDate', '');
+  const [filterEndDate, setFilterEndDate] = useLocalStorageState('invoice_filterEndDate', '');
+
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [columnFilters, setColumnFilters] = useLocalStorageState('invoice_columnFilters', {} as Record<string, string[]>);
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const [filterSearch, setFilterSearch] = useState('');
+
+  const ColumnFilter = ({ columnId, label }: { columnId: string, label: string }) => {
+    const uniqueValues = React.useMemo(() => {
+      const vals = new Set<string>();
+      invoices.forEach(r => {
+        let v = '';
+        if (columnId === 'issueDate') v = r.issueDate ? new Date(r.issueDate).toLocaleDateString('pt-BR') : '';
+        else if (columnId === 'value') v = r.value ? r.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
+        else if (columnId === 'number') v = String(r.number || '');
+        else if (columnId === 'issuerName') v = r.issuerName || '';
+        else if (columnId === 'status') v = r.status || '';
+        else if (columnId === 'linkedVehicle') v = r.linkedVehicle || 'Não vinculado';
+        else v = String((r as any)[columnId] || '');
+        if (v) vals.add(v);
+      });
+      return Array.from(vals).sort();
+    }, [columnId, invoices]);
+
+    const filteredValues = filterSearch 
+      ? uniqueValues.filter(v => v.toLowerCase().includes(filterSearch.toLowerCase()))
+      : uniqueValues;
+
+    if (openFilter !== columnId) return (
+      <button onClick={(e) => { e.stopPropagation(); setOpenFilter(columnId); setFilterSearch(''); }} className="ml-1 p-1 hover:bg-black/5 rounded-full transition-colors leading-none">
+        <span className={`material-symbols-outlined text-[16px] ${columnFilters[columnId]?.length ? 'text-primary' : 'text-on-surface-variant/30'}`}>filter_alt</span>
+      </button>
+    );
+
+    return (
+      <div className={`absolute top-full ${(label === 'Status' || label === 'Vínculo' || label === 'Valor' || label === 'Fornecedor' || label === 'Ações') ? 'right-0' : 'left-0'} mt-2 z-[1000] w-72 bg-white rounded-2xl shadow-2xl border border-outline-variant p-4 animate-in fade-in zoom-in-95 duration-200 shadow-surface-variant/20`} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-bold text-on-surface">Filtrar {label}</h4>
+          <button onClick={() => setOpenFilter(null)} className="p-1 hover:bg-surface-container rounded-full leading-none">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+        
+        <div className="relative mb-4">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">search</span>
+          <input 
+            type="text"
+            autoFocus
+            placeholder="Buscar valor..."
+            value={filterSearch}
+            onChange={e => setFilterSearch(e.target.value)}
+            className="w-full bg-surface-container border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+
+        <div className="max-h-48 overflow-y-auto mb-4 space-y-1 custom-scrollbar">
+          {filteredValues.map(val => (
+            <label key={val} className="flex items-center gap-3 p-2 hover:bg-surface-container rounded-lg cursor-pointer transition-colors group">
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                columnFilters[columnId]?.includes(val) ? 'bg-primary border-primary' : 'border-outline group-hover:border-primary/50'
+              }`}>
+                {columnFilters[columnId]?.includes(val) && (
+                  <span className="material-symbols-outlined text-white text-[14px] font-bold">check</span>
+                )}
+              </div>
+              <input 
+                type="checkbox"
+                className="hidden"
+                checked={columnFilters[columnId]?.includes(val)}
+                onChange={() => {
+                  const current = columnFilters[columnId] || [];
+                  const next = current.includes(val) ? current.filter(v => v !== val) : [...current, val];
+                  const newFilters = { ...columnFilters, [columnId]: next };
+                  if (next.length === 0) delete newFilters[columnId];
+                  setColumnFilters(newFilters);
+                }}
+              />
+              <span className="text-sm text-on-surface font-medium truncate">{val}</span>
+            </label>
+          ))}
+          {filteredValues.length === 0 && (
+            <p className="text-xs text-center py-4 text-on-surface-variant font-medium">Nenhum valor encontrado.</p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t border-outline-variant">
+          <button 
+            onClick={() => {
+              const next = { ...columnFilters };
+              delete next[columnId];
+              setColumnFilters(next);
+            }}
+            className="text-xs font-bold text-primary hover:underline"
+          >
+            Limpar Filtro
+          </button>
+          <button 
+            onClick={() => setOpenFilter(null)}
+            className="px-4 py-1.5 bg-surface-container-highest text-on-surface rounded-lg text-sm font-bold hover:bg-surface-variant"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) return 'swap_vert';
+    return sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
+  };
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleDeleteInvoice = async (id: string) => {
+    try {
+      await auditDelete('invoices', id, 'Geral');
+      setNotification({ message: 'Nota fiscal excluída com sucesso!', type: 'success' });
+      setConfirmDeleteId(null);
+    } catch (error) {
+      console.error('Erro ao excluir nota fiscal:', error);
+      setNotification({ message: 'Erro ao excluir nota fiscal. Verifique sua conexão ou permissões.', type: 'error' });
+    }
+  };
 
   useEffect(() => {
     if (notification) {
@@ -191,53 +369,331 @@ export function Invoices() {
   };
 
   const executePDFExport = async (invoice: Invoice, notesParam?: string) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const width = doc.internal.pageSize.getWidth();
+    let currentY = 10;
     
-    // Header
-    doc.setFillColor(33, 150, 243);
-    doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.text("DANFE Simplificado", 105, 25, { align: 'center' });
-    
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.text(`Chave de Acesso: ${invoice.key || 'NÃO INFORMADA'}`, 10, 50);
-    doc.text(`Número: ${invoice.number}`, 10, 55);
-    doc.text(`Data de Emissão: ${invoice.issueDate.split('-').reverse().join('/')}`, 160, 55);
-    
+    const drawBox = (x: number, y: number, w: number, h: number, title?: string, content?: string | string[], valueX?: number, valueY?: number, isBold: boolean = false) => {
+       doc.setDrawColor(200, 200, 200);
+       doc.setLineWidth(0.2);
+       doc.rect(x, y, w, h);
+       if (title) {
+         doc.setFontSize(6);
+         doc.setTextColor(100, 100, 100);
+         doc.setFont("helvetica", "bold");
+         doc.text(title.toUpperCase(), x + 1, y + 3);
+       }
+       if (content) {
+         doc.setFontSize(8);
+         doc.setTextColor(0, 0, 0);
+         doc.setFont("helvetica", isBold ? "bold" : "normal");
+         if (Array.isArray(content)) {
+           doc.text(content, valueX || (x + 1), valueY || (y + 7.5));
+         } else {
+           doc.text(content, valueX || (x + 1), valueY || (y + 7.5));
+         }
+       }
+    };
+
+    // Main header box
     doc.setDrawColor(200, 200, 200);
-    doc.line(10, 60, 200, 60);
+    doc.setLineWidth(0.3);
+    doc.rect(10, currentY, 190, 30);
     
-    doc.setFontSize(12);
+    // Left Box
+    doc.line(90, currentY, 90, currentY + 30);
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("DADOS DO EMITENTE", 10, 70);
+    doc.text("DANFE", 15, currentY + 7);
+    doc.setFontSize(6);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Nome: ${invoice.issuerName}`, 10, 78);
-    doc.text(`CNPJ: ${invoice.issuerCNPJ}`, 10, 84);
+    doc.text("Documento Auxiliar da Nota Fiscal Eletrônica", 15, currentY + 11);
     
+    // Entrada/Saida box
+    drawBox(15, currentY + 13, 15, 12);
+    doc.setFontSize(6);
+    doc.text("0 - ENTRADA", 16, currentY + 16);
+    doc.text("1 - SAÍDA", 16, currentY + 19);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("1", 20, currentY + 23);
+    
+    // Number Box
+    drawBox(32, currentY + 13, 30, 12);
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "normal");
+    doc.text("Nº", 33, currentY + 16);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(invoice.number, 38, currentY + 20);
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "normal");
+    doc.text("SÉRIE: 1", 33, currentY + 23);
+
+    // Chave box
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    doc.text("CHAVE DE ACESSO", 95, currentY + 5);
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold");
+    const barcodeText = invoice.key || 'NÃO INFORMADA';
+    doc.text(barcodeText.replace(/(\d{4})/g, '$1 ').trim(), 95, currentY + 12);
+    
+    doc.line(90, currentY + 20, 200, currentY + 20);
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont("helvetica", "normal");
+    doc.text("Consulta de autenticidade no portal nacional da NF-e", 100, currentY + 24);
+    doc.text("www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora", 95, currentY + 27);
+
+    currentY += 32;
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont("helvetica", "bold");
+    doc.text("NATUREZA DA OPERAÇÃO", 10, currentY + 3);
+    drawBox(10, currentY + 4, 190, 8, "", extractXmlTag(invoice.xmlContent || '', 'natOp') || 'VENDA DE MERCADORIA', 12, currentY + 9, true);
+
+    currentY += 14;
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.text("EMITENTE", 10, currentY);
+    drawBox(10, currentY + 1, 130, 8, "NOME / RAZÃO SOCIAL", invoice.issuerName, 11, currentY + 7, true);
+    drawBox(140, currentY + 1, 60, 8, "CNPJ", invoice.issuerCNPJ, 141, currentY + 7, true);
+    
+    drawBox(10, currentY + 9, 45, 8, "INSCRIÇÃO ESTADUAL", extractXmlTag(invoice.xmlContent || '', 'IE') || 'ISENTO', 11, currentY + 15, true);
+    const endLine = `${extractXmlTag(invoice.xmlContent || '', 'xLgr')}, ${extractXmlTag(invoice.xmlContent || '', 'nro')} - ${extractXmlTag(invoice.xmlContent || '', 'xBairro')} - ${extractXmlTag(invoice.xmlContent || '', 'xMun')} / ${extractXmlTag(invoice.xmlContent || '', 'UF')}`.toUpperCase();
+    drawBox(55, currentY + 9, 145, 8, "ENDEREÇO", endLine, 56, currentY + 15);
+
+    currentY += 21;
+    let destName = 'NÃO IDENTIFICADO';
+    let destCNPJ = '---';
+    const destMatch = (invoice.xmlContent || '').match(/<dest>([\s\S]*?)<\/dest>/);
+    if (destMatch) {
+       const nM = destMatch[1].match(/<xNome>([^<]*)<\/xNome>/);
+       if (nM) destName = nM[1].toUpperCase();
+       const cjM = destMatch[1].match(/<CNPJ>(\d+)<\/CNPJ>/);
+       const cfM = destMatch[1].match(/<CPF>(\d+)<\/CPF>/);
+       const v = cjM ? cjM[1] : (cfM ? cfM[1] : null);
+       if (v) {
+          destCNPJ = v.length === 14 ? v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") : v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+       }
+    }
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.text("DESTINATÁRIO / REMETENTE", 10, currentY);
+    drawBox(10, currentY + 1, 130, 8, "NOME / RAZÃO SOCIAL", destName, 11, currentY + 7, true);
+    drawBox(140, currentY + 1, 60, 8, "CNPJ / CPF", destCNPJ, 141, currentY + 7, true);
+
+    currentY += 13;
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.text("FATURA / DUPLICATA", 10, currentY);
+    drawBox(10, currentY + 1, 63, 8, "NÚMERO", invoice.number, 11, currentY + 7, true);
+    drawBox(73, currentY + 1, 63, 8, "VENCIMENTO", invoice.issueDate.split('-').reverse().join('/'), 74, currentY + 7, true);
+    drawBox(136, currentY + 1, 64, 8, "VALOR (R$)", invoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 137, currentY + 7, true);
+
+    currentY += 13;
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.text("CÁLCULO DO IMPOSTO", 10, currentY);
+    drawBox(10, currentY + 1, 47, 8, "BASE DE CÁLCULO ICMS", "R$ " + (extractXmlTag(invoice.xmlContent || '', 'vBC') || '0,00'), 11, currentY + 7, true);
+    drawBox(57, currentY + 1, 47, 8, "VALOR DO ICMS", "R$ " + (extractXmlTag(invoice.xmlContent || '', 'vICMS') || '0,00'), 58, currentY + 7, true);
+    drawBox(104, currentY + 1, 47, 8, "VALOR FRETE", "R$ " + (extractXmlTag(invoice.xmlContent || '', 'vFrete') || '0,00'), 105, currentY + 7, true);
+    drawBox(151, currentY + 1, 49, 8, "VALOR TOTAL DA NOTA", "R$ " + invoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 152, currentY + 7, true);
+
+    currentY += 13;
+    doc.setFontSize(6);
+    doc.text("DADOS DOS PRODUTOS / SERVIÇOS", 10, currentY);
+    
+    const items = getInvoiceItems(invoice.xmlContent, invoice.value);
+    const tableBody = items.map(item => [
+      item.xProd.toUpperCase(),
+      parseFloat(item.qCom).toLocaleString('pt-BR'),
+      item.uCom,
+      parseFloat(item.vUnCom).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+      parseFloat(item.vProd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    ]);
+
     autoTable(doc, {
-      startY: 100,
-      head: [['Descrição', 'Qtd', 'Un', 'Valor Unit', 'Valor Total']],
-      body: [
-        ['Serviço/Peça Genérica', '1', 'UN', invoice.value.toFixed(2), invoice.value.toFixed(2)],
-      ],
+      startY: currentY + 2,
+      head: [['DESCRIÇÃO COMPLETA', 'QTD', 'UN', 'VALOR UNIT', 'VALOR TOTAL']],
+      body: tableBody,
       theme: 'grid',
-      headStyles: { fillColor: [33, 150, 243] }
+      styles: { fontSize: 7, cellPadding: 1, textColor: [0, 0, 0] },
+      headStyles: { fillColor: [240, 240, 240], textColor: [100, 100, 100], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 100 },
+        1: { halign: 'center' },
+        2: { halign: 'center' },
+        3: { halign: 'right' },
+        4: { halign: 'right', fontStyle: 'bold' }
+      }
     });
     
-    let finalY = (doc as any).lastAutoTable.finalY + 20;
-    doc.setFontSize(12);
+    let finalY = ((doc as any).lastAutoTable?.finalY || 100) + 10;
+    
+    // 1. Original SEFAZ Notes (Preserving original data)
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
     doc.setFont("helvetica", "bold");
-    doc.text(`TOTAL DA NOTA: R$ ${invoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 140, finalY);
+    doc.text("DADOS ADICIONAIS / ANOTAÇÕES ORIGINAIS (SEFAZ)", 10, finalY);
+    
+    const originalNotesRaw = extractXmlTag(invoice.xmlContent || '', 'infAdic') || 
+                            extractXmlTag(invoice.xmlContent || '', 'infCpl') || 
+                            "Nenhuma anotação adicional constante no documento original.";
+    
+    // Clean up XML tags if they somehow leaked into the extraction
+    const originalNotes = originalNotesRaw.replace(/<[^>]*>/g, '').trim();
+    
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    
+    const splitOriginalNotes = doc.splitTextToSize(originalNotes.toUpperCase(), 180);
+    const lineHeight = 3.5;
+    const originalBoxHeight = Math.max(15, (splitOriginalNotes.length * lineHeight) + 6);
+    
+    // Page overflow check for SEFAZ notes
+    if (finalY + originalBoxHeight + 5 > 285) {
+      doc.addPage();
+      finalY = 20;
+      doc.setFontSize(6);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont("helvetica", "bold");
+      doc.text("DADOS ADICIONAIS / ANOTAÇÕES ORIGINAIS (SEFAZ) - CONTINUAÇÃO", 10, finalY - 5);
+    }
 
+    // Manual box drawing for better control
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.rect(10, finalY + 1, 190, originalBoxHeight);
+    
+    // Render the wrapped text array directly
+    doc.text(splitOriginalNotes, 13, finalY + 7);
+    
+    finalY += originalBoxHeight + 8;
+
+    // 2. Stylized User Comments Section (Only if notesParam exists)
     if (notesParam) {
-       finalY += 20;
-       doc.setFontSize(10);
-       doc.setFont("helvetica", "italic");
-       const lines = doc.splitTextToSize(`Anotações: ${notesParam}`, 180);
-       doc.text(lines, 10, finalY);
+      const notesTitle = "COMENTÁRIOS E ANOTAÇÕES DO USUÁRIO";
+      const notesText = notesParam;
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      const splitNotes = doc.splitTextToSize(notesText, 170);
+      const lineHeight = 4;
+      const userNotesHeight = (splitNotes.length * lineHeight) + 12;
+      
+      // Page overflow check
+      if (finalY + userNotesHeight + 10 > 285) {
+        doc.addPage();
+        finalY = 20;
+      }
+
+      // Creative Container for User Comments
+      doc.setFillColor(249, 250, 251); 
+      doc.setDrawColor(229, 231, 235);
+      doc.roundedRect(10, finalY, 190, userNotesHeight, 2, 2, "FD");
+      doc.setFillColor(37, 99, 235);
+      doc.rect(10, finalY, 1.5, userNotesHeight, "F");
+      
+      // Icon
+      doc.setDrawColor(37, 99, 235);
+      doc.setLineWidth(0.3);
+      doc.rect(14, finalY + 3.5, 3.5, 4.5);
+      doc.line(15, finalY + 5, 16.5, finalY + 5);
+      doc.line(15, finalY + 6.5, 16.5, finalY + 6.5);
+
+      doc.setFontSize(7);
+      doc.setTextColor(37, 99, 235);
+      doc.setFont("helvetica", "bold");
+      doc.text(notesTitle, 20, finalY + 7);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(31, 41, 55);
+      doc.text(splitNotes, 14, finalY + 13);
+      
+      finalY += userNotesHeight + 10;
+    }
+
+    // Assinatura (only logic without UI)
+    if (notesParam) {
+       if (finalY > 250) {
+          doc.addPage();
+          finalY = 20;
+       }
+       const signatureId = await createSignature({
+         documentType: 'Edição de Nota Fiscal / DANFE',
+         documentTitle: `NF ${invoice.number} - ${invoice.issuerName}`
+       });
+
+       if (signatureId) {
+          let logoImgData: string | null = null;
+          try {
+             const img = new Image();
+             img.crossOrigin = 'anonymous';
+             img.src = 'https://i.imgur.com/1DaE4Bm.png';
+             await new Promise((resolve) => {
+               img.onload = () => {
+                 const canvas = document.createElement('canvas');
+                 canvas.width = img.width;
+                 canvas.height = img.height;
+                 const ctx = canvas.getContext('2d');
+                 if (ctx) {
+                   ctx.drawImage(img, 0, 0);
+                   logoImgData = canvas.toDataURL('image/png');
+                 }
+                 resolve(true);
+               };
+               img.onerror = () => resolve(false);
+             });
+          } catch (err) {
+             console.warn("Could not load signature logo", err);
+          }
+
+          const verifyUrl = generateVerificationUrl(signatureId);
+          const qrCodeDataUrl = await getQRCodeDataUrl(verifyUrl);
+          
+          const pageWidth = doc.internal.pageSize.getWidth();
+          const signatureHeight = 40;
+          
+          doc.setFillColor(248, 250, 252);
+          doc.roundedRect(14, finalY, pageWidth - 28, signatureHeight, 3, 3, "F");
+          doc.setDrawColor(226, 232, 240);
+          doc.setLineWidth(0.1);
+          doc.roundedRect(14, finalY, pageWidth - 28, signatureHeight, 3, 3, "S");
+          
+          if (qrCodeDataUrl) {
+             doc.addImage(qrCodeDataUrl, "JPEG", 20, finalY + 5, 30, 30);
+          }
+          if (logoImgData) {
+            doc.addImage(logoImgData, "PNG", 14 + pageWidth - 28 - 20, finalY + 5, 15, 15);
+          }
+          
+          doc.setFontSize(10);
+          doc.setTextColor(30, 41, 59);
+          doc.setFont("helvetica", "bold");
+          doc.text("DOCUMENTO EDITADO E ASSINADO DIGITALMENTE", 56, finalY + 8);
+          
+          const userName = userData?.signatureInfo?.fullName || userData?.name || 'USUÁRIO DO SISTEMA';
+          doc.setFontSize(11);
+          doc.setTextColor(0, 0, 0);
+          doc.text(`por ${userName.toUpperCase()}`, 56, finalY + 14);
+          
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100, 116, 139);
+          doc.text(`Para verificar a autenticidade das edições, aponte a câmera para o QR Code\nou acesse a URL abaixo:`, 56, finalY + 20);
+          
+          doc.setTextColor(37, 99, 235);
+          doc.text(verifyUrl, 56, finalY + 28);
+          
+          doc.setTextColor(100, 116, 139);
+          doc.setFontSize(7);
+          doc.text(`Código de Validação: ${signatureId}`, 56, finalY + 36);
+       }
     }
     
     const arrayBuffer = doc.output('arraybuffer');
@@ -247,28 +703,21 @@ export function Invoices() {
   const handleExportSingle = async () => {
     if (!previewInvoice) return;
     setIsExporting(true);
+    
     try {
-      if (invoicePreviewRef.current) {
-        // Attempt html2canvas first for stylish output
-        const canvas = await html2canvas(invoicePreviewRef.current, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(getExportFilename(previewInvoice));
-      } else {
-        const blob = await executePDFExport(previewInvoice, invoiceNotes);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = getExportFilename(previewInvoice);
-        a.click();
-      }
+      const blob = await executePDFExport(previewInvoice, invoiceNotes);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = getExportFilename(previewInvoice);
+      a.click();
+      
       setNotification({ message: 'Download concluído com sucesso!', type: 'success' });
-    } catch (e) {
-      setNotification({ message: 'Erro ao gerar PDF', type: 'error' });
+    } catch (e: any) {
+      console.error("Critical export error", e);
+      setNotification({ message: 'Erro ao exportar PDF', type: 'error' });
     }
+    
     setIsExporting(false);
     setPreviewInvoice(null);
   };
@@ -303,17 +752,110 @@ export function Invoices() {
   };
 
   const filteredInvoices = invoices.filter(invoice => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
-      invoice.issuerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      searchTerm === '' ||
+      invoice.issuerName.toLowerCase().includes(searchLower) || 
       invoice.number.includes(searchTerm) ||
-      invoice.issuerCNPJ.includes(searchTerm) ||
-      (invoice.linkedVehicle && invoice.linkedVehicle.toLowerCase().includes(searchTerm.toLowerCase()));
+      invoice.issuerCNPJ.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')) ||
+      (invoice.key && invoice.key.includes(searchTerm)) ||
+      invoice.value.toString().includes(searchTerm) ||
+      (invoice.linkedVehicle && invoice.linkedVehicle.toLowerCase().includes(searchLower));
     
     const matchesStatus = filterStatus === 'all' || invoice.status === filterStatus;
     const matchesLinked = !filterLinkedOnly || !!invoice.linkedVehicle;
 
-    return matchesSearch && matchesStatus && matchesLinked;
+    const recordDate = invoice.issueDate ? new Date(invoice.issueDate + 'T12:00:00') : new Date(0);
+    const matchesMonth = filterMonth === 'Todos' || (recordDate.getUTCMonth() + 1).toString() === filterMonth;
+    const matchesYear = filterYear === 'Todos' || recordDate.getUTCFullYear().toString() === filterYear;
+
+    let inRange = true;
+    if (filterStartDate) {
+      const start = new Date(filterStartDate + 'T00:00:00');
+      if (recordDate < start) inRange = false;
+    }
+    if (filterEndDate) {
+      const end = new Date(filterEndDate + 'T23:59:59');
+      if (recordDate > end) inRange = false;
+    }
+
+    const matchesPeriod = (filterStartDate || filterEndDate) ? inRange : (matchesMonth && matchesYear);
+
+    const matchesColumnFilters = Object.entries(columnFilters).every(([key, values]) => {
+      if (!values || values.length === 0) return true;
+      let val = '';
+      if (key === 'issueDate') val = invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString('pt-BR') : '';
+      else if (key === 'value') val = invoice.value ? invoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
+      else if (key === 'number') val = String(invoice.number || '');
+      else if (key === 'issuerName') val = invoice.issuerName || '';
+      else if (key === 'status') val = invoice.status || '';
+      else if (key === 'linkedVehicle') val = invoice.linkedVehicle || 'Não vinculado';
+      else val = String((invoice as any)[key] || '');
+      return values.includes(val);
+    });
+
+    return matchesSearch && matchesStatus && matchesLinked && matchesColumnFilters && matchesPeriod;
   });
+
+  // Calculate available parameters for filters
+  const availableYears = React.useMemo(() => {
+    const years = new Set<string>();
+    invoices.forEach(inv => {
+      if (inv.issueDate) {
+        years.add(new Date(inv.issueDate + 'T12:00:00').getUTCFullYear().toString());
+      }
+    });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [invoices]);
+
+  const monthsNominal = [
+    { value: '1', label: 'Janeiro' },
+    { value: '2', label: 'Fevereiro' },
+    { value: '3', label: 'Março' },
+    { value: '4', label: 'Abril' },
+    { value: '5', label: 'Maio' },
+    { value: '6', label: 'Junho' },
+    { value: '7', label: 'Julho' },
+    { value: '8', label: 'Agosto' },
+    { value: '9', label: 'Setembro' },
+    { value: '10', label: 'Outubro' },
+    { value: '11', label: 'Novembro' },
+    { value: '12', label: 'Dezembro' }
+  ];
+
+  const sortedInvoices = [...filteredInvoices].sort((a: any, b: any) => {
+    if (!sortConfig) return 0;
+    const { key, direction } = sortConfig;
+    let valA = a[key as keyof Invoice];
+    let valB = b[key as keyof Invoice];
+
+    if (key === 'issueDate') {
+      valA = new Date(valA).getTime();
+      valB = new Date(valB).getTime();
+    }
+    if (typeof valA === 'string') valA = valA.toLowerCase();
+    if (typeof valB === 'string') valB = valB.toLowerCase();
+
+    if (valA < valB) return direction === 'asc' ? -1 : 1;
+    if (valA > valB) return direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Pagination Logic
+  const totalPages = Math.ceil(sortedInvoices.length / itemsPerPage);
+  const paginatedInvoices = sortedInvoices.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Period stats
+  const dateRangeLabel = React.useMemo(() => {
+    if (filteredInvoices.length === 0) return 'Período não definido';
+    const dates = filteredInvoices.map(i => new Date(i.issueDate).getTime());
+    const start = new Date(Math.min(...dates)).toLocaleDateString('pt-BR');
+    const end = new Date(Math.max(...dates)).toLocaleDateString('pt-BR');
+    return `De ${start} até ${end}`;
+  }, [filteredInvoices]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -378,10 +920,63 @@ export function Invoices() {
         )}
       </AnimatePresence>
 
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {confirmDeleteId && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-outline-variant"
+            >
+              <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <span className="material-symbols-outlined text-error text-[32px]">delete_forever</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface text-center mb-2">Confirmar Exclusão</h3>
+              <p className="text-on-surface-variant text-center mb-8 font-medium">
+                Deseja realmente excluir esta nota fiscal? Esta ação é irreversível e removerá todos os vínculos permanentemente.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="flex-1 px-6 py-3 border border-outline-variant text-on-surface font-bold rounded-2xl hover:bg-surface-container transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => handleDeleteInvoice(confirmDeleteId)}
+                  className="flex-1 px-6 py-3 bg-error text-white font-bold rounded-2xl hover:bg-error/90 shadow-lg shadow-error/20 transition-all"
+                >
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-[32px] font-bold text-on-surface tracking-tight">Notas Fiscais (NFe)</h1>
-          <p className="text-on-surface-variant">Central de pesquisa e visualização de notas emitidas para a empresa.</p>
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">
+             <span className="material-symbols-outlined text-[32px] text-primary">description</span>
+          </div>
+          <div>
+            <h1 className="text-[28px] font-bold text-on-surface tracking-tight leading-none mb-1">Notas Fiscais (NFe)</h1>
+            <div className="flex items-center gap-3 text-on-surface-variant font-medium text-xs">
+               <span className="bg-surface-container px-2 py-0.5 rounded flex items-center gap-1">
+                 <span className="text-primary font-black">{filteredInvoices.length}</span> notas
+               </span>
+               <span className="bg-surface-container px-2 py-0.5 rounded flex items-center gap-1">
+                 Total <span className="text-primary font-black">{filteredInvoices.reduce((acc, inv) => acc + inv.value, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+               </span>
+               <span className="text-outline-variant">|</span>
+               <span className="flex items-center gap-1">
+                 <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                 {dateRangeLabel}
+               </span>
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <input 
@@ -416,37 +1011,132 @@ export function Invoices() {
         </div>
       </div>
 
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-outline-variant flex flex-col md:flex-row gap-4 items-center justify-between bg-surface-container-lowest">
-          <div className="relative flex-1 max-w-md w-full">
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-visible">
+        <div className="p-4 border-b border-outline-variant flex flex-col md:flex-row gap-4 items-center justify-between bg-surface-container-lowest sticky top-0 z-20 rounded-t-2xl">
+          <div className="relative flex-1 max-w-sm w-full">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
             <input 
               type="text" 
-              placeholder="Pesquisar por fornecedor, número, CNPJ ou placa..."
+              placeholder="Pesquisa global inteligente..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-primary outline-none"
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-on-surface-variant/50"
             />
           </div>
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            {/* New Filter Controls (matching Fuel page) */}
+            <div className="flex items-center bg-surface-container-low border border-outline-variant rounded-2xl p-1 shadow-sm">
+               <div className="pl-3 pr-2 py-2 flex items-center gap-3">
+                 <span className="material-symbols-outlined text-[20px] text-primary">calendar_month</span>
+                 <div className="flex items-center gap-2">
+                   <span className="text-[13px] font-bold text-on-surface-variant">Mês:</span>
+                   <select 
+                     value={filterMonth}
+                     onChange={(e) => {
+                       setFilterMonth(e.target.value);
+                       setCurrentPage(1);
+                     }}
+                     className="bg-transparent text-[13px] font-bold text-on-surface outline-none cursor-pointer hover:text-primary transition-colors pr-1"
+                   >
+                     <option value="Todos">Todos</option>
+                     {monthsNominal.map(m => (
+                       <option key={m.value} value={m.value}>{m.label}</option>
+                     ))}
+                   </select>
+                   <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">expand_more</span>
+                 </div>
+                 <div className="w-[1px] h-4 bg-outline-variant"></div>
+                 <div className="flex items-center gap-2">
+                   <span className="text-[13px] font-bold text-on-surface-variant">Ano:</span>
+                   <select 
+                     value={filterYear}
+                     onChange={(e) => {
+                       setFilterYear(e.target.value);
+                       setCurrentPage(1);
+                     }}
+                     className="bg-transparent text-[13px] font-bold text-on-surface outline-none cursor-pointer hover:text-primary transition-colors pr-1"
+                   >
+                     <option value="Todos">Todos</option>
+                     {availableYears.map(y => (
+                       <option key={y} value={y}>{y}</option>
+                     ))}
+                   </select>
+                   <span className="material-symbols-outlined text-[16px] text-on-surface-variant/50">expand_more</span>
+                 </div>
+               </div>
+            </div>
+
+            <div className="flex items-center bg-surface-container-low border border-outline-variant rounded-2xl p-1 shadow-sm">
+               <div className="flex items-center gap-3 px-3">
+                 <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-primary uppercase leading-tight">Início</span>
+                    <input 
+                      type="date"
+                      value={filterStartDate}
+                      onChange={(e) => {
+                        setFilterStartDate(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="bg-transparent text-[13px] font-bold text-on-surface outline-none cursor-pointer w-28"
+                    />
+                 </div>
+                 <div className="w-[1px] h-6 bg-outline-variant"></div>
+                 <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-primary uppercase leading-tight">Fim</span>
+                    <input 
+                      type="date"
+                      value={filterEndDate}
+                      onChange={(e) => {
+                        setFilterEndDate(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="bg-transparent text-[13px] font-bold text-on-surface outline-none cursor-pointer w-28"
+                    />
+                 </div>
+                 {(filterStartDate || filterEndDate) && (
+                   <button 
+                    onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setCurrentPage(1); }}
+                    className="p-1 hover:bg-error/10 hover:text-error text-on-surface-variant/50 rounded-lg transition-all"
+                    title="Limpar Datas"
+                   >
+                      <span className="material-symbols-outlined text-[20px] fill-1">cancel</span>
+                   </button>
+                 )}
+               </div>
+            </div>
+
             <button
-               onClick={() => setFilterLinkedOnly(!filterLinkedOnly)}
-               className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 ${filterLinkedOnly ? 'bg-secondary text-on-secondary' : 'bg-surface-container-low border border-outline-variant text-on-surface'}`}
+               onClick={() => {
+                 setFilterLinkedOnly(!filterLinkedOnly);
+                 setCurrentPage(1);
+               }}
+               className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border ${filterLinkedOnly ? 'bg-secondary text-on-secondary border-secondary' : 'bg-surface-container-low border border-outline-variant text-on-surface hover:bg-surface-container'}`}
              >
                <span className="material-symbols-outlined text-[16px]">directions_car</span>
                {filterLinkedOnly ? 'Apenas Veículos' : 'Todos'}
              </button>
 
-            <span className="material-symbols-outlined text-on-surface-variant ml-2">filter_list</span>
             <select 
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary flex-1"
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-surface-container-low border border-outline-variant rounded-xl pl-4 pr-8 outline-none appearance-none font-bold text-xs cursor-pointer truncate custom-select flex items-center h-[36px]"
+              style={{
+                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 0.5rem center',
+                backgroundSize: '1em'
+              }}
             >
-              <option value="all">Todos os Status</option>
-              <option value="autorizada">Autorizada</option>
-              <option value="cancelada">Cancelada</option>
-              <option value="rejeitada">Rejeitada</option>
+              <option value="all">SITUAÇÃO: TODOS</option>
+              <option value="autorizada">AUTORIZADA</option>
+              <option value="cancelada">CANCELADA</option>
+              <option value="rejeitada">REJEITADA</option>
             </select>
             {selectedInvoices.length > 0 && (
               <button
@@ -463,36 +1153,78 @@ export function Invoices() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-surface-container-low border-b border-outline-variant">
+        <div className="overflow-visible min-h-[500px]">
+          <table className="w-full text-left border-collapse table-auto">
+            <thead className="sticky top-[73px] z-[40] bg-surface-container-low shadow-sm">
+              <tr className="border-b border-outline-variant">
                 <th className="p-4 w-12 text-center">
                   <input
                     type="checkbox"
-                    checked={selectedInvoices.length === filteredInvoices.length && filteredInvoices.length > 0}
-                    onChange={(e) => setSelectedInvoices(e.target.checked ? filteredInvoices.map(i => i.id) : [])}
+                    checked={selectedInvoices.length === paginatedInvoices.length && paginatedInvoices.length > 0}
+                    onChange={(e) => setSelectedInvoices(e.target.checked ? paginatedInvoices.map(i => i.id) : [])}
                     className="w-4 h-4 rounded text-primary focus:ring-primary"
                   />
                 </th>
-                <th className="p-4 font-bold text-sm text-on-surface-variant">Número</th>
-                <th className="p-4 font-bold text-sm text-on-surface-variant">Emissão</th>
-                <th className="p-4 font-bold text-sm text-on-surface-variant">Fornecedor</th>
-                <th className="p-4 font-bold text-sm text-on-surface-variant text-right">Valor</th>
-                <th className="p-4 font-bold text-sm text-on-surface-variant">Vínculo Frota</th>
-                <th className="p-4 font-bold text-sm text-on-surface-variant">Status</th>
-                <th className="p-4 font-bold text-sm text-on-surface-variant text-center">Ações</th>
+                <th className="p-0 relative group">
+                  <div className="flex items-center">
+                    <button onClick={() => handleSort('number')} className="flex-1 p-4 text-left font-bold text-[11px] uppercase tracking-wider text-on-surface-variant flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                      Número
+                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant/30 group-hover:text-primary transition-colors">{getSortIcon('number')}</span>
+                    </button>
+                    <ColumnFilter columnId="number" label="Número" />
+                  </div>
+                </th>
+                <th className="p-0 relative group">
+                  <div className="flex items-center">
+                    <button onClick={() => handleSort('issueDate')} className="flex-1 p-4 text-left font-bold text-[11px] uppercase tracking-wider text-on-surface-variant flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                      Emissão
+                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant/30 group-hover:text-primary transition-colors">{getSortIcon('issueDate')}</span>
+                    </button>
+                    <ColumnFilter columnId="issueDate" label="Emissão" />
+                  </div>
+                </th>
+                <th className="p-0 relative group">
+                  <div className="flex items-center">
+                    <button onClick={() => handleSort('issuerName')} className="flex-1 p-4 text-left font-bold text-[11px] uppercase tracking-wider text-on-surface-variant flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                      Fornecedor
+                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant/30 group-hover:text-primary transition-colors">{getSortIcon('issuerName')}</span>
+                    </button>
+                    <ColumnFilter columnId="issuerName" label="Fornecedor" />
+                  </div>
+                </th>
+                <th className="p-0 relative group">
+                  <div className="flex items-center justify-end">
+                    <button onClick={() => handleSort('value')} className="p-4 text-right font-bold text-[11px] uppercase tracking-wider text-on-surface-variant flex items-center justify-end gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                      Valor
+                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant/30 group-hover:text-primary transition-colors">{getSortIcon('value')}</span>
+                    </button>
+                    <ColumnFilter columnId="value" label="Valor" />
+                  </div>
+                </th>
+                <th className="p-0 relative group">
+                  <div className="flex items-center">
+                    <button onClick={() => handleSort('linkedVehicle')} className="flex-1 p-4 text-left font-bold text-[11px] uppercase tracking-wider text-on-surface-variant flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                      Vínculo
+                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant/30 group-hover:text-primary transition-colors">{getSortIcon('linkedVehicle')}</span>
+                    </button>
+                    <ColumnFilter columnId="linkedVehicle" label="Vínculo" />
+                  </div>
+                </th>
+                <th className="p-0 relative group">
+                  <div className="flex items-center">
+                    <button onClick={() => handleSort('status')} className="flex-1 p-4 text-left font-bold text-[11px] uppercase tracking-wider text-on-surface-variant flex items-center gap-2 hover:bg-surface-container transition-colors outline-none cursor-pointer">
+                      Status
+                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant/30 group-hover:text-primary transition-colors">{getSortIcon('status')}</span>
+                    </button>
+                    <ColumnFilter columnId="status" label="Status" />
+                  </div>
+                </th>
+                <th className="p-0 text-center font-bold text-[11px] uppercase tracking-wider text-on-surface-variant">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filteredInvoices.map((invoice, index) => (
-                <motion.tr 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.05 }}
-                  key={invoice.id} 
-                  className={`border-b border-outline-variant/50 transition-colors group ${selectedInvoices.includes(invoice.id) ? 'bg-primary/5' : 'hover:bg-surface-container-low/50'}`}
-                >
+              {paginatedInvoices.map((invoice, index) => (
+                <tr key={invoice.id} className="border-b border-outline-variant/30 hover:bg-surface-container-low transition-colors group">
                   <td className="p-4 text-center">
                     <input
                       type="checkbox"
@@ -531,16 +1263,22 @@ export function Invoices() {
                      </span>
                   </td>
                   <td className="p-4">
-                     <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <div className="flex items-center justify-center gap-2">
                        <button 
-                        onClick={() => openPreviewModal(invoice)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openPreviewModal(invoice);
+                        }}
                         className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors" 
                         title="Visualizar PDF"
                        >
-                         <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                         <span className="material-symbols-outlined text-[20px] pointer-events-none">picture_as_pdf</span>
                        </button>
                        <button 
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           const xml = invoice.xmlContent || `<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFeId="NFe${invoice.key}"><ide><nNF>${invoice.number}</nNF></ide></infNFe></NFe></nfeProc>`;
                           const blob = new Blob([xml], { type: 'text/xml' });
                           const url = URL.createObjectURL(blob);
@@ -552,11 +1290,22 @@ export function Invoices() {
                         className="p-1.5 text-on-surface-variant hover:text-tertiary hover:bg-tertiary/10 rounded-lg transition-colors" 
                         title="Download XML"
                        >
-                         <span className="material-symbols-outlined text-[20px]">code</span>
+                         <span className="material-symbols-outlined text-[20px] pointer-events-none">code</span>
+                       </button>
+                       <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setConfirmDeleteId(invoice.id);
+                        }}
+                        className="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-colors relative z-[100]" 
+                        title="Excluir Nota"
+                       >
+                         <span className="material-symbols-outlined text-[20px] pointer-events-none text-error">delete</span>
                        </button>
                      </div>
                   </td>
-                </motion.tr>
+                </tr>
               ))}
               
               {filteredInvoices.length === 0 && (
@@ -569,6 +1318,78 @@ export function Invoices() {
               )}
             </tbody>
           </table>
+
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-outline-variant flex items-center justify-between bg-surface-container-low/50 sticky bottom-0 z-20 backdrop-blur-md">
+              <div className="text-xs text-on-surface-variant font-medium">
+                Página <span className="text-on-surface font-black">{currentPage}</span> de <span className="text-on-surface font-black">{totalPages}</span>
+                <span className="mx-2">•</span>
+                Mostrando <span className="text-on-surface font-black">{(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedInvoices.length)}</span> de <span className="text-on-surface font-black">{sortedInvoices.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                  className="w-10 h-10 rounded-xl bg-white border border-outline-variant flex items-center justify-center hover:bg-surface-container transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm font-bold"
+                >
+                  <span className="material-symbols-outlined">chevron_left</span>
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum = 1;
+                    if (totalPages <= 5) pageNum = i + 1;
+                    else if (currentPage <= 3) pageNum = i + 1;
+                    else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                    else pageNum = currentPage - 2 + i;
+                    
+                    if (pageNum <= 0 || pageNum > totalPages) return null;
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 rounded-xl font-bold text-xs transition-all ${currentPage === pageNum ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white border border-outline-variant text-on-surface hover:bg-surface-container'}`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  className="w-10 h-10 rounded-xl bg-white border border-outline-variant flex items-center justify-center hover:bg-surface-container transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm font-bold"
+                >
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {paginatedInvoices.length === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center py-24 text-on-surface-variant font-medium">
+              <div className="w-20 h-20 bg-surface-container rounded-full flex items-center justify-center mb-4 border border-outline-variant">
+                <span className="material-symbols-outlined text-[40px] opacity-20">search_off</span>
+              </div>
+              <p className="text-lg font-bold text-on-surface">Nenhum resultado encontrado</p>
+              <p className="text-sm">Tente ajustar seus filtros ou termos de pesquisa.</p>
+              <button 
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterStatus('all');
+                  setFilterLinkedOnly(false);
+                  setColumnFilters({});
+                  setSelectedPeriod('all');
+                  setCurrentPage(1);
+                }}
+                className="mt-6 text-primary font-bold hover:underline"
+              >
+                Limpar todos os filtros
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -618,16 +1439,19 @@ export function Invoices() {
                       value={invoiceNotes}
                       onChange={e => setInvoiceNotes(e.target.value)}
                       placeholder="Adicione observações, motivo da recusa, centro de custo, etc..."
-                      className="w-full h-40 resize-none rounded-xl border border-outline-variant bg-surface p-3 text-sm focus:outline-none focus:border-primary transition-colors"
+                      className="w-full h-40 resize-none rounded-xl border border-outline-variant bg-surface p-3 text-sm focus:outline-none focus:border-primary transition-colors font-medium"
                     />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-on-surface mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">highlighter</span> Ferramentas</h3>
-                    <p className="text-xs text-on-surface-variant mb-4 font-medium mb-3">Você pode clicar nos campos da NFe na pré-visualização para destacá-los visualmente (Highlight).</p>
+                    <h3 className="text-sm font-bold text-on-surface mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">info</span> Informações</h3>
                     
                     <div className="bg-primary/5 rounded-xl border border-primary/20 p-4">
-                       <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-2">Informações da NF</p>
+                       <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-2">Dados da Nota</p>
                        <ul className="space-y-2 text-xs font-semibold text-on-surface">
+                         <li className="flex flex-col gap-0.5 border-b border-primary/10 pb-2 mb-2">
+                            <span className="text-[10px] text-primary uppercase font-black opacity-60">Fornecedor:</span> 
+                            <span className="text-[11px] leading-tight break-words">{previewInvoice.issuerName}</span>
+                         </li>
                          <li className="flex justify-between"><span>Valor:</span> <span>{previewInvoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>
                          <li className="flex justify-between"><span>Emissão:</span> <span>{previewInvoice.issueDate.split('-').reverse().join('/')}</span></li>
                          <li className="flex justify-between"><span>Vínculo Placa:</span> <span className="font-mono bg-surface-container px-1 py-0.5 rounded">{previewInvoice.linkedVehicle || 'Nenhum'}</span></li>
@@ -640,49 +1464,119 @@ export function Invoices() {
                <div className="flex-1 bg-surface-container overflow-auto p-4 md:p-8 flex items-start justify-center custom-scrollbar">
                   <div 
                     ref={invoicePreviewRef} 
-                    className="bg-white shadow-xl max-w-[800px] w-full p-8 md:p-12 border border-outline-variant pointer-events-auto"
-                    style={{ minHeight: '1050px', transformOrigin: 'top center' }}
+                    id="invoice-preview-capture"
+                    className="bg-white shadow-xl p-8 md:p-12 border border-outline-variant pointer-events-auto"
+                    style={{ minHeight: '1050px', width: '800px', transformOrigin: 'top center', backgroundColor: '#ffffff' }}
                   >
-                     {/* DANFE HTML Representation */}
-                     <div className="border border-outline-variant mb-4">
-                       <div className="flex">
-                         <div className="w-1/2 p-4 border-r border-outline-variant">
-                            <h1 className="text-lg font-black uppercase text-on-surface mb-1">DANFE</h1>
-                            <h2 className="text-xs font-bold text-on-surface-variant uppercase mb-4">Documento Auxiliar da Nota Fiscal Eletrônica</h2>
-                            
-                            <div className="space-y-1">
-                               <p className="border border-outline p-1.5 text-[10px] cursor-pointer hover:bg-yellow-200/50 transition-colors">0 - ENTRADA <br/>1 - SAÍDA</p>
-                               <p className="border border-outline p-1.5 text-[10px] cursor-pointer hover:bg-yellow-200/50 transition-colors">Nº: <strong className="text-sm">{previewInvoice.number}</strong> <br/>SÉRIE: 1</p>
-                            </div>
-                         </div>
-                         <div className="w-1/2 p-4 flex flex-col justify-center">
-                            <p className="text-[9px] uppercase font-bold text-on-surface-variant mb-1">Chave de Acesso</p>
-                            <p className="text-sm font-mono tracking-widest font-bold bg-surface-container py-1.5 px-2 rounded mb-4 cursor-pointer hover:bg-yellow-200/50">{previewInvoice.key || 'NÃO INFORMADA'}</p>
-                            <div className="text-center mt-auto">
-                              <p className="text-[10px] uppercase font-bold text-on-surface-variant mb-1">Consulta de Autenticidade</p>
-                              <a href="#" className="text-xs text-primary font-bold hover:underline">www.nfe.fazenda.gov.br/portal</a>
-                            </div>
-                         </div>
-                       </div>
-                     </div>
-
-                     <div className="mb-4">
-                        <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Emitente</p>
-                        <div className="flex border border-outline-variant mt-1 cursor-pointer hover:outline hover:outline-yellow-400 hover:outline-2 transition-all">
-                           <div className="w-2/3 p-2 border-r border-outline-variant">
-                             <p className="text-[8px] uppercase text-on-surface-variant font-bold">NOME / RAZÃO SOCIAL</p>
-                             <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.issuerName}</p>
+                    {/* DANFE HTML Representation */}
+                    <div className="border border-outline-variant mb-4">
+                      <div className="flex">
+                        <div className="w-1/2 p-4 border-r border-outline-variant text-[10px]">
+                           <h1 className="text-lg font-black uppercase text-on-surface mb-1">DANFE</h1>
+                           <h2 className="text-[9px] font-bold text-on-surface-variant uppercase mb-4 leading-tight">Documento Auxiliar da Nota Fiscal Eletrônica</h2>
+                           
+                           <div className="grid grid-cols-2 gap-1 mb-2">
+                              <div className="border border-outline p-1 text-[9px] flex flex-col justify-center items-center">
+                                <span className="font-bold">0 - ENTRADA</span>
+                                <span className="font-bold">1 - SAÍDA</span>
+                                <span className="text-sm font-black mt-1">1</span>
+                              </div>
+                              <div className="border border-outline p-1 text-[9px] flex flex-col justify-center">
+                                <span className="font-bold">Nº: <span className="text-sm">{previewInvoice.number}</span></span>
+                                <span className="font-bold">SÉRIE: 1</span>
+                              </div>
                            </div>
-                           <div className="w-1/3 p-2">
-                             <p className="text-[8px] uppercase text-on-surface-variant font-bold">CNPJ</p>
-                             <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.issuerCNPJ}</p>
+                           <div className="border border-outline p-1 text-[9px]">
+                              <p className="font-bold uppercase text-[8px] text-on-surface-variant">Protocolo de Autorização</p>
+                              <p className="font-mono font-bold">{extractXmlTag(previewInvoice.xmlContent || '', 'nProt') || '---'}</p>
                            </div>
                         </div>
-                     </div>
+                        <div className="w-1/2 p-4 flex flex-col">
+                           <div className="mb-4">
+                             <p className="text-[9px] uppercase font-bold text-on-surface-variant mb-1">Chave de Acesso</p>
+                             <p className="text-[12px] font-mono tracking-widest font-bold border border-transparent py-1 leading-none break-all">{previewInvoice.key || 'NÃO INFORMADA'}</p>
+                           </div>
+                           <div className="text-center mt-auto border-t border-outline-variant pt-2">
+                             <p className="text-[9px] uppercase font-bold text-on-surface-variant mb-1">Consulta de Autenticidade</p>
+                             <a href="#" className="text-xs text-primary font-bold hover:underline">www.nfe.fazenda.gov.br/portal</a>
+                           </div>
+                        </div>
+                      </div>
+                    </div>
 
-                     <div className="mb-4">
-                        <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Fatura / Duplicata</p>
-                        <div className="flex border border-outline-variant mt-1 cursor-pointer hover:outline hover:outline-yellow-400 hover:outline-2 transition-all">
+                    <div className="mb-4">
+                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Natureza da Operação</p>
+                       <div className="border border-outline-variant mt-1 p-2 transition-colors">
+                          <p className="text-xs font-bold text-on-surface uppercase">{extractXmlTag(previewInvoice.xmlContent || '', 'natOp') || 'VENDA DE MERCADORIA'}</p>
+                       </div>
+                    </div>
+
+                    <div className="mb-4">
+                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Emitente</p>
+                       <div className="flex flex-col border border-outline-variant mt-1 transition-colors divide-y divide-outline-variant">
+                          <div className="flex divide-x divide-outline-variant">
+                             <div className="w-2/3 p-2">
+                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">NOME / RAZÃO SOCIAL</p>
+                               <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.issuerName}</p>
+                             </div>
+                             <div className="w-1/3 p-2">
+                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">CNPJ</p>
+                               <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.issuerCNPJ}</p>
+                             </div>
+                          </div>
+                          <div className="p-2 flex gap-4">
+                             <div>
+                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">Inscrição Estadual</p>
+                               <p className="text-xs font-bold text-on-surface">{extractXmlTag(previewInvoice.xmlContent || '', 'IE') || 'ISENTO'}</p>
+                             </div>
+                             <div className="flex-1">
+                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">Endereço</p>
+                               <p className="text-[10px] text-on-surface truncate uppercase">
+                                 {extractXmlTag(previewInvoice.xmlContent || '', 'xLgr')}, {extractXmlTag(previewInvoice.xmlContent || '', 'nro')} - {extractXmlTag(previewInvoice.xmlContent || '', 'xBairro')} - {extractXmlTag(previewInvoice.xmlContent || '', 'xMun')}/{extractXmlTag(previewInvoice.xmlContent || '', 'UF')}
+                               </p>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="mb-4">
+                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Destinatário / Remetente</p>
+                       <div className="flex flex-col border border-outline-variant mt-1 transition-colors divide-y divide-outline-variant">
+                          <div className="flex divide-x divide-outline-variant">
+                             <div className="w-2/3 p-2">
+                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">NOME / RAZÃO SOCIAL</p>
+                               <p className="text-sm font-bold text-on-surface leading-snug">
+                                 {(() => {
+                                   const destMatch = (previewInvoice.xmlContent || '').match(/<dest>([\s\S]*?)<\/dest>/);
+                                   if (!destMatch) return 'DESTINATÁRIO NÃO IDENTIFICADO';
+                                   const nameMatch = destMatch[1].match(/<xNome>([^<]*)<\/xNome>/);
+                                   return nameMatch ? nameMatch[1].toUpperCase() : 'DESTINATÁRIO NÃO IDENTIFICADO';
+                                 })()}
+                               </p>
+                             </div>
+                             <div className="w-1/3 p-2">
+                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">CNPJ / CPF</p>
+                               <p className="text-sm font-bold text-on-surface leading-snug">
+                                 {(() => {
+                                   const destMatch = (previewInvoice.xmlContent || '').match(/<dest>([\s\S]*?)<\/dest>/);
+                                   if (!destMatch) return '---';
+                                   const cnpjMatch = destMatch[1].match(/<CNPJ>(\d+)<\/CNPJ>/);
+                                   const cpfMatch = destMatch[1].match(/<CPF>(\d+)<\/CPF>/);
+                                   const val = cnpjMatch ? cnpjMatch[1] : (cpfMatch ? cpfMatch[1] : null);
+                                   if (!val) return '---';
+                                   return val.length === 14 
+                                     ? val.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
+                                     : val.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+                                 })()}
+                               </p>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="mb-4">
+                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Fatura / Duplicata</p>
+                       <div className="flex border border-outline-variant mt-1 transition-colors">
                            <div className="w-1/3 p-2 border-r border-outline-variant">
                              <p className="text-[8px] uppercase text-on-surface-variant font-bold">NÚMERO</p>
                              <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.number}</p>
@@ -698,21 +1592,21 @@ export function Invoices() {
                         </div>
                      </div>
 
-                     <div className="mb-4 mt-8">
-                        <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Cálculo do Imposto (Demonstrativo)</p>
-                        <div className="flex border border-outline-variant mt-1 bg-surface-container-lowest cursor-pointer hover:outline hover:outline-yellow-400 hover:outline-2 transition-all">
+                    <div className="mb-4 mt-8">
+                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Cálculo do Imposto (Demonstrativo)</p>
+                       <div className="flex border border-outline-variant mt-1 bg-surface-container-lowest transition-colors">
                            <div className="w-full p-2 grid grid-cols-4 gap-2">
                              <div>
                                <p className="text-[8px] uppercase text-on-surface-variant font-bold">BASE DE CÁLCULO ICMS</p>
-                               <p className="text-xs font-bold text-on-surface">R$ 0,00</p>
+                               <p className="text-xs font-bold text-on-surface">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vBC') || '0,00'}</p>
                              </div>
                              <div>
                                <p className="text-[8px] uppercase text-on-surface-variant font-bold">VALOR DO ICMS</p>
-                               <p className="text-xs font-bold text-on-surface">R$ 0,00</p>
+                               <p className="text-xs font-bold text-on-surface">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vICMS') || '0,00'}</p>
                              </div>
                              <div>
                                <p className="text-[8px] uppercase text-on-surface-variant font-bold">VALOR FRETE</p>
-                               <p className="text-xs font-bold text-on-surface">R$ 0,00</p>
+                               <p className="text-xs font-bold text-on-surface">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vFrete') || '0,00'}</p>
                              </div>
                              <div>
                                <p className="text-[8px] uppercase text-on-surface-variant font-bold">VALOR TOTAL DA NOTA</p>
@@ -722,10 +1616,38 @@ export function Invoices() {
                         </div>
                      </div>
 
+                    <div className="mb-4 mt-8">
+                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Dados dos Produtos / Serviços</p>
+                       <div className="border border-outline-variant mt-1 overflow-hidden">
+                         <table className="w-full text-left text-[9px]">
+                           <thead>
+                             <tr className="bg-surface-container-lowest border-b border-outline-variant">
+                               <th className="p-2 font-bold uppercase text-on-surface-variant">Descrição Completa</th>
+                               <th className="p-2 font-bold uppercase text-on-surface-variant w-16 text-center">Qtd</th>
+                               <th className="p-2 font-bold uppercase text-on-surface-variant w-16 text-center">Un</th>
+                               <th className="p-2 font-bold uppercase text-on-surface-variant w-24 text-right">Valor Unit</th>
+                               <th className="p-2 font-bold uppercase text-on-surface-variant w-24 text-right">Valor Total</th>
+                             </tr>
+                           </thead>
+                           <tbody className="divide-y divide-outline-variant/30">
+                             {getInvoiceItems(previewInvoice.xmlContent, previewInvoice.value).map((item, idx) => (
+                               <tr key={idx} className="transition-colors">
+                                 <td className="p-2 font-bold text-on-surface whitespace-normal leading-tight max-w-[400px] uppercase">{item.xProd}</td>
+                                 <td className="p-2 text-center text-on-surface-variant">{parseFloat(item.qCom).toLocaleString('pt-BR')}</td>
+                                 <td className="p-2 text-center text-on-surface-variant">{item.uCom}</td>
+                                 <td className="p-2 text-right text-on-surface-variant">{parseFloat(item.vUnCom).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                 <td className="p-2 text-right font-bold text-primary">{parseFloat(item.vProd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                               </tr>
+                             ))}
+                           </tbody>
+                         </table>
+                       </div>
+                    </div>
+
                      <div className="mt-8">
-                        <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Dados Adicionais / Anotações</p>
-                        <div className="border border-outline-variant mt-1 p-4 min-h-[120px] text-sm text-on-surface whitespace-pre-wrap font-medium font-serif leading-relaxed line-clamp-[20]">
-                          {invoiceNotes || "Nenhuma anotação adicional informada para esta nota fiscal."}
+                        <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Dados Adicionais / Anotações Originais</p>
+                        <div className="border border-outline-variant mt-1 p-4 min-h-[120px] text-[10px] text-on-surface-variant whitespace-pre-wrap font-medium font-serif leading-relaxed uppercase transition-colors">
+                          Nenhuma anotação adicional constante no documento original emitido pela SEFAZ.
                         </div>
                      </div>
                   </div>

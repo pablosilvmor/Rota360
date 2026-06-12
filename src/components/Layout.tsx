@@ -585,6 +585,20 @@ export function Layout({ children }: LayoutProps) {
                         Gestão AutoAlerta
                       </NavLink>
                       )}
+                      
+                      {userData?.role?.toLowerCase() === 'admin' && (
+                      <NavLink
+                        to="/audit"
+                        onClick={() => setIsMoreMenuOpen(false)}
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-warning hover:bg-warning/10 font-bold transition-colors text-base"
+                        title="Auditoria de Ações"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          history
+                        </span>
+                        Auditoria de Ações
+                      </NavLink>
+                      )}
                     </div>
                   </motion.div>
                   )}

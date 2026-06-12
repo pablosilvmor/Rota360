@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { auditDelete } from '../lib/audit';
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -74,7 +75,7 @@ export function Works() {
 
   const deleteWork = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'works', id));
+      await auditDelete('works', id, 'Geral');
       setDeletingId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `works/${id}`);

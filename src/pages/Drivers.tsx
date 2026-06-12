@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { auditDelete } from '../lib/audit';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
@@ -739,7 +740,7 @@ export function Drivers() {
                         <span className="material-symbols-outlined text-[20px]">edit</span>
                       </button>
                       <button 
-                        onClick={async () => await deleteDoc(doc(db, 'drivers', driver.id))} 
+                        onClick={async () => await auditDelete('drivers', driver.id, 'Geral')} 
                         className="text-error hover:text-error/80 transition-colors p-1.5 hover:bg-error/10 rounded-lg"
                         title="Excluir Motorista"
                       >
