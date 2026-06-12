@@ -477,7 +477,7 @@ export function Layout({ children }: LayoutProps) {
           })}
 
           {(() => {
-            const hasMoreOptions = userData?.role?.toLowerCase() === 'admin' || ['/maintenance', '/fuel', '/tracking', '/reports', '/works', '/autoalerta-admin', '/drivers'].some(path => (userData?.allowedScreens || []).includes(path));
+            const hasMoreOptions = userData?.role?.toLowerCase() === 'admin' || ['/maintenance', '/fuel', '/tracking', '/reports', '/works', '/autoalerta-admin', '/drivers', '/audit'].some(path => (userData?.allowedScreens || []).includes(path));
             if (!hasMoreOptions) return null;
             return (
             <div className="px-2 pt-2">
@@ -586,11 +586,11 @@ export function Layout({ children }: LayoutProps) {
                       </NavLink>
                       )}
                       
-                      {userData?.role?.toLowerCase() === 'admin' && (
+                      { (userData?.role?.toLowerCase() === 'admin' || (userData?.allowedScreens || []).includes('/audit')) && (
                       <NavLink
                         to="/audit"
                         onClick={() => setIsMoreMenuOpen(false)}
-                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-warning hover:bg-warning/10 font-bold transition-colors text-base"
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-bold transition-colors text-base"
                         title="Auditoria de Ações"
                       >
                         <span className="material-symbols-outlined text-[20px]">

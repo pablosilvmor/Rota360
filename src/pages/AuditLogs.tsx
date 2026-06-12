@@ -254,7 +254,7 @@ export function AuditLogs() {
                          className="px-3 py-1.5 bg-secondary-container text-on-secondary-container rounded-lg font-bold text-[12px] shadow-sm hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center gap-1 ml-auto"
                        >
                          <span className="material-symbols-outlined text-[16px]">undo</span>
-                         RESTORE
+                         RESTAURAR
                        </button>
                     </td>
                   </tr>

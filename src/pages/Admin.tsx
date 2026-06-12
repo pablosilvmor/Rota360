@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { auditDelete } from '../lib/audit';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -78,6 +78,95 @@ export function Admin() {
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState('operador');
 
+  const [userSort, setUserSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: 'name', direction: 'asc' });
+  const [preSort, setPreSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: 'email', direction: 'asc' });
+  const [worksSort, setWorksSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: 'name', direction: 'asc' });
+  const [vehiclesSort, setVehiclesSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: 'plate', direction: 'asc' });
+  const [driversSort, setDriversSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: 'name', direction: 'asc' });
+  const [statusesSort, setStatusesSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: 'name', direction: 'asc' });
+
+  const handleSort = (field: string, setSortState: any) => {
+    setSortState((prev: any) => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      let valA: any = '';
+      let valB: any = '';
+
+      if (userSort.field === 'name') {
+        valA = a.name || a.email || '';
+        valB = b.name || b.email || '';
+      } else if (userSort.field === 'email') {
+        valA = a.email || '';
+        valB = b.email || '';
+      } else if (userSort.field === 'isActive') {
+        valA = a.isActive ? 1 : 0;
+        valB = b.isActive ? 1 : 0;
+      } else if (userSort.field === 'role') {
+        valA = a.role || '';
+        valB = b.role || '';
+      }
+
+      if (typeof valA === 'string') {
+        const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+        return userSort.direction === 'asc' ? cmp : -cmp;
+      }
+
+      if (valA < valB) return userSort.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return userSort.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [users, userSort]);
+
+  const sortedPreApproved = useMemo(() => {
+    return [...preApproved].sort((a, b) => {
+      const valA = (a[preSort.field] || '').toString();
+      const valB = (b[preSort.field] || '').toString();
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+      return preSort.direction === 'asc' ? cmp : -cmp;
+    });
+  }, [preApproved, preSort]);
+
+  const sortedWorks = useMemo(() => {
+    return [...works].sort((a, b) => {
+      const valA = a.name || '';
+      const valB = b.name || '';
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+      return worksSort.direction === 'asc' ? cmp : -cmp;
+    });
+  }, [works, worksSort]);
+
+  const sortedVehicles = useMemo(() => {
+    return [...vehicles].sort((a, b) => {
+      const valA = a.plate || '';
+      const valB = b.plate || '';
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+      return vehiclesSort.direction === 'asc' ? cmp : -cmp;
+    });
+  }, [vehicles, vehiclesSort]);
+
+  const sortedDrivers = useMemo(() => {
+    return [...drivers].sort((a, b) => {
+      const valA = a.name || '';
+      const valB = b.name || '';
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+      return driversSort.direction === 'asc' ? cmp : -cmp;
+    });
+  }, [drivers, driversSort]);
+
+  const sortedStatuses = useMemo(() => {
+    return [...statuses].sort((a, b) => {
+      const valA = a.name || '';
+      const valB = b.name || '';
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+      return statusesSort.direction === 'asc' ? cmp : -cmp;
+    });
+  }, [statuses, statusesSort]);
+
   const isAdmin = userData?.role?.toLowerCase() === 'admin';
   const canAccessAdmin = isAdmin || (userData?.allowedScreens || []).includes('/admin');
 
@@ -124,9 +213,7 @@ export function Admin() {
           id: doc.id,
           ...doc.data(),
         })) as Work[];
-        setWorks([...worksData].sort((a, b) => 
-          (a.name || "").localeCompare((b.name || ""), undefined, { numeric: true, sensitivity: 'base' })
-        ));
+        setWorks(worksData);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, 'works')
     );
@@ -136,9 +223,7 @@ export function Admin() {
     const unsubscribeVehicles = onSnapshot(
       qVehicles,
       (snapshot) => {
-        setVehicles(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => 
-          (a.plate || "").localeCompare((b.plate || ""), undefined, { numeric: true, sensitivity: 'base' })
-        ));
+        setVehicles(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       },
       (error) => handleFirestoreError(error, OperationType.LIST, 'vehicles')
     );
@@ -148,9 +233,7 @@ export function Admin() {
     const unsubscribeDrivers = onSnapshot(
       qDrivers,
       (snapshot) => {
-        setDrivers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => 
-          (a.name || "").localeCompare((b.name || ""), undefined, { numeric: true, sensitivity: 'base' })
-        ));
+        setDrivers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       },
       (error) => handleFirestoreError(error, OperationType.LIST, 'drivers')
     );
@@ -160,9 +243,7 @@ export function Admin() {
     const unsubscribeStatuses = onSnapshot(
       qStatuses,
       (snapshot) => {
-        setStatuses(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => 
-          (a.name || "").localeCompare((b.name || ""), undefined, { numeric: true, sensitivity: 'base' })
-        ));
+        setStatuses(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       },
       (error) => handleFirestoreError(error, OperationType.LIST, 'statuses')
     );
@@ -654,28 +735,54 @@ export function Admin() {
               </button>
             </div>
 
-            {preApproved.length > 0 && (
-              <div>
-                <h4 className="text-sm font-bold text-on-surface-variant uppercase tracking-wider mb-4">Usuários com Acesso Prévio</h4>
-                <div className="flex flex-col gap-2">
-                  {preApproved.map(p => (
-                    <div key={p.id} className="flex justify-between items-center p-4 bg-surface-container-low rounded-xl border border-outline-variant">
-                      <div className="flex items-center gap-4">
-                        <span className="font-medium text-on-surface"><PrivateValue value={p.email} /></span>
-                        <span className="text-[10px] uppercase font-bold px-2 py-1 bg-secondary-container text-on-secondary-container rounded">
-                          {p.role}
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => deletePreApproved(p.id)}
-                        className="text-on-surface-variant hover:text-error transition-colors p-2"
-                        title="Remover acesso"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
+            {sortedPreApproved.length > 0 && (
+              <div className="bg-surface-container-low border border-outline-variant rounded-xl overflow-hidden mt-6">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-surface-container-high/30 border-b border-outline-variant">
+                      {[
+                        { id: 'email', label: 'E-mail' },
+                        { id: 'role', label: 'Função' }
+                      ].map((col) => (
+                        <th key={col.id} className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                          <div 
+                            className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group select-none"
+                            onClick={() => handleSort(col.id, setPreSort)}
+                          >
+                            {col.label}
+                            <div className="flex items-center gap-0.5 ml-1">
+                              <span className={`material-symbols-outlined text-[16px] transition-all ${preSort.field === col.id ? 'text-primary' : 'text-outline opacity-30 group-hover:opacity-100'}`}>
+                                {preSort.field === col.id ? (preSort.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                              </span>
+                            </div>
+                          </div>
+                        </th>
+                      ))}
+                      <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant">
+                    {sortedPreApproved.map(p => (
+                      <tr key={p.id} className="hover:bg-surface-container-high/20 transition-colors">
+                        <td className="p-4 text-sm font-medium text-on-surface"><PrivateValue value={p.email} /></td>
+                        <td className="p-4">
+                          <span className="text-[10px] uppercase font-bold px-2 py-1 bg-secondary-container text-on-secondary-container rounded">
+                            {p.role}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <button 
+                            onClick={() => deletePreApproved(p.id)}
+                            className="text-on-surface-variant hover:text-error transition-colors p-2"
+                            title="Remover acesso"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -685,10 +792,26 @@ export function Admin() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-surface-container-low/50 border-b border-outline-variant max-w-full">
-                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Usuário</th>
-                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">E-mail</th>
-                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Status</th>
-                    <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Função</th>
+                    {[
+                      { id: 'name', label: 'Usuário' },
+                      { id: 'email', label: 'E-mail' },
+                      { id: 'isActive', label: 'Status' },
+                      { id: 'role', label: 'Função' }
+                    ].map((col) => (
+                      <th key={col.id} className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                        <div 
+                          className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group select-none"
+                          onClick={() => handleSort(col.id, setUserSort)}
+                        >
+                          {col.label}
+                          <div className="flex items-center gap-0.5 ml-1">
+                            <span className={`material-symbols-outlined text-[16px] transition-all ${userSort.field === col.id ? 'text-primary' : 'text-outline opacity-30 group-hover:opacity-100'}`}>
+                              {userSort.field === col.id ? (userSort.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                            </span>
+                          </div>
+                        </div>
+                      </th>
+                    ))}
                     <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider min-w-[200px]">Acesso às Telas</th>
                     <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
                   </tr>
@@ -701,7 +824,7 @@ export function Admin() {
                       </td>
                     </tr>
                   ) : (
-                    users.map(u => (
+                    sortedUsers.map(u => (
                       <tr key={u.uid} className="hover:bg-surface-container-low/20 transition-colors">
                         <td className="p-4">
                           <div className="flex items-center gap-3">
@@ -829,35 +952,54 @@ export function Admin() {
       {activeTab === 'obras' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-outline-variant bg-surface-container-low/50">
-              <h3 className="font-bold text-on-surface text-sm uppercase tracking-wider">Obras Cadastradas</h3>
-            </div>
-            <div className="divide-y divide-outline-variant">
-              {works.length === 0 ? (
-                <div className="p-8 text-center text-on-surface-variant">Nenhuma obra cadastrada.</div>
-              ) : (
-                works.map(work => (
-                  <div key={work.id} className="p-4 flex justify-between items-center hover:bg-surface-container-low/20 transition-colors">
-                    <span className="font-semibold text-on-surface">{work.name}</span>
-                    <div className="flex items-center gap-2">
-                      {deletingId === work.id ? (
-                        <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
-                          <button onClick={() => setDeletingId(null)} className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all">Cancelar</button>
-                          <button onClick={() => deleteWork(work.id)} className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all">Confirmar</button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => setDeletingId(work.id)}
-                          className="text-error hover:bg-error/10 p-2 rounded-full transition-all"
-                        >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                        </button>
-                      )}
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-low/50 border-b border-outline-variant">
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                    <div 
+                      className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group select-none"
+                      onClick={() => handleSort('name', setWorksSort)}
+                    >
+                      Obras Cadastradas
+                      <div className="flex items-center gap-0.5 ml-1">
+                        <span className={`material-symbols-outlined text-[16px] transition-all ${worksSort.field === 'name' ? 'text-primary' : 'text-outline opacity-30 group-hover:opacity-100'}`}>
+                          {worksSort.field === 'name' ? (worksSort.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  </th>
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant">
+                {sortedWorks.length === 0 ? (
+                  <tr><td colSpan={2} className="p-8 text-center text-on-surface-variant">Nenhuma obra cadastrada.</td></tr>
+                ) : (
+                  sortedWorks.map(work => (
+                    <tr key={work.id} className="hover:bg-surface-container-low/20 transition-colors">
+                      <td className="p-4 font-semibold text-on-surface">{work.name}</td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          {deletingId === work.id ? (
+                            <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
+                              <button onClick={() => setDeletingId(null)} className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all">Cancelar</button>
+                              <button onClick={() => deleteWork(work.id)} className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all">Confirmar</button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setDeletingId(work.id)}
+                              className="text-error hover:bg-error/10 p-2 rounded-full transition-all"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -865,35 +1007,54 @@ export function Admin() {
       {activeTab === 'veiculos' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-outline-variant bg-surface-container-low/50">
-              <h3 className="font-bold text-on-surface text-sm uppercase tracking-wider">Veículos Cadastrados</h3>
-            </div>
-            <div className="divide-y divide-outline-variant">
-              {vehicles.length === 0 ? (
-                <div className="p-8 text-center text-on-surface-variant">Nenhum veículo cadastrado.</div>
-              ) : (
-                vehicles.map(v => (
-                  <div key={v.id} className="p-4 flex justify-between items-center hover:bg-surface-container-low/20 transition-colors">
-                    <span className="font-semibold text-on-surface"><PrivateValue value={v.plate} /></span>
-                    <div className="flex items-center gap-2">
-                      {deletingId === v.id ? (
-                        <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
-                          <button onClick={() => setDeletingId(null)} className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all">Cancelar</button>
-                          <button onClick={() => deleteVehicle(v.id)} className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all">Confirmar</button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => setDeletingId(v.id)}
-                          className="text-error hover:bg-error/10 p-2 rounded-full transition-all"
-                        >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                        </button>
-                      )}
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-low/50 border-b border-outline-variant">
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                    <div 
+                      className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group select-none"
+                      onClick={() => handleSort('plate', setVehiclesSort)}
+                    >
+                      Veículos Cadastrados
+                      <div className="flex items-center gap-0.5 ml-1">
+                        <span className={`material-symbols-outlined text-[16px] transition-all ${vehiclesSort.field === 'plate' ? 'text-primary' : 'text-outline opacity-30 group-hover:opacity-100'}`}>
+                          {vehiclesSort.field === 'plate' ? (vehiclesSort.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  </th>
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant">
+                {sortedVehicles.length === 0 ? (
+                  <tr><td colSpan={2} className="p-8 text-center text-on-surface-variant">Nenhum veículo cadastrado.</td></tr>
+                ) : (
+                  sortedVehicles.map(v => (
+                    <tr key={v.id} className="hover:bg-surface-container-low/20 transition-colors">
+                      <td className="p-4 font-semibold text-on-surface"><PrivateValue value={v.plate} /></td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          {deletingId === v.id ? (
+                            <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
+                              <button onClick={() => setDeletingId(null)} className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all">Cancelar</button>
+                              <button onClick={() => deleteVehicle(v.id)} className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all">Confirmar</button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setDeletingId(v.id)}
+                              className="text-error hover:bg-error/10 p-2 rounded-full transition-all"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -901,35 +1062,54 @@ export function Admin() {
       {activeTab === 'motoristas' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-outline-variant bg-surface-container-low/50">
-              <h3 className="font-bold text-on-surface text-sm uppercase tracking-wider">Motoristas Cadastrados</h3>
-            </div>
-            <div className="divide-y divide-outline-variant">
-              {drivers.length === 0 ? (
-                <div className="p-8 text-center text-on-surface-variant">Nenhum motorista cadastrado.</div>
-              ) : (
-                drivers.map(d => (
-                  <div key={d.id} className="p-4 flex justify-between items-center hover:bg-surface-container-low/20 transition-colors">
-                    <span className="font-semibold text-on-surface"><PrivateValue value={d.name} /></span>
-                    <div className="flex items-center gap-2">
-                      {deletingId === d.id ? (
-                        <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
-                          <button onClick={() => setDeletingId(null)} className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all">Cancelar</button>
-                          <button onClick={() => deleteDriver(d.id)} className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all">Confirmar</button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => setDeletingId(d.id)}
-                          className="text-error hover:bg-error/10 p-2 rounded-full transition-all"
-                        >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                        </button>
-                      )}
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-low/50 border-b border-outline-variant">
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                    <div 
+                      className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group select-none"
+                      onClick={() => handleSort('name', setDriversSort)}
+                    >
+                      Motoristas Cadastrados
+                      <div className="flex items-center gap-0.5 ml-1">
+                        <span className={`material-symbols-outlined text-[16px] transition-all ${driversSort.field === 'name' ? 'text-primary' : 'text-outline opacity-30 group-hover:opacity-100'}`}>
+                          {driversSort.field === 'name' ? (driversSort.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  </th>
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant">
+                {sortedDrivers.length === 0 ? (
+                  <tr><td colSpan={2} className="p-8 text-center text-on-surface-variant">Nenhum motorista cadastrado.</td></tr>
+                ) : (
+                  sortedDrivers.map(d => (
+                    <tr key={d.id} className="hover:bg-surface-container-low/20 transition-colors">
+                      <td className="p-4 font-semibold text-on-surface"><PrivateValue value={d.name} /></td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          {deletingId === d.id ? (
+                            <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
+                              <button onClick={() => setDeletingId(null)} className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all">Cancelar</button>
+                              <button onClick={() => deleteDriver(d.id)} className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all">Confirmar</button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setDeletingId(d.id)}
+                              className="text-error hover:bg-error/10 p-2 rounded-full transition-all"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -937,35 +1117,54 @@ export function Admin() {
       {activeTab === 'status' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-outline-variant bg-surface-container-low/50">
-              <h3 className="font-bold text-on-surface text-sm uppercase tracking-wider">Status Cadastrados</h3>
-            </div>
-            <div className="divide-y divide-outline-variant">
-              {statuses.length === 0 ? (
-                <div className="p-8 text-center text-on-surface-variant">Nenhum status cadastrado.</div>
-              ) : (
-                statuses.map(s => (
-                  <div key={s.id} className="p-4 flex justify-between items-center hover:bg-surface-container-low/20 transition-colors">
-                    <span className="font-semibold text-on-surface">{s.name}</span>
-                    <div className="flex items-center gap-2">
-                      {deletingId === s.id ? (
-                        <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
-                          <button onClick={() => setDeletingId(null)} className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all">Cancelar</button>
-                          <button onClick={() => deleteStatus(s.id)} className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all">Confirmar</button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => setDeletingId(s.id)}
-                          className="text-error hover:bg-error/10 p-2 rounded-full transition-all"
-                        >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                        </button>
-                      )}
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-low/50 border-b border-outline-variant">
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                    <div 
+                      className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group select-none"
+                      onClick={() => handleSort('name', setStatusesSort)}
+                    >
+                      Status Cadastrados
+                      <div className="flex items-center gap-0.5 ml-1">
+                        <span className={`material-symbols-outlined text-[16px] transition-all ${statusesSort.field === 'name' ? 'text-primary' : 'text-outline opacity-30 group-hover:opacity-100'}`}>
+                          {statusesSort.field === 'name' ? (statusesSort.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  </th>
+                  <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant">
+                {sortedStatuses.length === 0 ? (
+                  <tr><td colSpan={2} className="p-8 text-center text-on-surface-variant">Nenhum status cadastrado.</td></tr>
+                ) : (
+                  sortedStatuses.map(s => (
+                    <tr key={s.id} className="hover:bg-surface-container-low/20 transition-colors">
+                      <td className="p-4 font-semibold text-on-surface">{s.name}</td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          {deletingId === s.id ? (
+                            <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
+                              <button onClick={() => setDeletingId(null)} className="px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-all">Cancelar</button>
+                              <button onClick={() => deleteStatus(s.id)} className="px-3 py-1 text-xs font-bold bg-error text-on-error rounded-lg shadow-sm hover:opacity-90 transition-all">Confirmar</button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setDeletingId(s.id)}
+                              className="text-error hover:bg-error/10 p-2 rounded-full transition-all"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
