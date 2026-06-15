@@ -1745,7 +1745,7 @@ export function Invoices() {
                   </td>
                   <td className="p-4">
                     <div className="text-sm font-bold text-on-surface">{invoice.issuerName}</div>
-                    <div className="text-xs text-on-surface-variant">{invoice.issuerCNPJ}</div>
+                    <div className="text-xs text-on-surface-variant"><PrivateValue>{invoice.issuerCNPJ}</PrivateValue></div>
                   </td>
                   <td className="p-4 text-sm font-bold text-on-surface text-right">
                     <PrivateValue>{invoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</PrivateValue>
