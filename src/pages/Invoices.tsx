@@ -82,6 +82,7 @@ export function Invoices() {
   const [invoiceNotes, setInvoiceNotes] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [originalHadNoPlate, setOriginalHadNoPlate] = useState(false);
   const [activeTab, setActiveTab] = useState<'invoices' | 'history' | 'draft'>('invoices');
   const [importHistory, setImportHistory] = useState<any[]>([]);
   const [drafts, setDrafts] = useState<Invoice[]>([]);
@@ -660,6 +661,7 @@ export function Invoices() {
     setPreviewInvoice(invoice);
     setInvoiceNotes("");
     setZoom(1);
+    setOriginalHadNoPlate(!invoice.linkedVehicle);
   };
 
   // Helper para renderizar a modal de visualização
@@ -2068,11 +2070,19 @@ export function Invoices() {
                                 onChange={(e) => {
                                   const newVal = e.target.value.toUpperCase();
                                   setPreviewInvoice({ ...previewInvoice, linkedVehicle: newVal });
+                                  if (originalHadNoPlate) {
+                                    setInvoiceNotes(newVal);
+                                  }
                                 }}
                                 className="w-32 font-mono text-[10px] bg-[#F8FAFC] dark:bg-[#F8FAFC] border border-outline-variant px-1.5 py-0.5 rounded text-slate-800 dark:text-slate-800 focus:outline-none focus:border-primary"
                               />
                               {previewInvoice.linkedVehicle && (
-                                <button onClick={() => setPreviewInvoice({ ...previewInvoice, linkedVehicle: '' })} className="text-on-surface-variant hover:text-error leading-none">
+                                <button onClick={() => {
+                                  setPreviewInvoice({ ...previewInvoice, linkedVehicle: '' });
+                                  if (originalHadNoPlate) {
+                                    setInvoiceNotes('');
+                                  }
+                                }} className="text-on-surface-variant hover:text-error leading-none">
                                   <span className="material-symbols-outlined text-[14px]">close</span>
                                 </button>
                               )}
