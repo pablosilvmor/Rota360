@@ -72,7 +72,7 @@ function InspectionForm({
   onBack: () => void;
   onPlateClick: (vehicle: any) => void;
 }) {
-  const { userData } = useAuth();
+  const { user, userData } = useAuth();
   const isAdmin = userData?.role === 'admin';
   const { isPrivacyMode } = usePrivacy();
   const [vehicle, setVehicle] = useState<any>(null);
@@ -1309,7 +1309,9 @@ function InspectionForm({
             status: 'pending',
             createdAt: Date.now(),
             resolvedAt: null,
-            fromSystem: true
+            fromSystem: true,
+            creatorName: userData?.signatureInfo?.fullName || user?.displayName || "Sistema",
+            creatorEmail: user?.email || "",
         });
 
         setIsGeneratingAlert(false);

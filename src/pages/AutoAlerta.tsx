@@ -89,6 +89,8 @@ export function AutoAlerta() {
         status: "Pendente",
         createdAt: serverTimestamp(),
         createdBy: user?.uid || "unknown",
+        creatorName: userData?.signatureInfo?.fullName || user?.displayName || "",
+        creatorEmail: user?.email || "",
       };
 
       const docRef = await addDoc(collection(db, "auto_alertas"), newAlert);
@@ -146,6 +148,14 @@ export function AutoAlerta() {
               <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#666666', textTransform: 'uppercase' }}>Observação</span>
               <p style={{ fontSize: '0.875rem', color: '#000000', marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>{successData.observation}</p>
             </div>
+            {(successData.creatorName || successData.creatorEmail) && (
+              <div style={{ padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px dashed #d1d5db', marginTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.025em' }}>Solicitante Responsável</span>
+                <p style={{ fontSize: '0.75rem', fontWeight: '600', color: '#4b5563', margin: '2px 0 0 0' }}>
+                  {successData.creatorName} {successData.creatorEmail && <span style={{ fontWeight: '400', opacity: 0.8 }}>({successData.creatorEmail})</span>}
+                </p>
+              </div>
+            )}
           </div>
           <div className="pt-8 flex flex-col sm:flex-row justify-between gap-4">
             <button

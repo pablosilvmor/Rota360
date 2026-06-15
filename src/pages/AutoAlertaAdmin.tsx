@@ -222,10 +222,19 @@ export function AutoAlertaAdmin() {
              </div>
           </div>
           <div className="bg-error-container/30 border border-error-container/50 p-4 rounded-xl">
-              <span className="text-xs font-semibold text-error uppercase tracking-wider flex items-center gap-1 mb-2">
-                <span className="material-symbols-outlined text-[16px]">campaign</span>
-                Reporte do Operador
-              </span>
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold text-error uppercase tracking-wider flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">campaign</span>
+                  Reporte do Operador
+                </span>
+                {(selectedAlerta.creatorName || selectedAlerta.creatorEmail) && (
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-on-surface-variant/70 uppercase block">Solicitante</span>
+                    <span className="text-[11px] font-bold text-on-surface block">{selectedAlerta.creatorName || '---'}</span>
+                    <span className="text-[10px] text-on-surface-variant block">{selectedAlerta.creatorEmail || '---'}</span>
+                  </div>
+                )}
+              </div>
               <p className="text-on-surface font-medium whitespace-pre-wrap">{selectedAlerta.observation}</p>
           </div>
 
@@ -348,9 +357,17 @@ export function AutoAlertaAdmin() {
 
             <div style={{ width: '100%', backgroundColor: '#f8fafc', borderRadius: '16px', padding: '20px', border: '1px solid #f1f5f9' }}>
               <p style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Observação</p>
-              <p style={{ fontSize: '13px', color: '#334155', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>
+              <p style={{ fontSize: '13px', color: '#334155', margin: '0 0 16px 0', lineHeight: '1.6', fontWeight: '500' }}>
                 {selectedAlerta.observation}
               </p>
+              {(selectedAlerta.creatorName || selectedAlerta.creatorEmail) && (
+                <div style={{ paddingTop: '12px', borderTop: '1px dashed #e2e8f0' }}>
+                  <p style={{ fontSize: '9px', fontWeight: '800', color: '#64748b', margin: '0 0 2px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Solicitante Responsável</p>
+                  <p style={{ fontSize: '11px', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                    {selectedAlerta.creatorName} {selectedAlerta.creatorEmail && <span style={{ fontWeight: '400', fontSize: '10px', color: '#64748b' }}>- {selectedAlerta.creatorEmail}</span>}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Interaction Mockups (visual only for the PNG) */}
