@@ -315,6 +315,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     Placa {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
+                    type={isPrivacyMode ? 'password' : 'text'}
                     className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 dark:text-slate-800 tracking-wider focus:outline-none focus:border-slate-400 transition-all uppercase" 
                     value={vehicleData.plate} 
                     onChange={(e) => setVehicleData({ ...vehicleData, plate: e.target.value })}
