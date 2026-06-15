@@ -1610,29 +1610,29 @@ export function Invoices() {
 
           </div>
         </div>
-        <div className="flex items-end justify-between px-6 bg-surface-container-lowest border-b border-outline-variant/20">
+        <div className="flex items-end justify-between px-6 bg-surface-container-low/50 border-b border-outline-variant pt-2">
           <div className="flex items-center gap-1 -mb-[1px]">
             <button
                onClick={() => handleTabChange('invoices')}
-               className={`px-4 py-2 rounded-t-lg text-sm font-bold transition-all border-t border-x ${activeTab === 'invoices' ? 'bg-surface-container-low text-primary border-outline-variant' : 'bg-transparent text-on-surface-variant hover:bg-surface-container border-transparent'}`}
+               className={`px-6 py-4 rounded-t-xl text-sm font-bold transition-all border-t border-x ${activeTab === 'invoices' ? 'bg-surface-container-lowest text-primary border-outline-variant shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.05)] relative z-10' : 'bg-transparent text-on-surface-variant hover:bg-surface-container-high/60 border-transparent opacity-70 hover:opacity-100'}`}
             >
                Notas Fiscais
             </button>
             <button
                onClick={() => handleTabChange('draft')}
-               className={`px-4 py-2 rounded-t-lg text-sm font-bold transition-all border-t border-x ${activeTab === 'draft' ? 'bg-surface-container-low text-primary border-outline-variant' : 'bg-transparent text-on-surface-variant hover:bg-surface-container border-transparent'}`}
+               className={`px-6 py-4 rounded-t-xl text-sm font-bold transition-all border-t border-x ${activeTab === 'draft' ? 'bg-surface-container-lowest text-primary border-outline-variant shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.05)] relative z-10' : 'bg-transparent text-on-surface-variant hover:bg-surface-container-high/60 border-transparent opacity-70 hover:opacity-100'}`}
             >
                Rascunho
             </button>
             <button
                onClick={() => handleTabChange('history')}
-               className={`px-4 py-2 rounded-t-lg text-sm font-bold transition-all border-t border-x ${activeTab === 'history' ? 'bg-surface-container-low text-primary border-outline-variant' : 'bg-transparent text-on-surface-variant hover:bg-surface-container border-transparent'}`}
+               className={`px-6 py-4 rounded-t-xl text-sm font-bold transition-all border-t border-x ${activeTab === 'history' ? 'bg-surface-container-lowest text-primary border-outline-variant shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.05)] relative z-10' : 'bg-transparent text-on-surface-variant hover:bg-surface-container-high/60 border-transparent opacity-70 hover:opacity-100'}`}
             >
                Histórico de Importação
             </button>
           </div>
           {(activeTab === 'invoices' || activeTab === 'draft') && selectedInvoices.length > 0 && (
-            <div className="flex items-center gap-2 pb-2">
+            <div className="flex items-center gap-2 pb-3">
               <button
                 onClick={handleMassExport}
                 disabled={isExporting}
