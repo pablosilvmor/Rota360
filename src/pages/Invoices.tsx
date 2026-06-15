@@ -1482,7 +1482,7 @@ export function Invoices() {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-white dark:bg-surface-container-high border-2 border-transparent focus:border-primary/30 focus:bg-white rounded-[20px] pl-16 pr-6 py-4 text-base font-medium shadow-sm focus:shadow-md outline-none transition-all placeholder:text-on-surface-variant/60 text-on-surface hover:bg-white/80"
+              className="w-full bg-[#F8FAFC] dark:bg-[#F8FAFC] border-2 border-transparent focus:border-primary/30 focus:bg-[#F8FAFC] rounded-[20px] pl-16 pr-6 py-4 text-base font-medium shadow-sm focus:shadow-md outline-none transition-all placeholder:text-on-surface-variant/60 text-on-surface hover:bg-[#F8FAFC]/90"
             />
           </div>
         </div>
