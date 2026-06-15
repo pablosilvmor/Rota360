@@ -9,7 +9,9 @@ import html2canvas from 'html2canvas';
 import JSZip from 'jszip';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { useNavigate } from 'react-router';
 import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
+import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
 
 export interface Invoice {
   id: string;
@@ -62,7 +64,9 @@ const getInvoiceItems = (xmlContent?: string, defaultValue: number = 0) => {
 };
 
 export function Invoices() {
+  const navigate = useNavigate();
   const { userData } = useAuth();
+  const { isPrivacyMode } = usePrivacy();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -77,10 +81,39 @@ export function Invoices() {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [invoiceNotes, setInvoiceNotes] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [activeTab, setActiveTab] = useState<'invoices' | 'history' | 'draft'>('invoices');
   const [importHistory, setImportHistory] = useState<any[]>([]);
   const [drafts, setDrafts] = useState<Invoice[]>([]);
+  const [copyAnimationState, setCopyAnimationState] = useState<{ active: boolean, invoiceNumber?: string } | null>(null);
   const invoicePreviewRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isPanDragging, setIsPanDragging] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [scrollStart, setScrollStart] = useState({ left: 0, top: 0 });
+  
+  const handlePanMouseDown = (e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return;
+    setIsPanDragging(true);
+    setPanStart({ x: e.pageX, y: e.pageY });
+    setScrollStart({
+      left: scrollContainerRef.current.scrollLeft,
+      top: scrollContainerRef.current.scrollTop
+    });
+  };
+
+  const handlePanMouseMove = (e: React.MouseEvent) => {
+    if (!isPanDragging || !scrollContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - panStart.x;
+    const y = e.pageY - panStart.y;
+    scrollContainerRef.current.scrollLeft = scrollStart.left - x;
+    scrollContainerRef.current.scrollTop = scrollStart.top - y;
+  };
+
+  const handlePanMouseUp = () => {
+    setIsPanDragging(false);
+  };
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(25);
@@ -149,6 +182,9 @@ export function Invoices() {
       };
 
       await writeBatch(db).set(draftRef, draftData).commit();
+      
+      setCopyAnimationState({ active: true, invoiceNumber: invoice.number });
+      setTimeout(() => setCopyAnimationState(null), 1800);
       
       setNotification({ message: 'Nota copiada para o rascunho!', type: 'success' });
     } catch (error: any) {
@@ -245,7 +281,7 @@ export function Invoices() {
             placeholder="Buscar valor..."
             value={filterSearch}
             onChange={e => setFilterSearch(e.target.value)}
-            className="w-full bg-surface-container border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full bg-white dark:bg-surface-container border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
 
@@ -338,6 +374,18 @@ export function Invoices() {
     }
   }, [notification]);
 
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [detailsModalVehicle, setDetailsModalVehicle] = useState<any>(null);
+
+  const assignedDriversForModal = detailsModalVehicle
+    ? drivers.filter((d) =>
+        Array.isArray(d.vehicleAssigned)
+          ? d.vehicleAssigned.includes(detailsModalVehicle.plate)
+          : d.vehicleAssigned === detailsModalVehicle.plate,
+      )
+    : [];
+
   useEffect(() => {
     const q = query(collection(db, 'invoices'), orderBy('issueDate', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -357,6 +405,18 @@ export function Invoices() {
       handleFirestoreError(error, OperationType.LIST, 'invoice_drafts');
     });
 
+    const qVehicles = query(collection(db, 'vehicles'));
+    const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      setVehicles(docs);
+    });
+
+    const qDrivers = query(collection(db, 'drivers'));
+    const unsubscribeDrivers = onSnapshot(qDrivers, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      setDrivers(docs);
+    });
+
     const handleSyncStatus = (e: any) => {
       if (e.detail?.type === 'INVOICE') {
         setSyncing(e.detail.status === 'syncing');
@@ -367,6 +427,8 @@ export function Invoices() {
     return () => {
       unsubscribe();
       unsubscribeDrafts();
+      unsubscribeVehicles();
+      unsubscribeDrivers();
       window.removeEventListener('SYNC_STATUS_CHANGE', handleSyncStatus);
     };
   }, []);
@@ -383,6 +445,75 @@ export function Invoices() {
   const handleManualSync = () => {
     setSyncing(true);
     window.dispatchEvent(new CustomEvent('START_INVOICE_SYNC', { detail: { full: false } }));
+  };
+
+  const [recalculatingLinks, setRecalculatingLinks] = useState(false);
+
+  const handleRecalculateLinks = async () => {
+    if (recalculatingLinks) return;
+    setRecalculatingLinks(true);
+    setNotification({ message: 'Sincronizando vínculos com a frota...', type: 'info' });
+    try {
+      const activeInvoices = activeTab === 'draft' ? drafts : invoices;
+      if (activeInvoices.length === 0) {
+        setNotification({ message: 'Nenhuma nota fiscal encontrada para vincular.', type: 'info' });
+        setRecalculatingLinks(false);
+        return;
+      }
+
+      if (vehicles.length === 0) {
+        setNotification({ message: 'Nenhum veículo cadastrado na frota para cruzar dados.', type: 'error' });
+        setRecalculatingLinks(false);
+        return;
+      }
+
+      let updatedCount = 0;
+      const batch = writeBatch(db);
+
+      for (const invoice of activeInvoices) {
+        if (!invoice.xmlContent) continue;
+
+        const contentUpper = invoice.xmlContent.toUpperCase();
+        
+        const extractTag = (xml: string, tag: string) => {
+          const tagRegex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
+          const val = xml.match(tagRegex);
+          return val ? val[1] : '';
+        };
+
+        const infAdic = (extractTag(invoice.xmlContent, 'infAdic') || extractTag(invoice.xmlContent, 'infCpl') || extractTag(invoice.xmlContent, 'infAdOrig') || "").toUpperCase();
+        
+        const searchScope = (infAdic + " " + contentUpper);
+        const plateRegex = /([A-Z]{3}[- ]?[0-9][A-Z0-9][0-9]{2})|([A-Z]{3}[- ]?[0-9]{4})/gi;
+        const matchesInContent = searchScope.match(plateRegex) || [];
+
+        const foundPlates = Array.from(new Set(matchesInContent
+          .map(p => p.replace(/[^A-Za-z0-9]/g, '').toUpperCase())
+          .filter(plate => vehicles.some(v => v.plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === plate))
+        ));
+
+        if (foundPlates.length > 0) {
+          const newLinked = foundPlates.join(', ');
+          if (invoice.linkedVehicle !== newLinked) {
+            const invoiceRef = doc(db, activeTab === 'draft' ? 'invoice_drafts' : 'invoices', invoice.id);
+            batch.update(invoiceRef, { linkedVehicle: newLinked });
+            updatedCount++;
+          }
+        }
+      }
+
+      if (updatedCount > 0) {
+        await batch.commit();
+        setNotification({ message: `${updatedCount} nota(s) fiscal(is) vinculada(s) à frota com sucesso!`, type: 'success' });
+      } else {
+        setNotification({ message: 'Todos os vínculos já estão atualizados ou nenhuma placa correspondente foi encontrada.', type: 'info' });
+      }
+    } catch (error: any) {
+      console.error("Erro ao recalcular vínculos:", error);
+      setNotification({ message: 'Erro ao recalcular os vínculos de placas.', type: 'error' });
+    } finally {
+      setRecalculatingLinks(false);
+    }
   };
 
   const processFiles = async (files: File[]) => {
@@ -429,6 +560,24 @@ export function Invoices() {
         const vNF = extract(/<vNF>([\d.]+)<\/vNF>/) || (Math.random() * 1000 + 100).toString();
         const finalKey = key || Math.random().toString(36).substring(2, 15).toUpperCase();
 
+        let linkedVehicle = '';
+        
+        // Extração Inteligente de Placa
+        const infAdicXml = (extract(/<infAdic>([\s\S]*?)<\/infAdic>/i) || extract(/<infCpl>([\s\S]*?)<\/infCpl>/i) || "").toUpperCase();
+        
+        // Procurar padrões de placa (Mercosul ou Padrão) em todo o conteúdo
+        const plateRegex = /([A-Z]{3}[- ]?[0-9][A-Z0-9][0-9]{2})|([A-Z]{3}[- ]?[0-9]{4})/gi;
+        const matchesInContent = infAdicXml.match(plateRegex) || [];
+        
+        // Verificar contra placas cadastradas
+        const foundPlates = matchesInContent
+          .map(p => p.replace(/[^A-Za-z0-9]/g, '').toUpperCase())
+          .filter(plate => vehicles.some(v => v.plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === plate));
+          
+        if (foundPlates.length > 0) {
+            linkedVehicle = foundPlates.join(',');
+        }
+
         const id = `IMPORT-${finalKey}-${Date.now()}`;
         const invoiceRef = doc(collection(db, 'invoices'), id);
         
@@ -440,6 +589,7 @@ export function Invoices() {
           value: parseFloat(vNF),
           status: 'autorizada',
           key: finalKey,
+          linkedVehicle: linkedVehicle || undefined,
           xmlContent: content,
           lastSync: importDate,
           importMode: 'manual',
@@ -509,6 +659,20 @@ export function Invoices() {
   const openPreviewModal = (invoice: Invoice) => {
     setPreviewInvoice(invoice);
     setInvoiceNotes("");
+    setZoom(1);
+  };
+
+  // Helper para renderizar a modal de visualização
+  const renderPreviewModal = () => {
+    if (!previewInvoice) return null;
+    return (
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewInvoice(null)}>
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+          {/* Conteúdo da Modal (respeitando estrutura original) */}
+          {/* ... */}
+        </div>
+      </div>
+    );
   };
 
   const getExportFilename = (invoice: Invoice) => {
@@ -851,12 +1015,39 @@ export function Invoices() {
     return new Blob([arrayBuffer], { type: 'application/pdf' });
   };
 
+  const handleCloseModal = async () => {
+    if (previewInvoice) {
+      const originalInvoice = currentDataSource.find(inv => inv.id === previewInvoice.id);
+      if (originalInvoice && originalInvoice.linkedVehicle !== previewInvoice.linkedVehicle) {
+        try {
+          const batch = writeBatch(db);
+          const invoiceRef = doc(db, activeTab === 'draft' ? 'invoice_drafts' : 'invoices', previewInvoice.id);
+          batch.update(invoiceRef, { linkedVehicle: previewInvoice.linkedVehicle || null });
+          await batch.commit();
+        } catch (error) {
+          console.error("Error saving linkedVehicle on close:", error);
+        }
+      }
+    }
+    setPreviewInvoice(null);
+  };
+
   const handleExportSingle = async () => {
     if (!previewInvoice) return;
     setIsExporting(true);
     
     try {
       const blob = await executePDFExport(previewInvoice, invoiceNotes);
+      
+      // Update linkedVehicle in Firestore if it changed
+      const originalInvoice = currentDataSource.find(inv => inv.id === previewInvoice.id);
+      if (originalInvoice && originalInvoice.linkedVehicle !== previewInvoice.linkedVehicle) {
+        const batch = writeBatch(db);
+        const invoiceRef = doc(db, activeTab === 'draft' ? 'invoice_drafts' : 'invoices', previewInvoice.id);
+        batch.update(invoiceRef, { linkedVehicle: previewInvoice.linkedVehicle || null });
+        await batch.commit();
+      }
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -905,16 +1096,39 @@ export function Invoices() {
 
   const currentDataSource = activeTab === 'draft' ? drafts : invoices;
 
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
   const filteredInvoices = currentDataSource.filter(invoice => {
     const searchLower = searchTerm.toLowerCase();
+    const cleanSearchTerm = searchLower.replace(/[^a-z0-9]/g, '');
+    const cleanSearchValue = searchTerm.replace(/[^\d.,]/g, '');
+    
+    const valString = invoice.value.toString();
+    const valBRL = invoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    const cleanLinkedVehicle = invoice.linkedVehicle ? invoice.linkedVehicle.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
+    const cleanCNPJ = invoice.issuerCNPJ.replace(/\D/g, '');
+    const cleanSearchCNPJ = searchTerm.replace(/\D/g, '');
+    
+    // Extração para busca profunda
+    const fullXmlContent = (invoice.xmlContent || '').toLowerCase();
+    
+    // Extração para busca profunda nos dados adicionais da SEFAZ
+    const sefazInfo = (extractXmlTag(invoice.xmlContent || '', 'infAdic') || '') + ' ' + (extractXmlTag(invoice.xmlContent || '', 'infCpl') || '');
+    
     const matchesSearch = 
       searchTerm === '' ||
       invoice.issuerName.toLowerCase().includes(searchLower) || 
       invoice.number.includes(searchTerm) ||
-      invoice.issuerCNPJ.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')) ||
+      (cleanSearchCNPJ && cleanCNPJ.includes(cleanSearchCNPJ)) ||
       (invoice.key && invoice.key.includes(searchTerm)) ||
-      invoice.value.toString().includes(searchTerm) ||
-      (invoice.linkedVehicle && invoice.linkedVehicle.toLowerCase().includes(searchLower));
+      valString.includes(searchTerm) ||
+      valBRL.includes(searchTerm) ||
+      (cleanSearchValue && valString.includes(cleanSearchValue)) ||
+      (cleanLinkedVehicle !== '' && cleanSearchTerm !== '' && cleanLinkedVehicle.includes(cleanSearchTerm)) ||
+      (invoice.linkedVehicle && invoice.linkedVehicle.toLowerCase().includes(searchLower)) ||
+      sefazInfo.toLowerCase().includes(searchLower) ||
+      fullXmlContent.includes(searchLower) ||
+      (cleanSearchTerm !== '' && fullXmlContent.replace(/[^a-z0-9]/g, '').includes(cleanSearchTerm));
     
     if (activeTab === 'history') return true; // History uses different rendering
     
@@ -1200,7 +1414,7 @@ export function Invoices() {
                      <span className="text-primary font-black">{filteredInvoices.length}</span> notas
                    </span>
                    <span className="bg-surface-container px-2 py-0.5 rounded flex items-center gap-1">
-                     Total <span className="text-primary font-black">{filteredInvoices.reduce((acc, inv) => acc + inv.value, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                     Total <span className="text-primary font-black"><PrivateValue>{filteredInvoices.reduce((acc, inv) => acc + inv.value, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</PrivateValue></span>
                    </span>
                  </>
                ) : (
@@ -1226,6 +1440,17 @@ export function Invoices() {
             onChange={handleXmlImport}
           />
           <button 
+            onClick={handleRecalculateLinks}
+            disabled={recalculatingLinks || importing}
+            className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold hover:bg-primary/20 transition-colors flex items-center gap-2 disabled:opacity-50"
+            title="Procura placas registradas na frota dentro das observações/SEFAZ e vincula notas elegíveis de forma retroativa"
+          >
+            <span className={`material-symbols-outlined ${recalculatingLinks ? 'animate-spin' : 'keyboard_double_arrow_right'}`}>
+              {recalculatingLinks ? 'progress_activity' : 'directions_car'}
+            </span>
+            {recalculatingLinks ? 'Buscando...' : 'Vincular Placas'}
+          </button>
+          <button 
             onClick={() => document.getElementById('xml-batch-import')?.click()}
             disabled={importing}
             className="px-4 py-2 bg-secondary/10 text-secondary border border-secondary/20 rounded-xl font-bold hover:bg-secondary/20 transition-colors flex items-center gap-2 disabled:opacity-50"
@@ -1235,36 +1460,33 @@ export function Invoices() {
             </span>
             {importing ? 'Importando...' : 'Importar XMLs'}
           </button>
-
-          <button 
-            onClick={handleManualSync}
-            disabled={syncing}
-            className="px-4 py-2 bg-white border border-outline-variant text-on-surface rounded-xl font-bold hover:bg-surface-container-low transition-colors flex items-center gap-2 disabled:opacity-50"
-          >
-            <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>
-              {syncing ? 'progress_activity' : 'refresh'}
-            </span>
-            {syncing ? 'Sincronizando...' : 'Sincronizar SEFAZ'}
-          </button>
         </div>
       </div>
 
       <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-visible">
-        <div className="p-4 border-b border-outline-variant flex flex-col md:flex-row gap-4 items-center justify-between bg-surface-container-lowest sticky top-0 z-20 rounded-t-2xl">
-          <div className="relative flex-1 max-w-sm w-full">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+        <div className="p-4 border-b border-outline-variant bg-surface-container-lowest rounded-t-2xl">
+          <div className="w-full relative group">
+            <span className={`material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[28px] transition-colors ${isSearchFocused ? 'text-primary' : 'text-on-surface-variant/60'}`}>search</span>
             <input 
               type="text" 
-              placeholder="Pesquisa global inteligente..."
+              placeholder="Pesquisa global: fornecedores, valores, placas, CNPJ, produtos ou SEFAZ..."
               value={searchTerm}
+              onFocus={(e) => {
+                setIsSearchFocused(true);
+                e.target.select();
+              }}
+              onBlur={() => setIsSearchFocused(false)}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-on-surface-variant/50"
+              className="w-full bg-white dark:bg-surface-container-high border-2 border-transparent focus:border-primary/30 focus:bg-white rounded-[20px] pl-16 pr-6 py-4 text-base font-medium shadow-sm focus:shadow-md outline-none transition-all placeholder:text-on-surface-variant/60 text-on-surface hover:bg-white/80"
             />
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto">
+        </div>
+
+        <div className="p-4 flex flex-col xl:flex-row gap-4 items-center justify-between">
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             {/* New Filter Controls (matching Fuel page) */}
             <div className="flex items-center bg-surface-container-low border border-outline-variant rounded-2xl p-1 shadow-sm">
                <div className="pl-3 pr-2 py-2 flex items-center gap-3">
@@ -1363,7 +1585,7 @@ export function Invoices() {
                 setFilterStatus(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-surface-container-low border border-outline-variant rounded-xl pl-4 pr-8 outline-none appearance-none font-bold text-xs cursor-pointer truncate custom-select flex items-center h-[36px]"
+              className="bg-white dark:bg-surface-container border border-outline-variant rounded-xl pl-4 pr-8 outline-none appearance-none font-bold text-xs cursor-pointer truncate custom-select flex items-center h-[36px]"
               style={{
                 backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                 backgroundRepeat: 'no-repeat',
@@ -1388,31 +1610,29 @@ export function Invoices() {
 
           </div>
         </div>
-
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-2 border-b border-outline-variant bg-surface-container-lowest">
-          <div className="flex items-center gap-2">
+        <div className="flex items-end justify-between px-6 bg-surface-container-lowest border-b border-outline-variant/20">
+          <div className="flex items-center gap-1 -mb-[1px]">
             <button
-              onClick={() => handleTabChange('invoices')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'invoices' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
+               onClick={() => handleTabChange('invoices')}
+               className={`px-4 py-2 rounded-t-lg text-sm font-bold transition-all border-t border-x ${activeTab === 'invoices' ? 'bg-surface-container-low text-primary border-outline-variant' : 'bg-transparent text-on-surface-variant hover:bg-surface-container border-transparent'}`}
             >
-              Notas Fiscais
+               Notas Fiscais
             </button>
             <button
-              onClick={() => handleTabChange('draft')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'draft' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
+               onClick={() => handleTabChange('draft')}
+               className={`px-4 py-2 rounded-t-lg text-sm font-bold transition-all border-t border-x ${activeTab === 'draft' ? 'bg-surface-container-low text-primary border-outline-variant' : 'bg-transparent text-on-surface-variant hover:bg-surface-container border-transparent'}`}
             >
-              Rascunho
+               Rascunho
             </button>
             <button
-              onClick={() => handleTabChange('history')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
+               onClick={() => handleTabChange('history')}
+               className={`px-4 py-2 rounded-t-lg text-sm font-bold transition-all border-t border-x ${activeTab === 'history' ? 'bg-surface-container-low text-primary border-outline-variant' : 'bg-transparent text-on-surface-variant hover:bg-surface-container border-transparent'}`}
             >
-              Histórico de Importação
+               Histórico de Importação
             </button>
           </div>
-
           {(activeTab === 'invoices' || activeTab === 'draft') && selectedInvoices.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pb-2">
               <button
                 onClick={handleMassExport}
                 disabled={isExporting}
@@ -1433,11 +1653,10 @@ export function Invoices() {
             </div>
           )}
         </div>
-
         {(activeTab === 'invoices' || activeTab === 'draft') ? (
-          <div className="overflow-visible min-h-[500px]">
-            <table className="w-full text-left border-collapse table-auto">
-              <thead className="sticky top-[73px] z-[40] bg-surface-container-low shadow-sm">
+          <div className="w-full overflow-auto max-h-[calc(100vh-320px)]">
+            <table className="w-full text-left border-collapse table-auto min-w-[1000px]">
+              <thead className="sticky top-0 z-[40] bg-surface-container-low">
               <tr className="border-b border-outline-variant">
                 <th className="p-4 w-12 text-center">
                   <input
@@ -1527,16 +1746,41 @@ export function Invoices() {
                     <div className="text-xs text-on-surface-variant">{invoice.issuerCNPJ}</div>
                   </td>
                   <td className="p-4 text-sm font-bold text-on-surface text-right">
-                    {invoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    <PrivateValue>{invoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</PrivateValue>
                   </td>
                   <td className="p-4">
                     {invoice.linkedVehicle ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-bold font-mono">
-                        <span className="material-symbols-outlined text-[14px]">directions_car</span>
-                        {invoice.linkedVehicle}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {invoice.linkedVehicle.split(/[\s,;/]+/).filter(Boolean).map((plate, pIdx) => (
+                          <button 
+                            key={`${plate}-${pIdx}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const matchingVehicle = vehicles.find(v => 
+                                v.plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+                              );
+                              if (matchingVehicle) {
+                                setDetailsModalVehicle(matchingVehicle);
+                              } else {
+                                navigate(`/fleet?search=${plate}`);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-[10px] font-bold font-mono group/plate"
+                            title={`Ver veículo ${plate} na Frota`}
+                          >
+                            <span className="material-symbols-outlined text-[12px]">directions_car</span>
+                            {plate}
+                          </button>
+                        ))}
+                      </div>
                     ) : (
-                      <span className="text-xs text-on-surface-variant italic cursor-pointer hover:text-primary transition-colors">Vincular veículo...</span>
+                      <span 
+                        onClick={() => openPreviewModal(invoice)}
+                        className="text-xs text-on-surface-variant italic cursor-pointer hover:text-primary transition-colors hover:underline"
+                      >
+                        Vincular veículo...
+                      </span>
                     )}
                   </td>
                   <td className="p-4">
@@ -1644,7 +1888,7 @@ export function Invoices() {
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-10 h-10 rounded-xl font-bold text-xs transition-all ${currentPage === pageNum ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white border border-outline-variant text-on-surface hover:bg-surface-container'}`}
+                        className={`w-10 h-10 rounded-xl font-bold text-xs transition-all ${currentPage === pageNum ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white dark:bg-surface-container border border-outline-variant text-on-surface dark:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high'}`}
                       >
                         {pageNum}
                       </button>
@@ -1690,10 +1934,10 @@ export function Invoices() {
           )}
         </div>
       ) : (
-        <div className="overflow-visible min-h-[500px]">
+        <div className="w-full overflow-auto max-h-[calc(100vh-320px)]">
            {/* History Table */}
-           <table className="w-full text-left border-collapse table-auto">
-             <thead className="sticky top-[73px] z-[40] bg-surface-container-low shadow-sm">
+           <table className="w-full text-left border-collapse table-auto min-w-[800px]">
+             <thead className="sticky top-0 z-[40] bg-surface-container-low">
                <tr className="border-b border-outline-variant">
                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Lote / ID</th>
                  <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Data da Importação</th>
@@ -1754,22 +1998,23 @@ export function Invoices() {
     </div>
 
       {previewInvoice && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 lg:p-8">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 lg:py-8 lg:pr-8 lg:pl-[312px]" onClick={handleCloseModal}>
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-surface border border-outline-variant rounded-2xl shadow-2xl flex flex-col w-full max-w-5xl h-full max-h-[90vh] overflow-hidden"
+            className="bg-surface border border-outline-variant rounded-2xl shadow-2xl flex flex-col w-full max-w-7xl h-full max-h-[95vh] overflow-hidden"
+            onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-4 border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
+            <div className="p-4 border-b border-outline-variant bg-white dark:bg-surface-container flex justify-between items-center">
                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                     <span className="material-symbols-outlined text-primary">picture_as_pdf</span>
+                     <span className="material-symbols-outlined text-primary dark:text-blue-400">picture_as_pdf</span>
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-on-surface">Visualização de DANFE / Edição</h2>
-                    <p className="text-xs text-on-surface-variant font-medium">NF {previewInvoice.number} • {previewInvoice.issuerName}</p>
+                    <p className="text-xs text-on-surface-variant font-medium uppercase tracking-tighter italic">NF {previewInvoice.number} • {previewInvoice.issuerName}</p>
                   </div>
                </div>
                <div className="flex items-center gap-3">
@@ -1783,7 +2028,7 @@ export function Invoices() {
                     </span>
                     {isExporting ? 'Salvando...' : 'Salvar com Edições / Exportar PDF'}
                   </button>
-                  <button onClick={() => setPreviewInvoice(null)} className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors">
+                  <button onClick={handleCloseModal} className="w-8 h-8 rounded-full bg-surface-container-low dark:bg-surface-container-high hover:bg-surface-container-high dark:hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors">
                     <span className="material-symbols-outlined text-[18px]">close</span>
                   </button>
                </div>
@@ -1791,107 +2036,175 @@ export function Invoices() {
 
             <div className="flex flex-1 overflow-hidden">
                {/* Left sidebar: Editor */}
-               <div className="w-[300px] border-r border-outline-variant bg-surface-container-lowest p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+               <div className="w-[300px] border-r border-outline-variant bg-white dark:bg-surface-container p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
                   <div>
-                    <h3 className="text-sm font-bold text-on-surface mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">edit_note</span> Anotações e Comentários</h3>
-                    <p className="text-xs text-on-surface-variant mb-4 font-medium mb-3">Estes comentários serão anexados ao final do PDF exportado.</p>
+                    <h3 className="text-sm font-bold text-on-surface mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[18px] text-primary dark:text-blue-400">edit_note</span> Anotações</h3>
+                    <p className="text-[10px] text-on-surface-variant mb-4 font-bold uppercase tracking-wider mb-3 italic">Estes comentários serão anexados ao final do PDF exportado.</p>
                     <textarea 
                       value={invoiceNotes}
                       onChange={e => setInvoiceNotes(e.target.value)}
                       placeholder="Adicione observações, motivo da recusa, centro de custo, etc..."
-                      className="w-full h-40 resize-none rounded-xl border border-outline-variant bg-surface p-3 text-sm focus:outline-none focus:border-primary transition-colors font-medium"
+                      className="w-full h-40 resize-none rounded-xl border border-outline-variant bg-[#F8FAFC] dark:bg-[#F8FAFC] p-3 text-sm focus:outline-none focus:border-primary transition-colors font-medium text-slate-900 dark:text-slate-950"
                     />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-on-surface mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">info</span> Informações</h3>
+                    <h3 className="text-sm font-bold text-on-surface mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[18px] text-primary dark:text-blue-400">info</span> Infos Adicionais</h3>
                     
-                    <div className="bg-primary/5 rounded-xl border border-primary/20 p-4">
-                       <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-2">Dados da Nota</p>
+                    <div className="bg-[#F8FAFC] dark:bg-primary/10 rounded-xl border border-outline-variant dark:border-primary/20 p-4 shadow-sm mb-6">
+                       <p className="text-[10px] font-bold text-primary dark:text-blue-400 uppercase tracking-wider mb-2 opacity-70">Dados da Nota</p>
                        <ul className="space-y-2 text-xs font-semibold text-on-surface">
-                         <li className="flex flex-col gap-0.5 border-b border-primary/10 pb-2 mb-2">
-                            <span className="text-[10px] text-primary uppercase font-black opacity-60">Fornecedor:</span> 
+                         <li className="flex flex-col gap-0.5 border-b border-primary/10 dark:border-primary/20 pb-2 mb-2">
+                            <span className="text-[10px] text-primary dark:text-blue-400 uppercase font-black opacity-60">Fornecedor:</span> 
                             <span className="text-[11px] leading-tight break-words">{previewInvoice.issuerName}</span>
                          </li>
-                         <li className="flex justify-between"><span>Valor:</span> <span>{previewInvoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>
-                         <li className="flex justify-between"><span>Emissão:</span> <span>{previewInvoice.issueDate.split('-').reverse().join('/')}</span></li>
-                         <li className="flex justify-between"><span>Vínculo Placa:</span> <span className="font-mono bg-surface-container px-1 py-0.5 rounded">{previewInvoice.linkedVehicle || 'Nenhum'}</span></li>
+                         <li className="flex justify-between items-center"><span>VALOR:</span> <span className="font-bold text-primary dark:text-blue-400"><PrivateValue>{previewInvoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</PrivateValue></span></li>
+                         <li className="flex justify-between"><span>EMISSÃO:</span> <span className="opacity-80">{previewInvoice.issueDate.split('-').reverse().join('/')}</span></li>
+                         <li className="flex justify-between items-center"><span>VÍNCULO:</span> 
+                           <div className="flex items-center gap-1">
+                              <input 
+                                type="text" 
+                                placeholder="PLACA(S)"
+                                value={previewInvoice.linkedVehicle || ''}
+                                onChange={(e) => {
+                                  const newVal = e.target.value.toUpperCase();
+                                  setPreviewInvoice({ ...previewInvoice, linkedVehicle: newVal });
+                                }}
+                                className="w-32 font-mono text-[10px] bg-[#F8FAFC] dark:bg-[#F8FAFC] border border-outline-variant px-1.5 py-0.5 rounded text-slate-800 dark:text-slate-800 focus:outline-none focus:border-primary"
+                              />
+                              {previewInvoice.linkedVehicle && (
+                                <button onClick={() => setPreviewInvoice({ ...previewInvoice, linkedVehicle: '' })} className="text-on-surface-variant hover:text-error leading-none">
+                                  <span className="material-symbols-outlined text-[14px]">close</span>
+                                </button>
+                              )}
+                           </div>
+                         </li>
                        </ul>
+                    </div>
+
+                    <div>
+                       <h3 className="text-sm font-bold text-on-surface mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[18px] text-primary dark:text-blue-400">zoom_in</span> Zoom</h3>
+                       <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                             <button 
+                               onClick={() => setZoom(prev => Math.max(0.5, prev - 0.1))}
+                               className="flex-1 flex items-center justify-center py-2 bg-surface-container-low hover:bg-surface-container-high rounded-lg border border-outline-variant transition-colors"
+                               title="Zoom Out"
+                             >
+                               <span className="material-symbols-outlined">zoom_out</span>
+                             </button>
+                             <button 
+                               onClick={() => setZoom(1)}
+                               className="px-4 py-2 bg-surface-container-low hover:bg-surface-container-high rounded-lg border border-outline-variant transition-colors text-xs font-bold"
+                               title="Reset Zoom"
+                             >
+                               100%
+                             </button>
+                             <button 
+                               onClick={() => setZoom(prev => Math.min(2, prev + 0.1))}
+                               className="flex-1 flex items-center justify-center py-2 bg-surface-container-low hover:bg-surface-container-high rounded-lg border border-outline-variant transition-colors"
+                               title="Zoom In"
+                             >
+                               <span className="material-symbols-outlined">zoom_in</span>
+                             </button>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="0.5" 
+                            max="2" 
+                            step="0.1" 
+                            value={zoom} 
+                            onChange={(e) => setZoom(parseFloat(e.target.value))}
+                            className="w-full h-1.5 rounded-lg appearance-none bg-outline-variant cursor-pointer accent-primary"
+                          />
+                          <div className="flex justify-between text-[10px] text-on-surface-variant font-bold">
+                            <span>50%</span>
+                            <span>200%</span>
+                          </div>
+                       </div>
                     </div>
                   </div>
                </div>
 
                {/* Right side: Interactive PDF Preview Canvas */}
-               <div className="flex-1 bg-surface-container overflow-auto p-4 md:p-8 flex items-start justify-center custom-scrollbar">
-                  <div 
-                    ref={invoicePreviewRef} 
-                    id="invoice-preview-capture"
-                    className="bg-white shadow-xl p-8 md:p-12 border border-outline-variant pointer-events-auto"
-                    style={{ minHeight: '1050px', width: '800px', transformOrigin: 'top center', backgroundColor: '#ffffff' }}
-                  >
-                    {/* DANFE HTML Representation */}
-                    <div className="border border-outline-variant mb-4">
+               <div 
+                 ref={scrollContainerRef}
+                 onMouseDown={handlePanMouseDown}
+                 onMouseMove={handlePanMouseMove}
+                 onMouseUp={handlePanMouseUp}
+                 onMouseLeave={handlePanMouseUp}
+                 className={`flex-1 bg-surface-container dark:bg-black/20 overflow-auto p-4 md:p-8 flex items-start justify-center custom-scrollbar scroll-smooth whitespace-nowrap select-none ${isPanDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+               >
+                  <div className="transition-transform duration-200 ease-out origin-top" style={{ transform: `scale(${zoom})` }}>
+                    <div 
+                      ref={invoicePreviewRef} 
+                      id="invoice-preview-capture"
+                      className="bg-white shadow-2xl p-8 md:p-12 border border-outline-variant pointer-events-auto"
+                      style={{ minHeight: '1122px', width: '794px', backgroundColor: '#ffffff' }}
+                    >
+                    {/* DANFE HTML Representation - Forced Dark Text for Mockup */}
+                    <div className="border border-slate-950 mb-4 overflow-hidden rounded-sm">
                       <div className="flex">
-                        <div className="w-1/2 p-4 border-r border-outline-variant text-[10px]">
-                           <h1 className="text-lg font-black uppercase text-on-surface mb-1">DANFE</h1>
-                           <h2 className="text-[9px] font-bold text-on-surface-variant uppercase mb-4 leading-tight">Documento Auxiliar da Nota Fiscal Eletrônica</h2>
+                        <div className="w-1/2 p-4 border-r border-slate-950 text-[10px]">
+                           <h1 className="text-xl font-black uppercase text-slate-950 mb-1">DANFE</h1>
+                           <h2 className="text-[9px] font-bold text-slate-700 uppercase mb-4 leading-tight">Documento Auxiliar da Nota Fiscal Eletrônica</h2>
                            
                            <div className="grid grid-cols-2 gap-1 mb-2">
-                              <div className="border border-outline p-1 text-[9px] flex flex-col justify-center items-center">
-                                <span className="font-bold">0 - ENTRADA</span>
-                                <span className="font-bold">1 - SAÍDA</span>
+                              <div className="border border-slate-950 p-1 text-[9px] flex flex-col justify-center items-center text-slate-950">
+                                <span className="font-bold uppercase tracking-tighter">0 - ENTRADA</span>
+                                <span className="font-bold uppercase tracking-tighter">1 - SAÍDA</span>
                                 <span className="text-sm font-black mt-1">1</span>
                               </div>
-                              <div className="border border-outline p-1 text-[9px] flex flex-col justify-center">
-                                <span className="font-bold">Nº: <span className="text-sm">{previewInvoice.number}</span></span>
+                              <div className="border border-slate-950 p-1 text-[9px] flex flex-col justify-center text-slate-950">
+                                <span className="font-bold">Nº: <span className="text-sm font-black">{previewInvoice.number}</span></span>
                                 <span className="font-bold">SÉRIE: 1</span>
                               </div>
                            </div>
-                           <div className="border border-outline p-1 text-[9px]">
-                              <p className="font-bold uppercase text-[8px] text-on-surface-variant">Protocolo de Autorização</p>
+                           <div className="border border-slate-950 p-1 text-[9px] text-slate-950">
+                              <p className="font-bold uppercase text-[8px] text-slate-600">Protocolo de Autorização</p>
                               <p className="font-mono font-bold">{extractXmlTag(previewInvoice.xmlContent || '', 'nProt') || '---'}</p>
                            </div>
                         </div>
-                        <div className="w-1/2 p-4 flex flex-col">
+                        <div className="w-1/2 p-4 flex flex-col justify-center">
                            <div className="mb-4">
-                             <p className="text-[9px] uppercase font-bold text-on-surface-variant mb-1">Chave de Acesso</p>
-                             <p className="text-[12px] font-mono tracking-widest font-bold border border-transparent py-1 leading-none break-all">{previewInvoice.key || 'NÃO INFORMADA'}</p>
+                             <p className="text-[9px] uppercase font-bold text-slate-600 mb-1">Chave de Accesso</p>
+                             <p className="text-[12px] font-mono tracking-widest font-black border border-transparent py-1 leading-none break-all text-slate-950">{previewInvoice.key || 'NÃO INFORMADA'}</p>
                            </div>
-                           <div className="text-center mt-auto border-t border-outline-variant pt-2">
-                             <p className="text-[9px] uppercase font-bold text-on-surface-variant mb-1">Consulta de Autenticidade</p>
-                             <a href="#" className="text-xs text-primary font-bold hover:underline">www.nfe.fazenda.gov.br/portal</a>
+                           <div className="text-center mt-auto border-t border-slate-300 pt-2">
+                             <p className="text-[9px] uppercase font-bold text-slate-600 mb-1">Consulta de Autenticidade</p>
+                             <a href="#" className="text-xs text-blue-800 font-bold hover:underline">www.nfe.fazenda.gov.br/portal</a>
                            </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="mb-4">
-                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Natureza da Operação</p>
-                       <div className="border border-outline-variant mt-1 p-2 transition-colors">
-                          <p className="text-xs font-bold text-on-surface uppercase">{extractXmlTag(previewInvoice.xmlContent || '', 'natOp') || 'VENDA DE MERCADORIA'}</p>
+                       <p className="font-bold text-[10px] bg-white px-2 py-1 uppercase tracking-widest text-slate-700 border-b border-slate-950">Natureza da Operação</p>
+                       <div className="border border-slate-950 mt-1 p-2 bg-white">
+                          <p className="text-xs font-black text-slate-950 uppercase">{extractXmlTag(previewInvoice.xmlContent || '', 'natOp') || 'VENDA DE MERCADORIA'}</p>
                        </div>
                     </div>
 
                     <div className="mb-4">
-                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Emitente</p>
-                       <div className="flex flex-col border border-outline-variant mt-1 transition-colors divide-y divide-outline-variant">
-                          <div className="flex divide-x divide-outline-variant">
+                       <p className="font-bold text-[10px] bg-white px-2 py-1 uppercase tracking-widest text-slate-700 border-b border-slate-950">Emitente</p>
+                       <div className="flex flex-col border border-slate-950 mt-1 divide-y divide-slate-400">
+                          <div className="flex divide-x divide-slate-400">
                              <div className="w-2/3 p-2">
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">NOME / RAZÃO SOCIAL</p>
-                               <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.issuerName}</p>
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">NOME / RAZÃO SOCIAL</p>
+                               <p className="text-sm font-black text-slate-950 leading-snug">{previewInvoice.issuerName}</p>
                              </div>
                              <div className="w-1/3 p-2">
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">CNPJ</p>
-                               <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.issuerCNPJ}</p>
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">CNPJ</p>
+                               <p className="text-sm font-black text-slate-950 leading-snug">{previewInvoice.issuerCNPJ}</p>
                              </div>
                           </div>
                           <div className="p-2 flex gap-4">
                              <div>
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">Inscrição Estadual</p>
-                               <p className="text-xs font-bold text-on-surface">{extractXmlTag(previewInvoice.xmlContent || '', 'IE') || 'ISENTO'}</p>
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">Inscrição Estadual</p>
+                               <p className="text-xs font-bold text-slate-950">{extractXmlTag(previewInvoice.xmlContent || '', 'IE') || 'ISENTO'}</p>
                              </div>
                              <div className="flex-1">
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">Endereço</p>
-                               <p className="text-[10px] text-on-surface truncate uppercase">
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">Endereço</p>
+                               <p className="text-[10px] text-slate-950 truncate uppercase font-bold">
                                  {extractXmlTag(previewInvoice.xmlContent || '', 'xLgr')}, {extractXmlTag(previewInvoice.xmlContent || '', 'nro')} - {extractXmlTag(previewInvoice.xmlContent || '', 'xBairro')} - {extractXmlTag(previewInvoice.xmlContent || '', 'xMun')}/{extractXmlTag(previewInvoice.xmlContent || '', 'UF')}
                                </p>
                              </div>
@@ -1900,12 +2213,12 @@ export function Invoices() {
                     </div>
 
                     <div className="mb-4">
-                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Destinatário / Remetente</p>
-                       <div className="flex flex-col border border-outline-variant mt-1 transition-colors divide-y divide-outline-variant">
-                          <div className="flex divide-x divide-outline-variant">
+                       <p className="font-bold text-[10px] bg-white px-2 py-1 uppercase tracking-widest text-slate-700 border-b border-slate-950">Destinatário / Remetente</p>
+                       <div className="flex flex-col border border-slate-950 mt-1 divide-y divide-slate-400">
+                          <div className="flex divide-x divide-slate-400">
                              <div className="w-2/3 p-2">
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">NOME / RAZÃO SOCIAL</p>
-                               <p className="text-sm font-bold text-on-surface leading-snug">
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">NOME / RAZÃO SOCIAL</p>
+                               <p className="text-sm font-black text-slate-950 leading-snug uppercase">
                                  {(() => {
                                    const destMatch = (previewInvoice.xmlContent || '').match(/<dest>([\s\S]*?)<\/dest>/);
                                    if (!destMatch) return 'DESTINATÁRIO NÃO IDENTIFICADO';
@@ -1915,8 +2228,8 @@ export function Invoices() {
                                </p>
                              </div>
                              <div className="w-1/3 p-2">
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">CNPJ / CPF</p>
-                               <p className="text-sm font-bold text-on-surface leading-snug">
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">CNPJ / CPF</p>
+                               <p className="text-sm font-black text-slate-950 leading-snug">
                                  {(() => {
                                    const destMatch = (previewInvoice.xmlContent || '').match(/<dest>([\s\S]*?)<\/dest>/);
                                    if (!destMatch) return '---';
@@ -1935,68 +2248,68 @@ export function Invoices() {
                     </div>
 
                     <div className="mb-4">
-                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Fatura / Duplicata</p>
-                       <div className="flex border border-outline-variant mt-1 transition-colors">
-                           <div className="w-1/3 p-2 border-r border-outline-variant">
-                             <p className="text-[8px] uppercase text-on-surface-variant font-bold">NÚMERO</p>
-                             <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.number}</p>
+                       <p className="font-bold text-[10px] bg-white px-2 py-1 uppercase tracking-widest text-slate-700 border-b border-slate-950">Fatura / Duplicata</p>
+                       <div className="flex border border-slate-950 mt-1">
+                           <div className="w-1/3 p-2 border-r border-slate-950 text-slate-950">
+                             <p className="text-[8px] uppercase text-slate-600 font-bold">NÚMERO</p>
+                             <p className="text-sm font-black uppercase leading-snug">{previewInvoice.number}</p>
                            </div>
-                           <div className="w-1/3 p-2 border-r border-outline-variant">
-                             <p className="text-[8px] uppercase text-on-surface-variant font-bold">VENCIMENTO</p>
-                             <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.issueDate.split('-').reverse().join('/')}</p>
+                           <div className="w-1/3 p-2 border-r border-slate-950 text-slate-950">
+                             <p className="text-[8px] uppercase text-slate-600 font-bold">VENCIMENTO</p>
+                             <p className="text-sm font-black uppercase leading-snug">{previewInvoice.issueDate.split('-').reverse().join('/')}</p>
                            </div>
-                           <div className="w-1/3 p-2">
-                             <p className="text-[8px] uppercase text-on-surface-variant font-bold">VALOR (R$)</p>
-                             <p className="text-sm font-bold text-on-surface leading-snug">{previewInvoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                           </div>
-                        </div>
-                     </div>
-
-                    <div className="mb-4 mt-8">
-                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Cálculo do Imposto (Demonstrativo)</p>
-                       <div className="flex border border-outline-variant mt-1 bg-surface-container-lowest transition-colors">
-                           <div className="w-full p-2 grid grid-cols-4 gap-2">
-                             <div>
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">BASE DE CÁLCULO ICMS</p>
-                               <p className="text-xs font-bold text-on-surface">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vBC') || '0,00'}</p>
-                             </div>
-                             <div>
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">VALOR DO ICMS</p>
-                               <p className="text-xs font-bold text-on-surface">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vICMS') || '0,00'}</p>
-                             </div>
-                             <div>
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">VALOR FRETE</p>
-                               <p className="text-xs font-bold text-on-surface">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vFrete') || '0,00'}</p>
-                             </div>
-                             <div>
-                               <p className="text-[8px] uppercase text-on-surface-variant font-bold">VALOR TOTAL DA NOTA</p>
-                               <p className="text-sm font-black text-primary">R$ {previewInvoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                             </div>
+                           <div className="w-1/3 p-2 text-slate-950">
+                             <p className="text-[8px] uppercase text-slate-600 font-bold">VALOR (R$)</p>
+                             <p className="text-sm font-black leading-snug"><PrivateValue>{previewInvoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue></p>
                            </div>
                         </div>
                      </div>
 
                     <div className="mb-4 mt-8">
-                       <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Dados dos Produtos / Serviços</p>
-                       <div className="border border-outline-variant mt-1 overflow-hidden">
+                       <p className="font-bold text-[10px] bg-white px-2 py-1 uppercase tracking-widest text-slate-700 border-b border-slate-950">Cálculo do Imposto (Demonstrativo)</p>
+                       <div className="flex border border-slate-950 mt-1 bg-slate-50">
+                           <div className="w-full p-2 grid grid-cols-4 gap-2 text-slate-950">
+                             <div>
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">BASE DE CÁLCULO ICMS</p>
+                               <p className="text-xs font-bold">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vBC') || '0,00'}</p>
+                             </div>
+                             <div>
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">VALOR DO ICMS</p>
+                               <p className="text-xs font-bold">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vICMS') || '0,00'}</p>
+                             </div>
+                             <div>
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">VALOR FRETE</p>
+                               <p className="text-xs font-bold">R$ {extractXmlTag(previewInvoice.xmlContent || '', 'vFrete') || '0,00'}</p>
+                             </div>
+                             <div>
+                               <p className="text-[8px] uppercase text-slate-600 font-bold">VALOR TOTAL DA NOTA</p>
+                               <p className="text-sm font-black text-slate-950"><PrivateValue>R$ {previewInvoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue></p>
+                             </div>
+                           </div>
+                        </div>
+                     </div>
+
+                    <div className="mb-4 mt-8">
+                       <p className="font-bold text-[10px] bg-white px-2 py-1 uppercase tracking-widest text-slate-700 border-b border-slate-950">Dados dos Produtos / Serviços</p>
+                       <div className="border border-slate-950 mt-1 overflow-hidden">
                          <table className="w-full text-left text-[9px]">
                            <thead>
-                             <tr className="bg-surface-container-lowest border-b border-outline-variant">
-                               <th className="p-2 font-bold uppercase text-on-surface-variant">Descrição Completa</th>
-                               <th className="p-2 font-bold uppercase text-on-surface-variant w-16 text-center">Qtd</th>
-                               <th className="p-2 font-bold uppercase text-on-surface-variant w-16 text-center">Un</th>
-                               <th className="p-2 font-bold uppercase text-on-surface-variant w-24 text-right">Valor Unit</th>
-                               <th className="p-2 font-bold uppercase text-on-surface-variant w-24 text-right">Valor Total</th>
+                             <tr className="bg-slate-100 border-b border-slate-950 text-slate-950">
+                               <th className="p-2 font-bold uppercase text-slate-600">Descrição Completa</th>
+                               <th className="p-2 font-bold uppercase text-slate-600 w-16 text-center text-on">Qtd</th>
+                               <th className="p-2 font-bold uppercase text-slate-600 w-16 text-center">Un</th>
+                               <th className="p-2 font-bold uppercase text-slate-600 w-24 text-right">Valor Unit</th>
+                               <th className="p-2 font-bold uppercase text-slate-600 w-24 text-right">Valor Total</th>
                              </tr>
                            </thead>
-                           <tbody className="divide-y divide-outline-variant/30">
+                           <tbody className="divide-y divide-slate-300">
                              {getInvoiceItems(previewInvoice.xmlContent, previewInvoice.value).map((item, idx) => (
-                               <tr key={idx} className="transition-colors">
-                                 <td className="p-2 font-bold text-on-surface whitespace-normal leading-tight max-w-[400px] uppercase">{item.xProd}</td>
-                                 <td className="p-2 text-center text-on-surface-variant">{parseFloat(item.qCom).toLocaleString('pt-BR')}</td>
-                                 <td className="p-2 text-center text-on-surface-variant">{item.uCom}</td>
-                                 <td className="p-2 text-right text-on-surface-variant">{parseFloat(item.vUnCom).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                 <td className="p-2 text-right font-bold text-primary">{parseFloat(item.vProd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                               <tr key={idx} className="bg-white">
+                                 <td className="p-2 font-black text-slate-950 whitespace-normal leading-tight max-w-[400px] uppercase">{item.xProd}</td>
+                                 <td className="p-2 text-center text-slate-700 font-bold">{parseFloat(item.qCom).toLocaleString('pt-BR')}</td>
+                                 <td className="p-2 text-center text-slate-700 font-bold">{item.uCom}</td>
+                                 <td className="p-2 text-right text-slate-700 font-bold">{parseFloat(item.vUnCom).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                 <td className="p-2 text-right font-black text-slate-950">{parseFloat(item.vProd).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                                </tr>
                              ))}
                            </tbody>
@@ -2005,17 +2318,368 @@ export function Invoices() {
                     </div>
 
                      <div className="mt-8">
-                        <p className="font-bold text-[10px] bg-outline-variant/30 px-2 py-1 uppercase tracking-widest text-on-surface-variant">Dados Adicionais / Anotações Originais</p>
-                        <div className="border border-outline-variant mt-1 p-4 min-h-[120px] text-[10px] text-on-surface-variant whitespace-pre-wrap font-medium font-serif leading-relaxed uppercase transition-colors">
-                          Nenhuma anotação adicional constante no documento original emitido pela SEFAZ.
+                        <p className="font-bold text-[10px] bg-white px-2 py-1 uppercase tracking-widest text-slate-700 font-mono border-b border-slate-950">DADOS ADICIONAIS / ANOTAÇÕES ORIGINAIS (SEFAZ)</p>
+                        <div className="border border-slate-950 mt-1 p-4 min-h-[120px] text-[10px] text-slate-800 whitespace-pre-wrap font-bold font-sans leading-relaxed uppercase bg-white">
+                          {(extractXmlTag(previewInvoice.xmlContent || '', 'infAdic') || extractXmlTag(previewInvoice.xmlContent || '', 'infCpl') || 'NENHUMA ANOTAÇÃO ADICIONAL CONSTANTE NO DOCUMENTO ORIGINAL EMITIDO PELA SEFAZ.').replace(/<[^>]*>/g, '').trim()}
                         </div>
-                     </div>
-                  </div>
-               </div>
-            </div>
-          </motion.div>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+        </motion.div>
         </div>
       )}
+
+      <AnimatePresence>
+        {copyAnimationState?.active && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8, y: 50 }}
+              className="bg-white dark:bg-surface-container rounded-[32px] p-8 shadow-2xl flex flex-col items-center justify-center max-w-sm border border-outline-variant/30 text-center relative overflow-hidden"
+            >
+              {/* Decorative background glow */}
+              <div className="absolute -inset-10 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="relative flex items-center justify-center w-40 h-28 mb-4 pointer-events-none">
+                {/* Folder Icon */}
+                <motion.span 
+                  initial={{ x: 30, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.4 }}
+                  className="material-symbols-outlined text-[64px] text-secondary absolute right-6"
+                >
+                  folder_open
+                </motion.span>
+
+                {/* Flying Document Icon */}
+                <motion.span 
+                  initial={{ x: -60, y: -20, rotate: -25, scale: 0.4, opacity: 0 }}
+                  animate={{ x: 18, y: 0, rotate: 0, scale: 1, opacity: [0, 1, 1, 0.4, 0] }}
+                  transition={{ 
+                    duration: 1.0, 
+                    times: [0, 0.2, 0.5, 0.8, 1],
+                    ease: "easeInOut" 
+                  }}
+                  className="material-symbols-outlined text-[48px] text-primary absolute left-6"
+                >
+                  description
+                </motion.span>
+
+                {/* Explosion Sparkles on contact */}
+                <motion.div 
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: [0, 0.2, 1.2, 1], opacity: [0, 0, 1, 0] }}
+                  transition={{ delay: 0.6, duration: 0.6 }}
+                  className="absolute right-12 top-6 flex items-center justify-center"
+                >
+                  {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, idx) => (
+                    <motion.div 
+                      key={idx}
+                      className="absolute w-2 h-2 rounded-full bg-emerald-500"
+                      animate={{ 
+                        x: Math.cos(angle * Math.PI / 180) * 45,
+                        y: Math.sin(angle * Math.PI / 180) * 45,
+                        scale: [1, 0.4]
+                      }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                  ))}
+                </motion.div>
+
+                {/* Inflow checkmark inside the folder after doc enters */}
+                <motion.span 
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: [0, 1.3, 1], opacity: 1 }}
+                  transition={{ delay: 0.7, duration: 0.4, type: "spring" }}
+                  className="material-symbols-outlined text-[28px] text-emerald-500 absolute right-11 top-10 bg-white dark:bg-surface-container rounded-full shadow-sm p-0.5 border border-emerald-500/20"
+                >
+                  check_circle
+                </motion.span>
+              </div>
+
+              <motion.h4 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="text-lg font-bold text-on-surface mb-1 relative z-10"
+              >
+                Copiado com Sucesso!
+              </motion.h4>
+              
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.8 }}
+                transition={{ delay: 0.6 }}
+                className="text-xs text-on-surface-variant font-medium font-mono uppercase relative z-10"
+              >
+                NF {copyAnimationState?.invoiceNumber || ""} → RASCUNHOS
+              </motion.p>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Vehicle Details Modal */}
+      <AnimatePresence>
+        {detailsModalVehicle && (
+          <div 
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto" 
+            onClick={() => setDetailsModalVehicle(null)}
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-[#f8fafc] dark:bg-[#f8fafc] rounded-3xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col relative my-8" 
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header / Top Bar */}
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white dark:bg-white shadow-sm">
+                <h3 className="text-xl font-bold text-primary dark:text-primary flex items-center gap-2">
+                  <span className="material-symbols-outlined">info</span>
+                  Detalhes do Veículo: {detailsModalVehicle.plate}
+                </h3>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => navigate(`/fleet?editId=${detailsModalVehicle.id}`)}
+                    className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white dark:bg-white text-slate-700 dark:text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors shadow-sm text-sm"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                    Editar
+                  </button>
+                  <button 
+                    onClick={() => setDetailsModalVehicle(null)}
+                    className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-100 flex items-center justify-center text-slate-500 dark:text-slate-500 hover:text-error transition-all"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-8 overflow-y-auto max-h-[80vh] custom-scrollbar">
+                <div className="grid grid-cols-12 gap-6">
+                  {/* Hero Card */}
+                  <div className="col-span-12 lg:col-span-8 h-[380px] rounded-2xl overflow-hidden relative shadow-sm border border-slate-200 dark:border-slate-200 group bg-white dark:bg-white">
+                    <img 
+                      className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
+                      src={detailsModalVehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=1200"} 
+                      alt={detailsModalVehicle.model} 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-blue-600/80 via-blue-400/20 to-transparent pointer-events-none"></div>
+                    <div className="absolute bottom-8 left-8 text-on-primary">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className={`px-3 py-1 rounded font-bold text-[10px] uppercase tracking-wider ${detailsModalVehicle.status === 'Ativo' ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-red-100 dark:bg-red-100 text-red-700 dark:text-red-700 font-bold'}`}>
+                          {detailsModalVehicle.status}
+                        </span>
+                        <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded font-bold text-[10px] tracking-wider">
+                          RENAVAM: <PrivateValue value={detailsModalVehicle.renavam || '01291533734'} />
+                        </span>
+                      </div>
+                      <h2 className="text-[48px] font-black leading-none mb-2 tracking-tighter"><PrivateValue value={detailsModalVehicle.plate} /></h2>
+                      <p className="text-lg opacity-90 font-medium">{detailsModalVehicle.brand} {detailsModalVehicle.model} • {detailsModalVehicle.bodywork || 'ABERTA/MECANISMO OPERACIONAL'}</p>
+                    </div>
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+                    {/* Status Documentation */}
+                    <div className={`p-6 rounded-2xl border-l-4 flex items-start gap-4 shadow-sm h-full ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'bg-red-50 border-red-500' : 'bg-blue-50 border-blue-500'}`}>
+                      <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'bg-red-100' : 'bg-blue-100'}`}>
+                        <span className={`material-symbols-outlined ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'text-red-500' : 'text-blue-600'}`}>
+                          {detailsModalVehicle.exerciceStatus === 'Vencido' ? 'warning' : 'verified'}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest mb-1">Status Documentação</h3>
+                        <p className="text-[20px] font-bold mb-1 text-slate-800 dark:text-slate-800">Exercício {detailsModalVehicle.exerciceYear || '2026'}</p>
+                        <p className={`text-sm font-medium ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'text-red-600' : 'text-slate-500 dark:text-slate-500 opacity-70'}`}>
+                          {detailsModalVehicle.exerciceStatus === 'Vencido' ? 'O licenciamento está atrasado.' : 'Documentação em dia e verificada.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Odometer Card */}
+                    <div className="bg-white dark:bg-white border border-slate-100 dark:border-slate-100 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-full">
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest">Status do Odômetro</h3>
+                          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                            detailsModalVehicle.lastSyncStatus === 'success' || !detailsModalVehicle.lastSyncStatus
+                              ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-50 dark:text-emerald-600 dark:border-emerald-200' 
+                              : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-50 dark:text-red-600 dark:border-red-200'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                              detailsModalVehicle.lastSyncStatus === 'failed' ? 'bg-red-600' : 'bg-emerald-600'
+                            }`}></span>
+                            {detailsModalVehicle.lastSyncStatus === 'failed' ? 'ERRO SYNC' : 'CONECTADO'}
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-baseline mb-2">
+                          <span className="text-[48px] font-bold text-blue-600 dark:text-blue-600 leading-none tracking-tight">{(detailsModalVehicle.currentKM || 0).toLocaleString('pt-BR')}</span>
+                          <span className="text-[20px] font-bold text-slate-800 dark:text-slate-800">KM</span>
+                        </div>
+                        <div className="flex flex-col gap-1 mb-4 opacity-70">
+                          <p className="text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">sync</span>
+                            Última sincronização
+                          </p>
+                          <p className="text-xs font-bold text-blue-600 dark:text-blue-600">
+                            {new Date(detailsModalVehicle.lastSyncCheck || detailsModalVehicle.updatedAt || Date.now()).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('MANUAL_KM_SYNC', { 
+                              detail: { vehicleId: detailsModalVehicle.id, plate: detailsModalVehicle.plate } 
+                            }));
+                          }}
+                          className="w-full py-2.5 bg-blue-50 border border-blue-200 dark:bg-blue-50 dark:border-blue-200 text-blue-600 dark:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">refresh</span>
+                          Sincronizar Agora
+                        </button>
+                      </div>
+                      <div className="space-y-2 mt-6">
+                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-600 dark:bg-blue-600 rounded-full transition-all duration-1000" style={{ width: '65%' }}></div>
+                        </div>
+                        <div className="flex justify-between text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider">
+                          <span>Último: {((detailsModalVehicle.currentKM || 0) - 5000).toLocaleString('pt-BR')}</span>
+                          <span>Próximo: {((detailsModalVehicle.currentKM || 0) + 5000).toLocaleString('pt-BR')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Bento Grid */}
+                  <div className="col-span-12 lg:col-span-4 bg-white dark:bg-white border border-slate-100 dark:border-slate-100 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 dark:bg-slate-50 flex justify-between items-center">
+                      <h3 className="text-[10px] font-bold text-slate-700 dark:text-slate-700 uppercase tracking-widest">Informações Técnicas</h3>
+                      <span className="material-symbols-outlined text-blue-600 dark:text-blue-600 text-[20px]">precision_manufacturing</span>
+                    </div>
+                    <div className="p-6 divide-y divide-slate-100 dark:divide-slate-100 flex-1">
+                      {[
+                        { label: 'Cor Predominante', value: detailsModalVehicle.color || 'BRANCA', isBadge: true },
+                        { label: 'Ano do Modelo', value: detailsModalVehicle.modelYear || '2023' },
+                        { label: 'Combustível', value: detailsModalVehicle.fuelType || 'DIESEL' },
+                        { label: 'Chassi', value: detailsModalVehicle.chassis || '9535V6TBXPR001424', font: 'font-mono' },
+                        { label: 'Centro de Custo', value: (Array.isArray(detailsModalVehicle.costCenter) ? detailsModalVehicle.costCenter : [detailsModalVehicle.costCenter]).map(v => String(v || '').replace(/logística - região sul/gi, '').trim()).filter(Boolean).join(', ') || 'Sede Adm' },
+                        { label: 'Lotação', value: detailsModalVehicle.capacity || '03P' },
+                        { label: 'Peso Bruto Total (PBT)', value: detailsModalVehicle.grossWeight || '10.7' },
+                        { label: 'CNPJ / CPF', value: detailsModalVehicle.ownerCnpj || '26.005.751/0001-94' },
+                      ].map((spec, i) => (
+                        <div key={i} className="py-3 flex justify-between items-center">
+                          <span className="text-slate-500 dark:text-slate-500 text-sm font-medium">{spec.label}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold text-sm ${spec.font || ''} text-slate-800 dark:text-slate-800`}>{spec.value}</span>
+                            {spec.isBadge && (
+                              <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: spec.value.toLowerCase().includes('bran') ? '#ffffff' : spec.value.toLowerCase().includes('pret') ? '#1f2937' : '#ccc' }}></div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="pt-4">
+                        <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest mb-2">Observação</p>
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-700 p-3 bg-slate-50 dark:bg-slate-50 rounded-xl">
+                          {detailsModalVehicle.observation || 'SEM OBSERVAÇÕES'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-5 bg-white dark:bg-white border border-slate-100 dark:border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 dark:bg-slate-50 flex justify-between items-center">
+                      <h3 className="text-[10px] font-bold text-slate-700 dark:text-slate-700 uppercase tracking-widest">Distribuição Mensal</h3>
+                      <span className="material-symbols-outlined text-blue-600 dark:text-blue-600 text-[20px]">payments</span>
+                    </div>
+                    <div className="p-8 flex items-center gap-10 h-full">
+                      <div className="relative h-40 w-40 shrink-0">
+                        <svg className="h-full w-full transform -rotate-90">
+                          <circle className="text-slate-100 dark:text-slate-100" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeWidth="15"></circle>
+                          <circle className="text-primary" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeDasharray="408" strokeDashoffset="180" strokeWidth="15"></circle>
+                          <circle className="text-orange-500" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeDasharray="408" strokeDashoffset="320" strokeWidth="15"></circle>
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase">Total</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-800">R$ 1.2k</span>
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2.5 w-2.5 rounded-full bg-primary flex-shrink-0"></div>
+                            <span className="text-sm font-bold text-slate-500 dark:text-slate-500">Combustível</span>
+                          </div>
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-800">55%</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2.5 w-2.5 rounded-full bg-orange-500 flex-shrink-0"></div>
+                            <span className="text-sm font-bold text-slate-500 dark:text-slate-500">Manutenção</span>
+                          </div>
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-800">30%</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2.5 w-2.5 rounded-full bg-slate-200 dark:bg-slate-200 flex-shrink-0"></div>
+                            <span className="text-sm font-bold text-slate-500 dark:text-slate-500">Outros</span>
+                          </div>
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-800">15%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-3 bg-white dark:bg-white border border-slate-100 dark:border-slate-100 p-6 rounded-2xl shadow-sm flex flex-col items-center text-center">
+                    <div className="flex justify-between items-center w-full mb-6">
+                      <h3 className="text-[10px] font-bold text-slate-700 dark:text-slate-700 uppercase tracking-widest">Motoristas Atribuídos</h3>
+                      <span className="material-symbols-outlined text-blue-600 dark:text-blue-600 text-[20px]">person_add</span>
+                    </div>
+                    <div className="w-full flex-1 flex flex-col items-center justify-center">
+                      {assignedDriversForModal.length > 0 ? (
+                        <div className="w-full space-y-4 text-slate-800 dark:text-slate-800">
+                          {assignedDriversForModal.map(driver => (
+                            <div key={driver.id} className="flex flex-col items-center">
+                              <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary p-1 bg-slate-100 shadow-md">
+                                {driver.imageUrl ? (
+                                  <img 
+                                    src={driver.imageUrl} 
+                                    alt={driver.name} 
+                                    className={`h-full w-full rounded-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
+                                  />
+                                ) : (
+                                  <div className="h-full w-full rounded-full bg-blue-50 dark:bg-blue-50 flex items-center justify-center font-bold text-blue-600 dark:text-blue-600 text-xl">
+                                    {driver.name?.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <h4 className="text-base font-bold text-slate-800 dark:text-slate-800 leading-tight"><PrivateValue value={driver.name} /></h4>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase mt-1">Status: {driver.status}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-10">
+                          <span className="material-symbols-outlined text-4xl text-slate-500 dark:text-slate-500 opacity-20 mb-4 scale-150">person_off</span>
+                          <p className="text-sm font-bold text-slate-500 dark:text-slate-500 opacity-60">Nenhum motorista atribuído</p>
+                          <button 
+                            onClick={() => navigate('/drivers')}
+                            className="mt-6 px-6 py-2 rounded-full border border-primary text-primary text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-white transition-all"
+                          >
+                            Atribuir Agora
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

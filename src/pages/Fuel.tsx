@@ -268,7 +268,6 @@ export function Fuel() {
     { id: 'totalValue', label: 'Total', width: 'auto' },
     { id: 'transactionCode', label: 'CODIGO', width: 'auto' },
     { id: 'odometer', label: 'Odômetro', width: 'auto' },
-    { id: 'fuelType', label: 'Combustível', width: 'auto' },
     { id: 'driverRegistration', label: 'Matrícula', width: 'auto' },
     { id: 'driverName', label: 'Nome Motorista', width: 'auto' },
     { id: 'cityState', label: 'Cidade/Estado', width: 'auto' },
@@ -596,7 +595,7 @@ export function Fuel() {
   const [dialog, setDialog] = useState<{message: string, onConfirm?: () => void} | null>(null);
 
   const MessageDialog = () => !dialog ? null : (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4 lg:pl-[280px]">
       <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
         <h4 className="text-lg font-bold text-on-surface mb-2">Rota 360 diz:</h4>
         <p className="text-on-surface-variant mb-6">{dialog.message}</p>
@@ -1013,7 +1012,7 @@ export function Fuel() {
     }
 
     return result;
-  }, [fuelRecords, filterWork, searchTerm, reportMonth, reportYear, reportStartDate, reportEndDate, sortConfig]);
+  }, [fuelRecords, filterWork, searchTerm, reportMonth, reportYear, reportStartDate, reportEndDate, sortConfig, columnFilters]);
 
   const reportTotalCost = reportRecords.reduce((acc, curr) => acc + (curr.totalValue || 0), 0);
   const reportTotalLiters = reportRecords.reduce((acc, curr) => acc + (curr.liters || 0), 0);
@@ -1242,6 +1241,7 @@ export function Fuel() {
                 placeholder="🔍 Buscar placa, motorista..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="h-[44px] bg-surface w-64 border border-outline-variant rounded-xl px-4 text-sm outline-none focus:border-primary transition-colors focus:shadow-md"
               />
               <div className="h-6 w-px bg-outline-variant" />
@@ -1318,7 +1318,7 @@ export function Fuel() {
                 className={`h-11 px-6 rounded-xl border transition-all flex items-center gap-2 text-[13px] font-bold ${
                   isAnyFilterActive 
                     ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 ring-2 ring-primary/20 scale-[1.02]' 
-                    : 'bg-white border-outline-variant text-on-surface hover:bg-surface-container'
+                    : 'bg-white dark:bg-surface-container-low border-outline-variant dark:border-white/10 text-on-surface hover:bg-surface-container transition-all shadow-sm'
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">filter_alt_off</span>
@@ -1375,7 +1375,7 @@ export function Fuel() {
             </div>
             
             {showClearConfirm && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4 lg:pl-[280px]">
                     <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
                         <h4 className="text-lg font-bold text-on-surface mb-4">Confirmar exclusão</h4>
                         <p className="text-on-surface-variant mb-6">Tem certeza que deseja excluir todos os dados importados? Esta ação não pode ser desfeita.</p>
@@ -1413,7 +1413,7 @@ export function Fuel() {
           </div>
       </motion.div>
       <motion.div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm mb-10" variants={itemVariants}>
-        <div className="p-6 border-b border-outline-variant bg-white flex justify-between items-center">
+        <div className="p-6 border-b border-outline-variant bg-white dark:bg-surface flex justify-between items-center">
           <h4 className="text-[18px] font-semibold text-primary">Histórico de Abastecimentos</h4>
           <button 
             onClick={() => setShowReportPreview(true)}
@@ -1423,8 +1423,8 @@ export function Fuel() {
             Ver Relatório Completo
           </button>
         </div>
-        <div className="overflow-x-auto min-h-[450px] scrollbar-thin">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto min-h-[450px] scrollbar-thin w-full">
+          <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
                 {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'fuelType', 'liters', 'totalValue'].includes(opt.id) && opt.label !== 'Combustível').map(opt => (
@@ -1515,7 +1515,7 @@ export function Fuel() {
                       );
                       if (col.id === 'totalValue') return (
                         <td key={col.id} className="px-2 py-2 text-[13px] font-bold text-on-surface whitespace-nowrap">
-                          R$ <PrivateValue value={item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
+                          <PrivateValue>R$ {item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue>
                         </td>
                       );
                       return <td key={col.id} className="px-2 py-2">-</td>;
@@ -1553,27 +1553,27 @@ export function Fuel() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+            className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 lg:pl-[280px]"
             onClick={() => setShowReportPreview(false)}
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-[32px] w-full max-w-5xl h-[85vh] shadow-2xl flex flex-col overflow-hidden"
+              className="bg-white dark:bg-surface-container-low rounded-[32px] w-full max-w-[95vw] h-[98vh] shadow-2xl flex flex-col overflow-hidden border dark:border-white/10"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+              <div className="p-6 border-b border-outline-variant dark:border-white/10 flex justify-between items-center bg-surface-container-low dark:bg-surface-container">
                 <div>
-                  <h3 className="text-xl font-bold text-primary flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-primary dark:text-blue-400 flex items-center gap-2">
                     <span className="material-symbols-outlined">description</span>
                     Relatório Customizado
                   </h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${selectedColumns.length > 5 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${selectedColumns.length > 5 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
                       Formato {selectedColumns.length > 5 ? 'Paisagem' : 'Retrato'}
                     </span>
-                    <span className="text-xs text-on-surface-variant font-medium">• Escolha as colunas abaixo</span>
+                    <span className="text-xs text-on-surface-variant font-medium dark:text-on-surface/60">• Escolha as colunas abaixo</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1586,7 +1586,7 @@ export function Fuel() {
                   </button>
                   <button 
                     onClick={() => setShowReportPreview(false)}
-                    className="w-10 h-10 rounded-full hover:bg-black/5 flex items-center justify-center transition-colors"
+                    className="w-10 h-10 rounded-full hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors text-on-surface-variant"
                   >
                     <span className="material-symbols-outlined">close</span>
                   </button>
@@ -1594,7 +1594,7 @@ export function Fuel() {
               </div>
 
               {/* Column Selector */}
-              <div className="p-4 bg-white border-b border-outline-variant flex flex-wrap gap-2 justify-center">
+              <div className="p-4 bg-white dark:bg-surface-container-highest border-b border-outline-variant dark:border-white/10 flex flex-wrap gap-2 justify-center">
                 {columnOptions.map(opt => (
                   <button
                     key={opt.id}
@@ -1602,7 +1602,7 @@ export function Fuel() {
                     className={`h-9 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-2 ${
                       selectedColumns.includes(opt.id) 
                         ? 'bg-primary text-white border-primary shadow-md' 
-                        : 'bg-white text-on-surface-variant border-outline-variant hover:bg-surface-container'
+                        : 'bg-white dark:bg-surface-container border-outline-variant dark:border-white/10 text-on-surface-variant hover:bg-surface-container hover:text-on-surface dark:hover:bg-surface-variant transition-all'
                     }`}
                   >
                     <span className="material-symbols-outlined text-[16px]">
@@ -1615,35 +1615,35 @@ export function Fuel() {
 
               <div className="flex flex-1 overflow-hidden">
                 {/* Profiles Sidebar */}
-                <div className="w-[300px] bg-white border-r border-outline-variant flex flex-col p-6 overflow-y-auto custom-scrollbar">
+                <div className="w-[300px] bg-white dark:bg-surface-container border-r border-outline-variant flex flex-col p-6 overflow-y-auto custom-scrollbar">
                   <div className="flex items-center justify-between mb-6">
                     <h4 className="text-lg font-bold text-on-surface flex items-center gap-2">
-                       <span className="material-symbols-outlined text-primary">bookmark</span>
+                       <span className="material-symbols-outlined text-primary dark:text-blue-400">bookmark</span>
                        Perfis Salvos
                     </h4>
                     <button 
                       onClick={() => { setEditingProfileId(null); setEditingProfileName('Novo Perfil'); }}
-                      className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors"
+                      className="w-8 h-8 rounded-lg bg-primary/10 text-primary dark:text-blue-400 flex items-center justify-center hover:bg-primary/20 transition-colors"
                     >
                        <span className="material-symbols-outlined text-[20px]">add</span>
                     </button>
                   </div>
 
                   {editingProfileName !== '' && (
-                    <div className="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-4">
-                       <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Editar Nome do Perfil</label>
+                    <div className="bg-surface-container-low dark:bg-surface-container-high border border-outline-variant dark:border-white/10 rounded-xl p-4 mb-4">
+                       <label className="text-[10px] font-bold text-on-surface-variant dark:text-on-surface/50 uppercase tracking-wider block mb-2">Editar Nome do Perfil</label>
                        <input 
                          type="text" 
                          value={editingProfileName}
                          onChange={e => setEditingProfileName(e.target.value)}
                          autoFocus
-                         className="w-full h-10 px-3 border border-outline-variant rounded-lg text-sm mb-3 focus:outline-none focus:border-primary"
+                         className="w-full h-10 px-3 bg-white dark:bg-surface-container border border-outline-variant dark:border-white/10 rounded-lg text-sm text-on-surface mb-3 focus:outline-none focus:border-primary"
                        />
                        <div className="flex gap-2">
                           <button onClick={handleSaveProfile} className="flex-1 h-9 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-dark transition-colors">
                               Atualizar Perfil
                           </button>
-                          <button onClick={() => { setEditingProfileId(null); setEditingProfileName(''); }} className="flex-1 h-9 bg-surface-container-high text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-highest transition-colors">
+                          <button onClick={() => { setEditingProfileId(null); setEditingProfileName(''); }} className="flex-1 h-9 bg-surface-container-high dark:bg-surface-container-highest text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-highest transition-colors">
                               Cancelar
                           </button>
                        </div>
@@ -1654,7 +1654,7 @@ export function Fuel() {
                     {reportProfiles.map(p => (
                       <div 
                         key={p.id}
-                        className="group bg-surface-container border border-primary/20 rounded-xl p-4 cursor-pointer hover:bg-primary/5 hover:border-primary transition-all relative overflow-hidden"
+                        className="group bg-surface-container dark:bg-surface-container-high border border-primary/20 dark:border-primary/10 rounded-xl p-4 cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary transition-all relative overflow-hidden"
                         onClick={() => handleApplyProfile(p)}
                       >
                          <div className="flex justify-between items-start mb-1">
@@ -1662,7 +1662,7 @@ export function Fuel() {
                            <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
                              <button 
                                onClick={(e) => { e.stopPropagation(); setEditingProfileId(p.id); setEditingProfileName(p.name); }}
-                               className="p-1 text-primary hover:bg-primary/10 rounded"
+                               className="p-1 text-primary dark:text-blue-400 hover:bg-primary/10 rounded"
                              >
                                 <span className="material-symbols-outlined text-[14px]">edit</span>
                              </button>
@@ -1674,49 +1674,49 @@ export function Fuel() {
                              </button>
                            </div>
                          </div>
-                         <p className="text-[11px] text-on-surface-variant">
+                         <p className="text-[11px] text-on-surface-variant dark:text-on-surface/50">
                            {p.columns.length} campos • {p.columns.length > 5 ? 'Paisagem' : 'Retrato'}
                          </p>
                       </div>
                     ))}
                     {reportProfiles.length === 0 && editingProfileName === '' && (
-                      <p className="text-center text-sm text-on-surface-variant italic py-10 opacity-70">
+                      <p className="text-center text-sm text-on-surface-variant dark:text-on-surface/50 italic py-10 opacity-70">
                          Nenhum perfil salvo
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-auto p-8 bg-slate-100 scrollbar-thin scrollbar-thumb-primary/20">
-                  <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-12 min-h-full border border-outline-variant ${selectedColumns.length > 5 ? 'w-fit min-w-[1000px]' : 'max-w-[800px]'}`}>
-                  {/* PDF header mockup */}
-                  <div className="flex justify-between items-start border-b-4 border-primary/10 pb-8 mb-8">
-                    <div className="flex flex-col items-start gap-1">
+                <div className="flex-1 overflow-auto p-8 bg-slate-100 dark:bg-slate-950/40 scrollbar-thin scrollbar-thumb-primary/20">
+                  <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-12 min-h-full border border-slate-200 text-slate-950 ${selectedColumns.length > 5 ? 'w-fit min-w-[1000px]' : 'max-w-[800px]'}`}>
+                  {/* PDF header mockup - Forced Light Theme for Mockup */}
+                  <div className="flex justify-between items-start border-b-4 border-slate-100 pb-8 mb-8">
+                    <div className="flex flex-col items-start gap-1 text-slate-950">
                       <div className="flex items-center gap-4">
                         <img src="https://i.imgur.com/9iZCsf6.png" alt="Rota 360" className="h-14 object-contain" />
-                        <div className="h-10 w-px bg-outline-variant" />
+                        <div className="h-10 w-px bg-slate-200" />
                         <div>
                           <h1 className="text-xl font-black text-primary tracking-tight leading-none uppercase">GESTÃO DE COMBUSTÍVEL</h1>
-                          <p className="text-[10px] font-bold text-on-surface-variant uppercase mt-1 tracking-widest">Documento Operacional Oficial</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase mt-1 tracking-widest">Documento Operacional Oficial</p>
                         </div>
                       </div>
-                      <p className="text-[10px] font-black text-on-surface-variant/60 ml-2 uppercase tracking-tighter italic">{profile?.companyName || 'ROTA 360'}</p>
+                      <p className="text-[10px] font-black text-slate-400 ml-2 uppercase tracking-tighter italic">{profile?.companyName || 'ROTA 360'}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right text-slate-950">
                       <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">Data de Emissão</p>
-                      <p className="text-lg font-black text-on-surface leading-none">{new Date().toLocaleDateString('pt-BR')}</p>
+                      <p className="text-lg font-black text-slate-900 leading-none">{new Date().toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-8 mb-10">
-                    <div className="bg-primary/5 rounded-[24px] p-6 border border-primary/10">
-                      <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <div className="bg-slate-50 rounded-[24px] p-6 border border-slate-100">
+                      <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-3 flex items-center gap-2">
                         <span className="material-symbols-outlined text-[14px]">filter_list</span>
                         Contexto do Relatório
                       </p>
                       <div className="space-y-1">
-                        <p className="text-sm font-bold text-on-surface uppercase">Unidade: <span className="font-medium normal-case">{filterWork}</span></p>
-                        <p className="text-xs font-bold text-on-surface uppercase mt-1">
+                        <p className="text-sm font-bold text-slate-900 uppercase">Unidade: <span className="font-medium normal-case">{filterWork}</span></p>
+                        <p className="text-xs font-bold text-slate-900 uppercase mt-1">
                            Período: <span className="font-medium normal-case text-primary">
                              {(reportStartDate || reportEndDate) 
                                ? `${reportStartDate ? new Date(reportStartDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'Início'} até ${reportEndDate ? new Date(reportEndDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'Hoje'}` 
@@ -1728,7 +1728,7 @@ export function Fuel() {
                     <div className="bg-primary rounded-[24px] p-6 shadow-xl shadow-primary/10 flex justify-between items-center text-white">
                       <div>
                         <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Consumo Total</p>
-                        <p className="text-2xl font-black leading-none">R$ {reportTotalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-2xl font-black leading-none"><PrivateValue>R$ {reportTotalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue></p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Litros</p>
@@ -1783,7 +1783,7 @@ export function Fuel() {
                                          const v = vehicles.find(veh => veh.plate === r.vehiclePlate);
                                          const imgUrl = v?.imageUrl || v?.photoUrl;
                                          return imgUrl ? (
-                                           <img src={imgUrl} className="w-8 h-6 object-cover rounded shadow-sm border border-slate-200" alt="Veículo" />
+                                           <img src={imgUrl} className="w-8 h-6 object-cover rounded-lg shadow-sm border border-slate-200" alt="Veículo" />
                                          ) : (
                                            <div className="w-8 h-6 bg-slate-100 rounded flex items-center justify-center border border-slate-200">
                                               <span className="material-symbols-outlined text-[14px] text-slate-400">directions_car</span>
@@ -1794,9 +1794,9 @@ export function Fuel() {
                                     </div>
                                   );
                                   
-                                  if (opt.id === 'totalValue') return <span className="font-bold text-primary">R$ {Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
+                                  if (opt.id === 'totalValue') return <PrivateValue><span className="font-bold text-primary">R$ {Number(r.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></PrivateValue>;
                                   if (opt.id === 'transactionCode') return <span className="font-mono">{r.transactionId || (r.rawData ? r.rawData['CODIGO TRANSACAO'] || r.rawData['CÓDIGO TRANSAÇÃO'] || '-' : '-')}</span>;
-                                  if (opt.id === 'unitPrice') return <span className="">R$ {(Number(r.totalValue || 0) / (Number(r.liters) || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>;
+                                  if (opt.id === 'unitPrice') return <PrivateValue><span className="">R$ {(Number(r.totalValue || 0) / (Number(r.liters) || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></PrivateValue>;
                                   if (opt.id === 'station') {
                                     if (r.rawData) {
                                         const keys = Object.keys(r.rawData);
@@ -1829,6 +1829,13 @@ export function Fuel() {
                           })}
                           </tr>
                         ))}
+                        {reportRecords.length === 0 && (
+                          <tr>
+                            <td colSpan={selectedColumns.length} className="py-20 text-center text-slate-400 font-bold italic">
+                               Nenhum abastecimento encontrado para os filtros selecionados.
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1854,7 +1861,7 @@ export function Fuel() {
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-tighter mb-1">Total Consolidado</p>
-                      <p className="text-3xl font-black text-primary leading-none">R$ {reportTotalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-3xl font-black text-primary leading-none"><PrivateValue>R$ {reportTotalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue></p>
                     </div>
                   </div>
                 </div>
@@ -1871,7 +1878,7 @@ export function Fuel() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+            className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto lg:pl-[280px]"
             onClick={() => setSelectedRecord(null)}
           >
             <motion.div 
@@ -1879,10 +1886,10 @@ export function Fuel() {
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.95, y: 20, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-[#121212]/95 border border-white/10 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden my-8 backdrop-blur-md"
+              className="bg-[#0A101D]/95 border border-white/10 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden my-8 backdrop-blur-md"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
+              <div className="p-6 border-b border-white/10 flex justify-between items-center bg-[#1B2335]">
                 <div>
                     <h3 className="text-2xl font-bold text-white tracking-tight">Detalhes do Abastecimento</h3>
                     <p className="text-white/60 text-sm mt-1">
@@ -1897,7 +1904,7 @@ export function Fuel() {
                 </button>
               </div>
 
-              <div className="p-6 overflow-y-auto max-h-[70vh] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20" style={{ scrollbarColor: 'rgba(255,255,255,0.1) transparent', backgroundColor: '#121212' }}>
+              <div className="p-6 overflow-y-auto max-h-[70vh] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20" style={{ scrollbarColor: 'rgba(255,255,255,0.1) transparent', backgroundColor: '#0A101D' }}>
                 <div className="flex flex-col md:flex-row gap-6 mb-8">
                     {/* Vehicle & Driver Images Check */}
                     {(() => {
@@ -1948,19 +1955,19 @@ export function Fuel() {
                         <div className="col-span-full mb-2">
                              <h4 className="text-white/90 font-semibold tracking-tight text-lg mb-4">Métricas</h4>
                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                 <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                 <div className="bg-[#1B2335] border border-white/10 rounded-xl p-3">
                                      <span className="text-[10px] text-white/50 uppercase tracking-wider block mb-1">Valor Total</span>
-                                     <span className="text-lg font-bold text-white">R$ {Number(selectedRecord.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                     <span className="text-lg font-bold text-white"><PrivateValue>R$ {Number(selectedRecord.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue></span>
                                  </div>
-                                 <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                 <div className="bg-[#1B2335] border border-white/10 rounded-xl p-3">
                                      <span className="text-[10px] text-white/50 uppercase tracking-wider block mb-1">Litros</span>
                                      <span className="text-lg font-bold text-white">{selectedRecord.liters} L</span>
                                  </div>
-                                 <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                 <div className="bg-[#1B2335] border border-white/10 rounded-xl p-3">
                                      <span className="text-[10px] text-white/50 uppercase tracking-wider block mb-1">Odômetro</span>
                                      <span className="text-lg font-bold text-white font-mono">{selectedRecord.odometer}</span>
                                  </div>
-                                 <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                 <div className="bg-[#1B2335] border border-white/10 rounded-xl p-3">
                                      <span className="text-[10px] text-white/50 uppercase tracking-wider block mb-1">Data</span>
                                      <span className="text-sm font-bold text-white">
                                         {selectedRecord.date?.toDate ? selectedRecord.date.toDate().toLocaleString('pt-BR') : '-'}

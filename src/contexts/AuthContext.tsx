@@ -30,6 +30,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   cachedVehicles: any[];
   refreshVehiclesCache: () => Promise<void>;
+  quotaExceeded: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -42,6 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [cachedVehicles, setCachedVehicles] = useState<any[]>(globalVehiclesCache);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
+
+  const checkErrorForQuota = (error: any) => {
+    const errorStr = String(error?.message || error);
+    if (errorStr.includes('Quota limit exceeded') || errorStr.includes('Quota exceeded') || errorStr.includes('quota metric')) {
+      setQuotaExceeded(true);
+    }
+  };
 
   const refreshVehiclesCache = async () => {
     try {
@@ -52,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCachedVehicles(fetched);
     } catch (error) {
       console.error("Error fetching vehicles cache:", error);
+      checkErrorForQuota(error);
     }
   };
 
@@ -75,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             userDoc = await getDoc(userRef);
           } catch (error) {
             console.error('getDoc error:', error);
+            checkErrorForQuota(error);
             setLoading(false);
             return;
           }
@@ -148,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }, (error) => {
           console.error('Firestore Error on Auth:', error);
+          checkErrorForQuota(error);
           setLoading(false);
         });
       } else {
@@ -173,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, loginWithGoogle, logout, cachedVehicles, refreshVehiclesCache }}>
+    <AuthContext.Provider value={{ user, userData, loading, loginWithGoogle, logout, cachedVehicles, refreshVehiclesCache, quotaExceeded }}>
       {loading ? <Preloader /> : children}
     </AuthContext.Provider>
   );

@@ -555,6 +555,7 @@ export function Drivers() {
                 placeholder="Buscar por nome, CPF ou placa..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="w-full bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
               />
             </div>
@@ -609,8 +610,8 @@ export function Drivers() {
             </button>
           )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-surface-container-low text-on-surface-variant text-sm font-semibold">
                 <SortButton column="name" label="Perfil do Motorista" />

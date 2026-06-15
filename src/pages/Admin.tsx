@@ -736,8 +736,8 @@ export function Admin() {
             </div>
 
             {sortedPreApproved.length > 0 && (
-              <div className="bg-surface-container-low border border-outline-variant rounded-xl overflow-hidden mt-6">
-                <table className="w-full text-left border-collapse">
+              <div className="bg-surface-container-low border border-outline-variant rounded-xl overflow-x-auto w-full mt-6">
+                <table className="w-full text-left border-collapse min-w-[500px]">
                   <thead>
                     <tr className="bg-surface-container-high/30 border-b border-outline-variant">
                       {[
@@ -788,8 +788,8 @@ export function Admin() {
           </div>
 
           <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead>
                   <tr className="bg-surface-container-low/50 border-b border-outline-variant max-w-full">
                     {[

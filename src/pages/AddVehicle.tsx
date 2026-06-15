@@ -212,11 +212,11 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
           <p className="text-base text-on-surface-variant mt-2 max-w-2xl">{vehicleToEdit ? 'Atualize as informações técnicas e operacionais do veículo na frota.' : 'Agilize a integração da sua frota. Faça o upload do PDF do CRLV e nosso motor de OCR extrairá as especificações técnicas automaticamente.'}</p>
         </div>
         <div className="flex gap-4">
-          <button onClick={onCancel} className="px-6 py-2 border border-outline text-on-surface text-sm font-semibold rounded-lg hover:bg-surface-container-low transition-colors active:scale-95 disabled:opacity-50" disabled={isSaving}>Descartar</button>
+          <button onClick={onCancel} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-xl transition-colors active:scale-95 disabled:opacity-50" disabled={isSaving}>Descartar</button>
           <button 
             onClick={handleSubmit} 
             disabled={isSaving}
-            className="px-6 py-2 bg-primary text-on-primary text-sm font-semibold rounded-lg hover:bg-primary/90 transition-all active:scale-95 shadow-sm disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-2"
           >
             {isSaving && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
             {isSaving ? 'Salvando...' : 'Salvar Veículo'}
@@ -226,10 +226,10 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12 lg:col-span-5 space-y-6">
-          <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-8 shadow-sm">
+          <section className="bg-white dark:bg-white border border-slate-100 dark:border-slate-100 rounded-3xl p-8 shadow-md">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-semibold text-on-surface uppercase tracking-widest">Importação de Documento</h3>
-              <span className="flex items-center gap-2 px-2 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Importação de Documento</h3>
+              <span className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 dark:bg-blue-50 text-blue-600 dark:text-blue-600 text-[10px] font-bold rounded-lg border border-blue-100">
                 <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
                 OCR ATIVADO
               </span>
@@ -239,7 +239,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
               <label 
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
-                className="border-2 border-dashed border-outline-variant hover:border-primary-fixed-dim transition-colors rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer bg-surface-container-low/50 group"
+                className="border-2 border-dashed border-slate-200 dark:border-slate-200 hover:border-blue-400 dark:hover:border-blue-400 transition-colors rounded-3xl p-10 flex flex-col items-center justify-center text-center cursor-pointer bg-[#f8fafc] dark:bg-[#f8fafc] group"
               >
                 <input 
                   type="file" 
@@ -247,128 +247,132 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                   accept=".pdf,.jpg,.jpeg,.png"
                   onChange={handleSimulateUpload}
                 />
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform">
-                  <span className="material-symbols-outlined text-primary text-[32px]">upload_file</span>
+                <div className="w-16 h-16 bg-white dark:bg-white rounded-full flex items-center justify-center shadow-md mb-4 group-hover:scale-105 transition-transform border border-slate-100">
+                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-600 text-[32px]">upload_file</span>
                 </div>
-                <p className="text-[24px] font-semibold text-on-surface">Carregar PDF do CRLV</p>
-                <p className="text-on-surface-variant text-xs mt-2">Arraste e solte ou clique para navegar</p>
-                <p className="text-on-surface-variant text-[10px] mt-4 opacity-50 uppercase tracking-tighter">TAMANHO MÁX: 10MB | FORMATO: PDF, JPG, PNG</p>
+                <p className="text-[18px] font-bold text-slate-800 dark:text-slate-800">Carregar PDF do CRLV</p>
+                <p className="text-slate-400 text-xs mt-2 font-medium">Arraste e solte ou clique para navegar</p>
+                <p className="text-slate-300 text-[9px] mt-4 font-bold uppercase tracking-widest">TAMANHO MÁX: 10MB | FORMATO: PDF, JPG, PNG</p>
               </label>
             )}
 
             {(ocrStatus === 'uploading' || ocrStatus === 'processing' || ocrStatus === 'done') && (
-              <div className="mt-8 pt-8 border-t border-outline-variant">
-                <div className="flex items-center gap-4 p-4 bg-primary-container/5 rounded-lg border border-primary-fixed-dim/20">
-                  <span className="material-symbols-outlined text-on-primary-fixed-variant">picture_as_pdf</span>
+              <div className="mt-8 pt-8 border-t border-slate-100">
+                <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <span className="material-symbols-outlined text-blue-600">picture_as_pdf</span>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-on-surface">{fileName}</p>
-                    <div className="w-full bg-outline-variant/30 h-1 rounded-full mt-2 overflow-hidden">
-                      <div className={`bg-primary h-full transition-all duration-1000 ${ocrStatus === 'uploading' ? 'w-1/3' : ocrStatus === 'processing' ? 'w-2/3' : 'w-full'}`}></div>
+                    <p className="text-sm font-bold text-slate-800">{fileName}</p>
+                    <div className="w-full bg-slate-200 h-1 rounded-full mt-2 overflow-hidden">
+                      <div className={`bg-blue-600 h-full transition-all duration-1000 ${ocrStatus === 'uploading' ? 'w-1/3' : ocrStatus === 'processing' ? 'w-2/3' : 'w-full'}`}></div>
                     </div>
                   </div>
-                  {ocrStatus === 'done' && <span className="material-symbols-outlined text-on-tertiary-container" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>}
+                  {ocrStatus === 'done' && <span className="material-symbols-outlined text-emerald-600" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>}
                 </div>
-                <p className="text-xs text-on-surface-variant mt-4 text-center">
-                  Análise de OCR: <span className="font-bold text-on-surface">{ocrStatus === 'done' ? '100% Concluída' : 'Processando...'}</span>
+                <p className="text-xs text-slate-500 mt-4 text-center font-medium">
+                  Análise de OCR: <span className="font-bold text-slate-800">{ocrStatus === 'done' ? '100% Concluída' : 'Processando...'}</span>
                 </p>
               </div>
             )}
           </section>
 
           {ocrStatus === 'done' && (
-            <section className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm flex items-center justify-around">
+            <section className="bg-white dark:bg-white border border-slate-100 rounded-3xl p-6 shadow-md flex items-center justify-around">
               <div className="text-center">
-                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Precisão do OCR</p>
-                <p className="text-[24px] font-semibold text-primary">99.2%</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Precisão do OCR</p>
+                <p className="text-[24px] font-bold text-blue-600">99.2%</p>
               </div>
-              <div className="w-px h-10 bg-outline-variant"></div>
+              <div className="w-px h-10 bg-slate-100"></div>
               <div className="text-center">
-                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Campos Encontrados</p>
-                <p className="text-[24px] font-semibold text-primary">8/8</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Campos Encontrados</p>
+                <p className="text-[24px] font-bold text-blue-600">8/8</p>
               </div>
-              <div className="w-px h-10 bg-outline-variant"></div>
+              <div className="w-px h-10 bg-slate-100"></div>
               <div className="text-center">
-                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Status</p>
-                <p className="text-[24px] font-semibold text-on-tertiary-container">Pronto</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                <p className="text-[24px] font-bold text-emerald-600">Pronto</p>
               </div>
             </section>
           )}
         </div>
 
         <div className="col-span-12 lg:col-span-7">
-          <form className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm" onSubmit={(e) => e.preventDefault()}>
-            <div className="px-8 py-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low/30 rounded-t-2xl">
-              <h3 className="text-[24px] font-semibold text-on-surface">Detalhes do Veículo</h3>
-              <span className="text-xs text-on-surface-variant italic">Campos com <span className="material-symbols-outlined text-[12px] text-on-tertiary-container">auto_awesome</span> foram preenchidos automaticamente</span>
+          <form className="bg-white dark:bg-white border border-slate-100 dark:border-slate-100 rounded-3xl shadow-lg" onSubmit={(e) => e.preventDefault()}>
+            <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-100 flex items-center justify-between bg-white dark:bg-white rounded-t-3xl">
+              <h3 className="text-[22px] font-bold text-slate-800">Detalhes do Veículo</h3>
+              <span className="text-xs text-slate-400 font-medium italic text-right flex items-center gap-1">
+                Campos com 
+                <span className="material-symbols-outlined text-[14px] text-blue-600">auto_awesome</span> 
+                foram preenchidos automaticamente
+              </span>
             </div>
             
             <div className="p-8 space-y-8">
               <div className="grid grid-cols-2 gap-6">
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    Placa {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    Placa {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 font-bold text-on-surface focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 dark:text-slate-800 tracking-wider focus:outline-none focus:border-slate-400 transition-all uppercase" 
                     value={vehicleData.plate} 
                     onChange={(e) => setVehicleData({ ...vehicleData, plate: e.target.value })}
                   />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    Código Renavam {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    Código Renavam {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.renavam} 
                     onChange={(e) => setVehicleData({ ...vehicleData, renavam: e.target.value })}
                   />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    Marca {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    Marca {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.brand} 
                     onChange={(e) => setVehicleData({ ...vehicleData, brand: e.target.value })}
                   />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    Modelo {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    Modelo {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.model} 
                     onChange={(e) => setVehicleData({ ...vehicleData, model: e.target.value })}
                   />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Ano do Modelo</label>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">Ano do Modelo</label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.modelYear} 
                     onChange={(e) => setVehicleData({ ...vehicleData, modelYear: e.target.value })}
                   />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    Espécie / Tipo {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    Espécie / Tipo {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.bodywork} 
                     onChange={(e) => setVehicleData({ ...vehicleData, bodywork: e.target.value })}
                   />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    Exercício {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    Exercício {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <div className="relative">
                     <input 
-                      className={`w-full bg-white border-outline-variant border rounded-lg px-4 py-3 font-bold focus:outline-none focus:border-primary ${vehicleData.exerciceStatus === 'Vencido' ? 'text-error' : 'text-on-tertiary-container'}`} 
+                      className={`w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 font-bold focus:outline-none focus:border-slate-400 transition-all ${vehicleData.exerciceStatus === 'Vencido' ? 'text-red-500' : 'text-emerald-600'}`} 
                       value={vehicleData.exerciceYear} 
                       onChange={(e) => {
                         const year = e.target.value;
@@ -379,69 +383,70 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                       }}
                     />
                     {vehicleData.exerciceStatus && (
-                      <span className={`absolute right-10 top-1/2 -translate-y-1/2 text-[10px] font-bold px-2 py-0.5 rounded uppercase ${vehicleData.exerciceStatus === 'Vencido' ? 'bg-error-container text-on-error-container' : 'bg-tertiary-container text-on-tertiary-container'}`}>
+                      <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-extrabold px-2.5 py-1 rounded-lg uppercase shadow-sm border ${vehicleData.exerciceStatus === 'Vencido' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-[#e6f4ea] text-[#137333] border-[#ceead6]'}`}>
                         {vehicleData.exerciceStatus}
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    Chassi {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    Chassi {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface font-mono focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-mono font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.chassis} 
                     onChange={(e) => setVehicleData({ ...vehicleData, chassis: e.target.value })}
                   />
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    Lotação {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    Lotação {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.capacity || ''} 
                     onChange={(e) => setVehicleData({ ...vehicleData, capacity: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    PBT (Peso Bruto Total) {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    PBT (Peso Bruto Total) {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.grossWeight || ''} 
                     onChange={(e) => setVehicleData({ ...vehicleData, grossWeight: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                    CNPJ / CPF do Proprietário {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container">auto_awesome</span>}
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    CNPJ / CPF do Proprietário {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
-                    className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface font-mono focus:outline-none focus:border-primary" 
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-mono font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.ownerCnpj || ''} 
                     onChange={(e) => setVehicleData({ ...vehicleData, ownerCnpj: e.target.value })}
                   />
                 </div>
               </div>
               
-              <hr className="border-outline-variant/30" />
+              <hr className="border-slate-100 dark:border-slate-100" />
               
               <div>
-                <h4 className="text-sm font-semibold text-primary mb-6 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                <h4 className="text-[12px] font-bold text-blue-600 dark:text-blue-600 uppercase tracking-widest mb-6 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[20px]">edit_note</span>
                   ENTRADA MANUAL NECESSÁRIA
                 </h4>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="col-span-2 md:col-span-1">
                     <SearchableSelect 
-                      label="Tipo de Combustível"
+                      label="TIPO DE COMBUSTÍVEL"
                       placeholder="Selecione..."
+                      forceLightBg={true}
                       options={[
                         { value: 'DIESEL S10', label: 'DIESEL S10' },
                         { value: 'DIESEL', label: 'DIESEL' },
@@ -457,25 +462,26 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     />
                   </div>
                   <div className="col-span-2 md:col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-2 flex items-center gap-2">
-                      Cor do Veículo {ocrStatus === 'done' && <span className="material-symbols-outlined text-[14px] text-on-tertiary-container font-bold">auto_awesome</span>}
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                      Cor do Veículo {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                     </label>
                     <div className="flex items-center gap-3">
                       <input 
-                        className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary font-medium" 
+                        className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all uppercase" 
                         placeholder="ex: BRANCO" 
                         type="text" 
                         value={vehicleData.color}
                         onChange={(e) => setVehicleData({ ...vehicleData, color: e.target.value })}
                       />
-                      <div className="w-10 h-10 rounded-full border border-outline-variant bg-surface-container-highest flex-shrink-0" style={{ backgroundColor: vehicleData.color.toLowerCase().includes('bran') ? '#ffffff' : vehicleData.color.toLowerCase().includes('pret') ? '#1f2937' : vehicleData.color.toLowerCase().includes('verm') ? '#ef4444' : vehicleData.color.toLowerCase().includes('prat') ? '#e5e7eb' : vehicleData.color.toLowerCase().includes('cinz') ? '#9ca3af' : 'transparent' }}></div>
+                      <div className="w-10 h-10 rounded-full border border-slate-200 bg-slate-100 flex-shrink-0" style={{ backgroundColor: vehicleData.color.toLowerCase().includes('bran') ? '#ffffff' : vehicleData.color.toLowerCase().includes('pret') ? '#1f2937' : vehicleData.color.toLowerCase().includes('verm') ? '#ef4444' : vehicleData.color.toLowerCase().includes('prat') ? '#e5e7eb' : vehicleData.color.toLowerCase().includes('cinz') ? '#9ca3af' : 'transparent' }}></div>
                     </div>
                   </div>
                   <div className="col-span-2 md:col-span-1">
                     <SearchableSelect 
-                      label="Obra / Centro de Custo"
+                      label="OBRA / CENTRO DE CUSTO"
                       placeholder="Selecione..."
                       multiple={true}
+                      forceLightBg={true}
                       options={[
                         ...works.map(w => ({ value: w.name, label: w.name })),
                         { value: 'Sede Administrativa', label: 'Sede Administrativa' }
@@ -485,40 +491,40 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     />
                   </div>
                   <div className="col-span-2 md:col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Link da Imagem (URL)</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Link da Imagem (URL)</label>
                     <div className="flex items-center gap-3">
                       <input 
-                        className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary font-medium" 
+                        className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                         placeholder="https://exemplo.com/van.jpg" 
                         type="text" 
                         value={vehicleData.imageUrl}
                         onChange={(e) => setVehicleData({ ...vehicleData, imageUrl: e.target.value })}
                       />
-                      <div className="w-10 h-10 rounded-lg border border-outline-variant bg-surface-container overflow-hidden flex-shrink-0">
+                      <div className="w-10 h-10 rounded-xl border border-slate-200 bg-white overflow-hidden flex-shrink-0">
                         {vehicleData.imageUrl && <img src={vehicleData.imageUrl} className="w-full h-full object-cover" alt="Preview" />}
                       </div>
                     </div>
                   </div>
                   <div className="col-span-2 md:col-span-1">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Status Operacional</label>
-                    <div className="flex flex-wrap items-center gap-2 p-1 bg-surface-container rounded-lg">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Status Operacional</label>
+                    <div className="flex flex-wrap items-center gap-2 p-1.5 bg-white dark:bg-white border border-slate-200 rounded-xl">
                       {/* Fixed default options */}
                       <button 
-                        className={`px-3 py-2 flex-1 text-center rounded-md text-[10px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Ativo' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        className={`flex-1 py-2 text-center rounded-lg text-[10px] uppercase tracking-wider font-extrabold transition-all border ${vehicleData.status === 'Ativo' ? 'bg-[#e6f4ea] border-[#ceead6] text-[#137333]' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} 
                         type="button"
                         onClick={() => setVehicleData({ ...vehicleData, status: 'Ativo' })}
                       >
                         Ativo
                       </button>
                       <button 
-                        className={`px-3 py-2 flex-1 text-center rounded-md text-[10px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Em Manutenção' ? 'bg-white shadow-sm text-warning-dark' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        className={`flex-1 py-2 text-center rounded-lg text-[10px] uppercase tracking-wider font-extrabold transition-all border ${vehicleData.status === 'Em Manutenção' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} 
                         type="button"
                         onClick={() => setVehicleData({ ...vehicleData, status: 'Em Manutenção' })}
                       >
                         Manutenção
                       </button>
                       <button 
-                        className={`px-3 py-2 flex-1 text-center rounded-md text-[10px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === 'Inativo' ? 'bg-white shadow-sm text-error' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                        className={`flex-1 py-2 text-center rounded-lg text-[10px] uppercase tracking-wider font-extrabold transition-all border ${vehicleData.status === 'Inativo' ? 'bg-red-50 border-red-200 text-red-600' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} 
                         type="button"
                         onClick={() => setVehicleData({ ...vehicleData, status: 'Inativo' })}
                       >
@@ -529,7 +535,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                       {statuses.filter(s => !['Ativo', 'Inativo', 'Em Manutenção'].includes(s.name)).map(s => (
                         <button 
                           key={s.id}
-                          className={`px-3 py-2 flex-1 text-center rounded-md text-[10px] uppercase tracking-wider font-bold transition-colors ${vehicleData.status === s.name ? 'bg-white shadow-sm text-secondary' : 'text-on-surface-variant hover:text-on-surface'}`} 
+                          className={`flex-1 py-2 text-center rounded-lg text-[10px] uppercase tracking-wider font-extrabold transition-all border ${vehicleData.status === s.name ? 'bg-blue-50 border-blue-200 text-blue-600' : 'text-slate-400 border-transparent hover:bg-slate-100'}`} 
                           type="button"
                           onClick={() => setVehicleData({ ...vehicleData, status: s.name })}
                         >
@@ -539,9 +545,9 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     </div>
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Observação</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Observação</label>
                     <textarea 
-                      className="w-full bg-white border-outline-variant border rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-primary resize-y" 
+                      className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all resize-y placeholder:text-slate-300" 
                       placeholder="Insira alguma informação adicional..." 
                       rows={3} 
                       value={vehicleData.observation || ''}
@@ -552,18 +558,18 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
               </div>
             </div>
             
-            <div className="bg-surface-container-high/50 p-8 border-t border-outline-variant flex items-center justify-between">
+            <div className="bg-slate-50/50 dark:bg-surface-container-high/50 p-8 border-t border-outline-variant dark:border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-on-tertiary-container">verified_user</span>
+                <span className="material-symbols-outlined text-on-tertiary-container dark:text-emerald-400">verified_user</span>
                 <div>
                   <p className="text-sm font-semibold text-on-surface">Validação de Dados Aprovada</p>
-                  <p className="text-[10px] text-on-surface-variant uppercase">SISTEMA VERIFICADO CONTRA O BANCO DE DADOS NACIONAL</p>
+                  <p className="text-[10px] text-on-surface-variant dark:text-on-surface/60 uppercase">SISTEMA VERIFICADO CONTRA O BANCO DE DADOS NACIONAL</p>
                 </div>
               </div>
               <button 
                 type="button" 
                 onClick={() => setShowRawData(true)}
-                className="flex items-center gap-2 text-primary font-bold hover:underline text-sm"
+                className="flex items-center gap-2 text-primary dark:text-blue-400 font-bold hover:underline text-sm"
               >
                 <span className="material-symbols-outlined">visibility</span>
                 Ver Dados Brutos do OCR
@@ -573,23 +579,23 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
 
           {showRawData && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
-                <div className="px-8 py-6 border-b border-outline-variant flex items-center justify-between">
+              <div className="bg-white dark:bg-surface-container rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] border dark:border-white/10">
+                <div className="px-8 py-6 border-b border-outline-variant dark:border-white/10 flex items-center justify-between dark:bg-surface-container-high">
                   <h3 className="text-[20px] font-bold text-on-surface">Dados Brutos do OCR</h3>
                   <button onClick={() => setShowRawData(false)} className="w-10 h-10 rounded-full hover:bg-surface-container transition-colors flex items-center justify-center">
                     <span className="material-symbols-outlined">close</span>
                   </button>
                 </div>
-                <div className="p-8 overflow-y-auto bg-surface-container-low font-mono text-sm">
+                <div className="p-8 overflow-y-auto bg-surface-container-low dark:bg-surface-container font-mono text-sm">
                   {rawOcrData ? (
-                    <pre className="whitespace-pre-wrap text-secondary">{JSON.stringify(rawOcrData, null, 2)}</pre>
+                    <pre className="whitespace-pre-wrap text-secondary dark:text-blue-300">{JSON.stringify(rawOcrData, null, 2)}</pre>
                   ) : (
                     <div className="py-12 text-center text-on-surface-variant italic">
                       Nenhum dado processado ainda. Faça o upload de um CRLV primeiro.
                     </div>
                   )}
                 </div>
-                <div className="px-8 py-4 border-t border-outline-variant bg-white flex justify-end">
+                <div className="px-8 py-4 border-t border-outline-variant dark:border-white/10 bg-white dark:bg-surface-container-high flex justify-end">
                   <button onClick={() => setShowRawData(false)} className="px-6 py-2 bg-primary text-white rounded-lg font-bold">Entendido</button>
                 </div>
               </div>

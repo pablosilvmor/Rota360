@@ -386,8 +386,9 @@ export function AutoAlertaAdmin() {
         {loading ? (
           <div className="p-8 text-center text-on-surface-variant font-medium">Carregando alertas...</div>
         ) : (
-          <table className="w-full text-left">
-            <thead>
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left min-w-[800px]">
+              <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant">
                 <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Número</th>
                 <th className="p-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Data</th>
@@ -442,7 +443,8 @@ export function AutoAlertaAdmin() {
                 ))
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
     </div>

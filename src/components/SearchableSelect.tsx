@@ -17,6 +17,8 @@ interface SearchableSelectProps {
   className?: string;
   size?: "sm" | "md";
   multiple?: boolean;
+  icon?: string;
+  forceLightBg?: boolean;
 }
 
 export function SearchableSelect({
@@ -29,20 +31,26 @@ export function SearchableSelect({
   className = "",
   size = "md",
   multiple = false,
+  icon,
+  forceLightBg = false,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [filterTerm, setFilterTerm] = useState("");
   const [direction, setDirection] = useState<"down" | "up">("down");
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const uniqueOptions = options.filter(
+    (opt, index, self) => self.findIndex((o) => o.value === opt.value) === index
+  );
+
   const selectedOption = multiple
     ? undefined
-    : options.find((o) => o.value === value);
+    : uniqueOptions.find((o) => o.value === value);
   const selectedOptions = multiple
-    ? options.filter((o) => (value as string[]).includes(o.value))
+    ? uniqueOptions.filter((o) => (value as string[]).includes(o.value))
     : [];
 
-  const filteredOptions = options.filter(
+  const filteredOptions = uniqueOptions.filter(
     (o) =>
       o.label.toLowerCase().includes(filterTerm.toLowerCase()) ||
       o.value.toLowerCase().includes(filterTerm.toLowerCase()),
@@ -88,17 +96,20 @@ export function SearchableSelect({
         </label>
       )}
       <div
-        className={`w-full bg-white border ${error ? "border-error" : "border-outline-variant"} rounded-lg ${heightClass} cursor-pointer flex items-center justify-between hover:border-primary transition-colors shadow-sm`}
+        className={`w-full ${forceLightBg ? "!bg-white dark:!bg-white" : "!bg-white dark:!bg-surface-container"} border ${error ? "border-error" : isOpen ? "border-primary ring-2 ring-primary/20" : "border-outline-variant"} rounded-lg ${heightClass} cursor-pointer flex items-center justify-between hover:border-primary transition-all shadow-sm`}
         onClick={() => setIsOpen(!isOpen)}
       >
         <div
-          className={`flex items-center gap-2 truncate ${(!multiple && selectedOption) || (multiple && selectedOptions.length > 0) ? "text-on-surface font-medium" : "text-on-surface-variant/50"}`}
+          className={`flex items-center gap-3 truncate ${(!multiple && selectedOption) || (multiple && selectedOptions.length > 0) ? (forceLightBg ? "text-slate-800 dark:text-slate-800 font-medium" : "text-on-surface font-medium") : (forceLightBg ? "text-slate-400 dark:text-slate-400" : "text-on-surface-variant/50")}`}
         >
+          {icon && (
+             <span className="material-symbols-outlined text-[20px] text-primary">{icon}</span>
+          )}
           {!multiple && selectedOption?.imageUrl && (
             <img
               src={selectedOption.imageUrl}
               alt=""
-              className="w-6 h-6 object-contain rounded drop-shadow-sm bg-surface-container-lowest"
+              className="w-6 h-6 object-contain rounded drop-shadow-sm bg-white"
             />
           )}
           <span className="truncate">
@@ -110,7 +121,7 @@ export function SearchableSelect({
           </span>
         </div>
         <span
-          className={`material-symbols-outlined ${size === "sm" ? "text-[18px]" : "text-[20px]"} transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          className={`material-symbols-outlined ${forceLightBg ? "text-slate-500" : "text-on-surface-variant"} ${size === "sm" ? "text-[18px]" : "text-[20px]"} transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
         >
           expand_more
         </span>
@@ -131,17 +142,17 @@ export function SearchableSelect({
               scale: 0.95,
             }}
             transition={{ duration: 0.1 }}
-            className={`absolute left-0 right-0 ${direction === "down" ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} bg-white border border-outline-variant rounded-xl shadow-2xl z-[1000] overflow-hidden flex flex-col max-h-72 ring-1 ring-black/5`}
+            className={`absolute left-0 right-0 ${direction === "down" ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${forceLightBg ? "!bg-white dark:!bg-white" : "!bg-white dark:!bg-surface-container-high"} border border-outline-variant dark:border-white/10 rounded-xl shadow-2xl z-[1000] overflow-hidden flex flex-col max-h-72 ring-1 ring-black/5`}
           >
-            <div className="p-3 border-b border-outline-variant bg-surface-container-lowest sticky top-0">
+            <div className={`p-3 border-b border-outline-variant dark:border-white/10 ${forceLightBg ? "!bg-white dark:!bg-white" : "!bg-white dark:!bg-surface-container"} sticky top-0`}>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
+                <span className={`material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 ${forceLightBg ? "text-slate-400" : "text-on-surface-variant"} text-[20px]`}>
                   search
                 </span>
                 <input
                   autoFocus
                   type="text"
-                  className="w-full bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all"
+                  className={`w-full ${forceLightBg ? "!bg-white dark:!bg-white text-slate-800 dark:text-slate-800" : "!bg-white dark:bg-surface-variant/30 text-on-surface"} border border-outline-variant dark:border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all`}
                   placeholder="Pesquisar..."
                   value={filterTerm}
                   onChange={(e) => setFilterTerm(e.target.value)}
@@ -149,12 +160,12 @@ export function SearchableSelect({
                 />
               </div>
             </div>
-            <div className="overflow-y-auto py-2 scroll-smooth">
+            <div className={`overflow-y-auto py-2 scroll-smooth ${forceLightBg ? "!bg-white dark:!bg-white" : "!bg-white dark:!bg-surface-container-high"}`}>
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((opt) => (
                   <div
                     key={opt.value}
-                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-primary/10 transition-colors flex items-center justify-between group ${(!multiple && value === opt.value) || (multiple && (value as string[]).includes(opt.value)) ? "bg-primary/5 font-bold text-primary" : "text-on-surface"}`}
+                    className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-primary/10 transition-colors flex items-center justify-between group ${(!multiple && value === opt.value) || (multiple && (value as string[]).includes(opt.value)) ? "bg-primary/5 dark:bg-primary/10 font-bold text-primary dark:text-blue-400" : (forceLightBg ? "text-slate-700 dark:text-slate-700 hover:text-primary dark:hover:text-primary" : "text-on-surface")}`}
                     onClick={() => {
                       if (multiple) {
                         const arr = (value as string[]) || [];

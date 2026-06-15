@@ -209,7 +209,7 @@ export function Fleet() {
         </div>
       </motion.div>
 
-      <motion.div className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-50" variants={itemVariants}>
+      <motion.div className="bg-white dark:bg-surface-container rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-50" variants={itemVariants}>
         <div className="flex-1 min-w-[250px]">
           <label className="block text-sm font-semibold text-on-surface-variant mb-2">Pesquisar</label>
           <div className="relative group">
@@ -219,7 +219,8 @@ export function Fleet() {
               placeholder="Placa, modelo, observações..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm"
+              onFocus={(e) => e.target.select()}
+              className="w-full !bg-white dark:!bg-white border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm text-slate-800 dark:text-slate-800"
             />
             {searchTerm && (
               <button
@@ -237,6 +238,7 @@ export function Fleet() {
             label="Obra"
             placeholder="Todas as Obras"
             multiple={true}
+            forceLightBg={true}
             options={[
               ...works.map(work => ({ value: work.name, label: work.name }))
             ]}
@@ -249,11 +251,14 @@ export function Fleet() {
             label="Status"
             placeholder="Todos os Status"
             multiple={true}
+            forceLightBg={true}
             options={[
               { value: 'Ativo', label: 'Ativo' },
               { value: 'Inativo', label: 'Inativo' },
               { value: 'Em Manutenção', label: 'Em Manutenção' },
-              ...statuses.map(s => ({ value: s.name, label: s.name }))
+              ...statuses
+                .filter(s => s.name !== 'Ativo' && s.name !== 'Inativo' && s.name !== 'Em Manutenção')
+                .map(s => ({ value: s.name, label: s.name }))
             ]}
             value={filterStatus}
             onChange={(val) => setFilterStatus(val)}
@@ -286,7 +291,7 @@ export function Fleet() {
           {(searchTerm || filterWork.length > 0 || filterStatus.length > 0) && (
             <button 
               onClick={() => { setSearchTerm(''); setFilterWork([]); setFilterStatus([]); }}
-              className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-surface-container-low"
+              className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant dark:text-on-surface/60 hover:text-primary dark:hover:text-blue-400 transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-surface-container-low dark:hover:bg-white/5"
             >
               LIMPAR FILTRO
               <span className="material-symbols-outlined text-[14px]">filter_alt_off</span>
@@ -350,7 +355,7 @@ export function Fleet() {
         ) : (
           <AnimatePresence>
             {viewMode === 'list' && filteredVehicles.length > 0 ? (
-              <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-x-auto w-full">
+              <div className="bg-white dark:bg-surface-container border border-outline-variant rounded-2xl shadow-sm overflow-x-auto w-full">
                 <table className="w-full text-left min-w-[800px]">
                   <thead>
                     <tr className="bg-surface-container-low border-b border-outline-variant text-[12px] font-bold text-on-surface-variant uppercase tracking-wider">
@@ -370,7 +375,7 @@ export function Fleet() {
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <img src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=100"} alt="Veículo" className="w-10 h-10 rounded object-cover" />
+                            <img src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=100"} alt="Veículo" className="w-10 h-10 rounded-lg object-cover" />
                             <div>
                               <div className="text-sm font-bold text-on-surface">{vehicle.model}</div>
                               <div className="text-[10px] text-on-surface-variant uppercase">{vehicle.brand} • {vehicle.modelYear}</div>
@@ -417,77 +422,103 @@ export function Fleet() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 variants={itemVariants} 
                 onClick={() => setSearchParams({ vehicleId: vehicle.id })}
-                className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer"
+                className="!bg-white dark:!bg-white border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 group cursor-pointer flex flex-col relative h-full"
               >
-                <div className="relative h-56 overflow-hidden bg-white flex items-center justify-center p-4">
+                {/* Status Badge (Top Right) */}
+                {vehicle.status === 'Inativo' && (
+                  <div className="absolute top-4 right-4 z-20">
+                    <span className="px-2 py-1 bg-error/5 text-error border border-error/20 rounded text-[10px] font-bold uppercase tracking-widest leading-none">
+                      INATIVO
+                    </span>
+                  </div>
+                )}
+
+                {/* Image Area (Top) */}
+                <div className="relative h-48 overflow-hidden bg-white flex items-center justify-center border-b border-outline-variant/10">
                   <img 
-                    className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110" 
+                    className="max-w-[85%] max-h-[85%] object-contain transition-transform duration-500 group-hover:scale-110" 
                     src={vehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"} 
                     alt={vehicle.model} 
                   />
-                  <div className="absolute top-4 right-4">
-                    <span className={`bg-white/90 backdrop-blur-md px-3 py-1 rounded-full font-bold text-[10px] uppercase tracking-wider shadow-sm ${vehicle.status === 'Ativo' ? 'text-on-tertiary-container' : 'text-error'}`}>
-                      {vehicle.status}
-                    </span>
-                  </div>
                 </div>
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-4 relative">
+
+                <div className="p-6 flex-1 flex flex-col">
+                  {/* Identification Section */}
+                  <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="font-bold text-[28px] text-primary leading-none mb-1"><PrivateValue value={vehicle.plate} /></h3>
-                      <p className="text-sm text-on-surface-variant font-medium">{vehicle.brand} {vehicle.model}</p>
-                      {vehicle.bodywork && <p className="text-xs text-on-surface-variant/80 uppercase font-bold tracking-wide mt-1">{vehicle.bodywork}</p>}
-                      <div className="flex items-center gap-1 mt-2 text-on-surface-variant bg-surface-container w-fit px-2 py-0.5 rounded">
-                         <span className="material-symbols-outlined text-[14px]">domain</span>
-                         <span className="text-xs font-semibold">{(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
-                            .map(v => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim())
-                            .filter(Boolean)
-                            .join(', ') || 'Não atribuída'}</span>
-                      </div>
+                      <h3 className="font-bold text-[28px] text-primary leading-none mb-1">
+                        <PrivateValue value={vehicle.plate} />
+                      </h3>
+                      <p className="text-sm font-bold text-slate-700 dark:text-slate-700 uppercase tracking-tight">{vehicle.brand} {vehicle.model}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-500 font-bold uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">{vehicle.bodywork || 'ABERTA/MECANISMO OPERACIONAL'}</p>
                     </div>
+
                     <div className="relative group/menu">
                       <button 
                         onClick={(e) => { e.stopPropagation(); }} 
-                        className="p-2 hover:bg-surface-container rounded-full transition-colors text-on-surface-variant"
+                        className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 dark:text-slate-500"
                       >
-                        <span className="material-symbols-outlined">more_vert</span>
+                        <span className="material-symbols-outlined font-bold">more_vert</span>
                       </button>
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-outline-variant rounded-lg shadow-lg py-2 w-32 z-30 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all">
+                      <div className="absolute right-0 top-full mt-1 bg-white dark:bg-white border border-outline-variant rounded-lg shadow-xl py-2 w-40 z-30 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all">
                         {isAdmin ? (
                           <>
                             <button 
                               onClick={(e) => { e.stopPropagation(); setSearchParams({ editId: vehicle.id }); }} 
-                              className="w-full text-left px-4 py-2 hover:bg-surface-container text-sm transition-colors"
+                              className="w-full text-left px-4 py-2 hover:bg-slate-100 text-sm font-bold transition-colors text-slate-700 dark:text-slate-700 flex items-center gap-2"
                             >
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
                               Editar
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleDelete(vehicle.id); }} 
-                              className="w-full text-left px-4 py-2 hover:bg-surface-container text-sm text-error transition-colors"
+                              className="w-full text-left px-4 py-2 hover:bg-slate-100 text-sm font-bold text-error transition-colors flex items-center gap-2"
                             >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
                               Excluir
                             </button>
                           </>
                         ) : (
-                          <div className="px-4 py-2 text-xs text-on-surface-variant italic">
+                          <div className="px-4 py-2 text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase italic">
                             Apenas Administradores
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="h-px bg-outline-variant/30 mb-4" />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Odômetro Atual</p>
-                      <p className="font-bold text-sm text-on-surface">{(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()} KM</p>
+
+                  {/* Work Badge Section */}
+                  <div className="mb-6">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 text-primary border border-primary/20 rounded-lg w-fit shadow-sm">
+                      <span className="material-symbols-outlined text-[18px]">domain</span>
+                      <span className="text-[11px] font-bold uppercase tracking-tight">
+                        {(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
+                          .map(v => String(v || '').replace(/logística - região sul/gi, '').trim())
+                          .filter(Boolean)
+                          .join(', ') || 'Sede Adm'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Footer Stats Grid */}
+                  <div className="grid grid-cols-2 gap-4 mt-auto pt-6 border-t border-outline-variant/30">
+                    <div className="flex flex-col">
+                      <p className="text-[9px] text-slate-500 dark:text-slate-500 uppercase font-extrabold tracking-[0.1em] mb-1.5 opacity-60">Odômetro Atual</p>
+                      <p className="font-bold text-lg text-slate-800 dark:text-slate-800 leading-none">
+                        {(vehicle.currentKM || vehicle.odometer || 0).toLocaleString()} <span className="text-[10px] ml-0.5 font-bold">KM</span>
+                      </p>
                       {vehicle.lastSyncCheck && (
-                        <p className="text-[9px] text-primary/70 font-medium truncate">Atu: {new Date(vehicle.lastSyncCheck).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                        <p className="text-[8px] text-primary font-bold opacity-70 mt-2 uppercase tracking-tighter flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[10px]">sync</span>
+                          Atu: {new Date(vehicle.lastSyncCheck).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       )}
                     </div>
-                    <div>
-                      <p className="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest mb-1">Próximo Serviço</p>
-                      <p className="font-bold text-sm text-on-surface">{(vehicle.nextServiceKm || 0).toLocaleString()} KM</p>
+                    <div className="flex flex-col">
+                      <p className="text-[9px] text-slate-500 dark:text-slate-500 uppercase font-extrabold tracking-[0.1em] mb-1.5 opacity-60">Próximo Serviço</p>
+                      <p className="font-bold text-lg text-slate-800 dark:text-slate-800 leading-none">
+                        {(vehicle.nextServiceKm || 10000).toLocaleString()} <span className="text-[10px] ml-0.5 font-bold">KM</span>
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -498,12 +529,12 @@ export function Fleet() {
       </motion.div>
 
       {vehicles.length > 0 && (
-        <motion.div className="mt-16 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden" variants={itemVariants}>
+        <motion.div className="mt-16 bg-white dark:bg-surface-container border border-outline-variant rounded-2xl shadow-sm overflow-hidden" variants={itemVariants}>
           <div className="p-6 border-b border-outline-variant bg-surface-container-low">
             <h4 className="text-sm font-semibold text-on-surface uppercase tracking-widest">Inventário de Veículos</h4>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="bg-surface-container-low/50 border-b border-outline-variant">
                   <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">PLACA</th>

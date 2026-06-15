@@ -1395,17 +1395,17 @@ function InspectionForm({
             </div>
           </div>
       )}
-      <div className="flex flex-col md:flex-row justify-between md:items-center bg-surface-container-low p-6 rounded-2xl border border-outline-variant gap-6">
+      <div className="flex flex-col md:flex-row justify-between md:items-center bg-surface-container-low dark:bg-surface-variant/20 p-6 rounded-2xl border border-outline-variant dark:border-outline/50 gap-6 dark:glass-panel">
         <div className="flex items-center gap-5">
           <button
             onClick={onBack}
             data-html2canvas-ignore="true"
-            className="p-2 hover:bg-surface-container rounded-full transition-colors flex-shrink-0"
+            className="p-2 hover:bg-surface-container dark:hover:bg-surface-container-high rounded-full transition-colors flex-shrink-0 text-on-surface"
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
 
-          <div className="w-16 h-16 rounded-xl overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] flex-shrink-0 bg-white">
+          <div className="w-16 h-16 rounded-xl overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] flex-shrink-0 bg-white border border-outline-variant dark:border-outline/50">
             <img
               className="w-full h-full object-contain p-1"
               src={
@@ -1422,7 +1422,7 @@ function InspectionForm({
               Inspeção:{" "}
               <button
                 onClick={() => onPlateClick(vehicle)}
-                className="text-primary tracking-wide hover:underline decoration-2 underline-offset-4 transition-all"
+                className="text-primary dark:neon-text-primary tracking-wide hover:underline decoration-2 underline-offset-4 transition-all"
               >
                 <PrivateValue value={vehicle.plate} />
               </button>
@@ -1432,11 +1432,11 @@ function InspectionForm({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4 bg-surface-container p-4 rounded-xl border border-outline-variant shadow-sm w-full md:w-auto">
+        <div className="flex items-center gap-4 bg-surface-container-lowest dark:bg-surface-container-high p-4 rounded-xl border border-outline-variant dark:border-outline/50 shadow-sm w-full md:w-auto">
           <div className="w-full">
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block">
-                KM Atual
+                Km Atual
               </label>
               {(vehicle.lastSyncCheck || vehicle.lastKmUpdate || vehicle.updatedAt) && (
                 <span
@@ -1458,7 +1458,7 @@ function InspectionForm({
                 type="text"
                 value={formatKM(currentKM)}
                 onChange={(e) => setCurrentKM(parseKM(e.target.value))}
-                className="w-full md:w-32 bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-1.5 font-mono text-sm focus:ring-2 focus:ring-primary outline-none"
+                className="w-full md:w-32 bg-white dark:bg-surface-variant/30 border border-outline-variant dark:border-outline/50 rounded-lg px-3 py-1.5 font-mono text-sm focus:ring-2 focus:ring-primary dark:focus:ring-primary outline-none text-on-surface"
               />
               <button
                 onClick={() => {
@@ -1467,7 +1467,7 @@ function InspectionForm({
                 }}
                 data-html2canvas-ignore="true"
                 disabled={!isAdmin || isUpdatingKM || currentKM === vehicle.currentKM}
-                className={`bg-primary/10 text-primary hover:bg-primary/20 p-2 rounded-lg transition-colors disabled:opacity-50 disabled:bg-surface-container disabled:text-on-surface-variant flex-shrink-0 ${!isAdmin ? 'cursor-not-allowed' : ''}`}
+                className={`bg-primary/10 dark:bg-primary/20 text-primary dark:neon-text-primary hover:bg-primary/20 dark:hover:bg-primary/30 p-2 rounded-lg transition-colors disabled:opacity-50 disabled:bg-surface-container dark:disabled:bg-surface-variant disabled:text-on-surface-variant flex-shrink-0 ${!isAdmin ? 'cursor-not-allowed' : ''}`}
                 title={isAdmin ? "Salvar KM Atual" : "Apenas administradores"}
               >
                 <span className="material-symbols-outlined text-[20px]">
@@ -1481,7 +1481,7 @@ function InspectionForm({
                 }}
                 data-html2canvas-ignore="true"
                 disabled={!isAdmin}
-                className={`bg-secondary/10 text-secondary hover:bg-secondary/20 p-2 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-foreground hover:bg-primary/20 dark:hover:bg-primary/30 p-2 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed`}
                 title={isAdmin ? "Sincronizar GPS Agora" : "Apenas administradores"}
               >
                 <span className="material-symbols-outlined text-[20px]">
@@ -1490,14 +1490,14 @@ function InspectionForm({
               </button>
             </div>
           </div>
-          <div className="w-full pt-4 flex gap-4 border-t border-outline-variant">
+          <div className="w-full pt-4 flex gap-4 border-t border-outline-variant dark:border-outline/50">
             <div className="flex-1">
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">Data Checklist</label>
-                <input type="date" value={checklistDate} onChange={(e) => setChecklistDate(e.target.value)} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-1.5 text-sm" />
+                <input type="date" value={checklistDate} onChange={(e) => setChecklistDate(e.target.value)} className="w-full bg-surface-container-lowest dark:bg-surface-variant/30 border border-outline-variant dark:border-outline/50 rounded-lg px-3 py-1.5 text-sm text-on-surface pointer-events-auto [color-scheme:light] dark:[color-scheme:dark]" />
             </div>
             <div className="flex-1">
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest block mb-1">KM Checklist</label>
-                <input type="text" readOnly value={historyKM ? historyKM.toLocaleString('pt-BR') : ''} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-1.5 text-sm font-mono" />
+                <input type="text" readOnly value={historyKM ? historyKM.toLocaleString('pt-BR') : ''} className="w-full bg-surface-container-lowest dark:bg-surface-variant/30 border border-outline-variant dark:border-outline/50 rounded-lg px-3 py-1.5 text-sm font-mono text-on-surface" />
             </div>
           </div>
         </div>
@@ -1506,7 +1506,7 @@ function InspectionForm({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <h3 className="text-[20px] font-bold text-on-surface flex items-center gap-2">
           Itens de Inspeção
-          <span className="text-[12px] font-bold bg-surface-container-high px-2 py-0.5 rounded-full text-on-surface-variant flex items-center justify-center min-w-[24px]">
+          <span className="text-[12px] font-bold bg-surface-container-high dark:bg-surface-variant/50 px-2 py-0.5 rounded-full text-on-surface-variant flex items-center justify-center min-w-[24px]">
             {filteredItems.length}
           </span>
         </h3>
@@ -1517,7 +1517,7 @@ function InspectionForm({
           <button
             onClick={handleGenerateAutoAlerta}
             disabled={isGeneratingAlert}
-            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg font-bold shadow-sm transition-all text-sm text-primary relative overflow-hidden"
+            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant dark:border-outline/50 bg-surface-container-low dark:bg-surface-variant/30 text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-variant/50 rounded-lg font-bold shadow-sm transition-all text-sm text-primary dark:neon-text-primary relative overflow-hidden"
           >
             {isGeneratingAlert && (
               <div className="absolute inset-0 bg-primary/10">
@@ -1532,7 +1532,7 @@ function InspectionForm({
           <button
             onClick={exportToPDF}
             disabled={isExporting}
-            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg font-bold shadow-sm transition-all text-sm"
+            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 border border-outline-variant dark:border-outline/50 bg-surface-container-low dark:bg-surface-variant/30 text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-variant/50 rounded-lg font-bold shadow-sm transition-all text-sm"
           >
             <span className="material-symbols-outlined text-[18px]">
               picture_as_pdf
@@ -1542,7 +1542,7 @@ function InspectionForm({
           {selectedItems.size > 0 && isAdmin && (
             <button
               onClick={handleBulkDelete}
-              className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-error text-onError rounded-lg font-bold shadow-sm hover:opacity-90 transition-all text-sm"
+              className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-error dark:bg-error-container text-onError dark:text-error rounded-lg font-bold shadow-sm hover:opacity-90 transition-all text-sm border dark:border-error/30"
             >
               <span className="material-symbols-outlined text-[18px]">
                 delete
@@ -1775,7 +1775,7 @@ function InspectionForm({
         </div>
       )}
 
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden dark:glass-panel dark:border-outline">
         {/* Custom Confirm Delete Modal */}
         {confirmDelete.isOpen && (
           <div
@@ -1816,11 +1816,11 @@ function InspectionForm({
 
         {/* List Toolbar / Filter */}
         <div
-          className="p-4 border-b border-outline-variant flex flex-col md:flex-row items-center justify-between gap-4 bg-surface-container-low/30"
+          className="p-4 border-b border-outline-variant dark:border-outline/50 flex flex-col md:flex-row items-center justify-between gap-4 bg-surface-container-low/30 dark:bg-surface-variant/30"
           data-html2canvas-ignore="true"
         >
           <div className="relative w-full md:w-80 group">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 group-focus-within:text-primary transition-colors text-[20px]">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 group-focus-within:text-primary dark:group-focus-within:text-primary transition-colors text-[20px]">
               search
             </span>
             <input
@@ -1828,7 +1828,7 @@ function InspectionForm({
               placeholder="Filtrar itens..."
               value={itemSearchText}
               onChange={(e) => setItemSearchText(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
+              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-surface border border-outline-variant dark:border-outline rounded-lg focus:ring-2 focus:ring-primary dark:focus:ring-primary focus:border-primary dark:focus:border-primary outline-none transition-all text-sm text-on-surface"
             />
           </div>
           {itemSearchText && (
@@ -1844,13 +1844,13 @@ function InspectionForm({
           )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
-              <tr className="bg-surface-container-low/50 border-b border-outline-variant">
+              <tr className="bg-surface-container-low/50 dark:bg-surface-variant/50 border-b border-outline-variant dark:border-outline/50">
                 {isAdmin && (
                   <th
-                    className="p-4 w-12 text-center border-r border-outline-variant/30"
+                    className="p-4 w-12 text-center border-r border-outline-variant/30 dark:border-outline/50"
                     data-html2canvas-ignore="true"
                   >
                     <input
@@ -1992,14 +1992,14 @@ function InspectionForm({
                     descRemaining,
                   } = calculateProgress(item, record, currentVehicleKM);
 
-                  let progressColor = "bg-primary";
-                  if (progressPercent > 80) progressColor = "bg-tertiary";
-                  if (progressPercent >= 100) progressColor = "bg-error";
+                  let progressColor = "bg-primary dark:shadow-[0_0_12px_rgba(20,184,166,0.6)]";
+                  if (progressPercent > 80) progressColor = "bg-tertiary dark:shadow-[0_0_12px_rgba(245,158,11,0.6)]";
+                  if (progressPercent >= 100) progressColor = "bg-error dark:shadow-[0_0_12px_rgba(244,63,94,0.6)]";
 
                   return (
                     <tr
                       key={item.id}
-                      className={`transition-colors ${selectedItems.has(item.id) ? "bg-primary/5" : "hover:bg-surface-container-low/30"}`}
+                      className={`transition-colors border-b border-outline-variant/50 dark:border-outline/50 ${selectedItems.has(item.id) ? "bg-primary/5 dark:bg-primary/10" : "hover:bg-surface-container-low/30 dark:hover:bg-surface-variant/20"}`}
                     >
                       {isAdmin && (
                         <td
@@ -2103,12 +2103,12 @@ function InspectionForm({
                             });
                           }}
                           disabled={!isAdmin}
-                          className={`text-sm px-2 py-1 rounded border outline-none ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
+                          className={`text-sm px-2 py-1 rounded border outline-none dark:bg-surface-variant/30 ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
                             record.conformity === "SIM"
-                              ? "bg-success-container/30 border-success/30 text-success font-semibold"
+                              ? "bg-success-container/30 border-success/30 text-success dark:border-success/50 dark:text-emerald-400 font-semibold"
                               : record.conformity === "NÃO"
-                                ? "bg-error-container/30 border-error/30 text-error font-semibold"
-                                : "bg-surface-container border-outline-variant text-on-surface-variant"
+                                ? "bg-error-container/30 border-error/30 text-error dark:border-error/50 dark:text-red-400 font-semibold"
+                                : "bg-surface-container border-outline-variant text-on-surface-variant dark:border-outline/50 dark:text-on-surface-variant"
                           }`}
                         >
                           <option value="SIM">SIM</option>
@@ -2126,12 +2126,12 @@ function InspectionForm({
                             });
                           }}
                           disabled={!isAdmin || !!checklistDate}
-                          className={`text-sm px-2 py-1 rounded border outline-none ${isAdmin && !checklistDate ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
+                          className={`text-sm px-2 py-1 rounded border outline-none dark:bg-surface-variant/30 ${isAdmin && !checklistDate ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
                             (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) === "SIM"
-                              ? "bg-primary-container text-on-primary-container border-primary-container font-semibold"
+                              ? "bg-primary-container text-on-primary-container border-primary-container dark:border-primary/50 dark:text-emerald-400 font-semibold"
                               : (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) === "NaKM"
-                                ? "bg-warning-container/50 text-warning-dark border-warning/50 font-semibold"
-                                : "bg-surface-container border-outline-variant text-on-surface-variant"
+                                ? "bg-warning-container/50 text-warning-dark border-warning/50 dark:text-amber-400 font-semibold"
+                                : "bg-surface-container border-outline-variant text-on-surface-variant dark:border-outline/50 dark:text-on-surface-variant"
                           }`}
                         >
                           <option value="SIM">SIM</option>
@@ -2157,7 +2157,7 @@ function InspectionForm({
                                 });
                               }}
                               disabled={!isAdmin}
-                              className={`w-[125px] bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary outline-none ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
+                              className={`w-[125px] bg-surface-container-low dark:bg-surface-variant/30 border border-outline-variant dark:border-outline/50 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary outline-none pointer-events-auto [color-scheme:light] dark:[color-scheme:dark] text-on-surface ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
                             />
                           ) : (
                             <input
@@ -2170,7 +2170,7 @@ function InspectionForm({
                                 });
                               }}
                               disabled={!isAdmin}
-                              className={`w-24 bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-primary outline-none ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
+                              className={`w-24 bg-white dark:bg-surface-variant/30 border border-outline-variant dark:border-outline/50 rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-primary outline-none text-on-surface ${!isAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
                               placeholder="KM"
                             />
                           )}
@@ -2205,7 +2205,7 @@ function InspectionForm({
                               {Math.round(progressPercent)}%
                             </span>
                           </div>
-                          <div className="w-full bg-surface-container-high rounded-full h-2.5 overflow-hidden">
+                          <div className="w-full bg-surface-container-high dark:bg-surface-variant/50 rounded-full h-2.5 overflow-hidden">
                             <div
                               className={`h-full ${progressColor} transition-all duration-500`}
                               style={{ width: `${progressPercent}%` }}
@@ -2309,9 +2309,9 @@ const VehicleInspectionCard: React.FC<{ vehicle: any; onClick: () => any; onPlat
     <motion.div
       layout
       onClick={onClick}
-      className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:bg-surface-container-low hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col h-full"
+      className="!bg-white dark:!bg-white border border-outline-variant rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
     >
-      <div className="relative h-44 overflow-hidden bg-white flex items-center justify-center p-4">
+      <div className="relative h-44 overflow-hidden bg-white flex items-center justify-center p-4 border-b border-outline-variant/30">
         <img
           className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110"
           src={
@@ -2337,18 +2337,18 @@ const VehicleInspectionCard: React.FC<{ vehicle: any; onClick: () => any; onPlat
           <div className="flex-1 min-w-0">
             <button
               onClick={onPlateClick}
-              className="text-xl font-bold text-on-surface leading-none mb-1 truncate hover:text-primary transition-colors hover:underline text-left pointer-events-auto"
+              className="text-xl font-bold text-slate-800 dark:text-slate-800 leading-none mb-1 truncate hover:text-primary transition-colors hover:underline text-left pointer-events-auto"
             >
               {vehicle.plate}
             </button>
-            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest truncate opacity-70">
+            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest truncate">
               {vehicle.brand} {vehicle.model}
             </p>
           </div>
         </div>
 
         <div className="flex flex-col gap-2 mt-auto pt-3 border-t border-outline-variant/30">
-          <div className="flex items-center gap-1.5 text-on-surface-variant bg-surface-container-low w-fit px-2 py-1 rounded-lg overflow-hidden max-w-full border border-outline-variant/20">
+          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-600 bg-slate-100 dark:bg-slate-100 w-fit px-2 py-1 rounded-lg overflow-hidden max-w-full border border-slate-200">
             <span className="material-symbols-outlined text-[14px] flex-shrink-0">
               domain
             </span>
@@ -2369,7 +2369,7 @@ const VehicleInspectionCard: React.FC<{ vehicle: any; onClick: () => any; onPlat
             </span>
           </div>
 
-          <div className="flex items-center justify-between text-[9px] font-extrabold text-on-surface-variant/60 uppercase tracking-[0.1em] mt-1">
+          <div className="flex items-center justify-between text-[9px] font-extrabold text-slate-500 dark:text-slate-500 uppercase tracking-[0.1em] mt-1">
             <span>KM ATUAL</span>
             <span className="font-mono text-primary text-xs">
               {(vehicle.currentKM || 0).toLocaleString("pt-BR")}
@@ -2498,10 +2498,19 @@ export function Inspections() {
     const unsubscribeVehicles = onSnapshot(
       collection(db, "vehicles"),
       (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const seenPlates = new Set();
+        const data = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          } as any))
+          .filter((v) => {
+            const plate = (v.plate || '').toUpperCase().trim();
+            if (!plate) return true;
+            if (seenPlates.has(plate)) return false;
+            seenPlates.add(plate);
+            return true;
+          });
         setVehicles(
           data.sort((a: any, b: any) =>
             (a.plate || "").localeCompare(b.plate || "", undefined, {
@@ -2956,7 +2965,7 @@ export function Inspections() {
       >
         <motion.div
           variants={itemVariants}
-          className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 transition-transform duration-300"
+          className="bg-surface-container-lowest dark:glass-panel border border-outline-variant dark:border-blue-500/20 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-300 relative overflow-hidden"
         >
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
             Veículos Filtrados
@@ -2967,7 +2976,7 @@ export function Inspections() {
         </motion.div>
         <motion.div
           variants={itemVariants}
-          className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 transition-transform duration-300"
+          className="bg-surface-container-lowest dark:glass-panel border border-outline-variant dark:border-blue-500/20 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-300 relative overflow-hidden"
         >
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
             Em Conformidade
@@ -2978,7 +2987,7 @@ export function Inspections() {
         </motion.div>
         <motion.div
           variants={itemVariants}
-          className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 transition-transform duration-300"
+          className="bg-surface-container-lowest dark:glass-panel border border-outline-variant dark:border-blue-500/20 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-300 relative overflow-hidden"
         >
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
             Em Manutenção
@@ -2989,7 +2998,7 @@ export function Inspections() {
         </motion.div>
         <motion.div
           variants={itemVariants}
-          className="bg-surface-container-lowest border border-outline-variant p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 transition-transform duration-300"
+          className="bg-surface-container-lowest dark:glass-panel border border-outline-variant dark:border-blue-500/20 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-32 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-300 relative overflow-hidden"
         >
           <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
             Checklists (Mês)
@@ -3001,7 +3010,7 @@ export function Inspections() {
       </motion.div>
 
       <motion.div
-        className="bg-surface/70 backdrop-blur-md rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-40"
+        className="bg-white dark:bg-surface-container rounded-2xl p-6 mb-10 shadow-sm flex flex-wrap items-center gap-8 border border-outline-variant/50 relative z-40"
         variants={itemVariants}
       >
         <div className="flex-1 min-w-[250px]">
@@ -3017,7 +3026,8 @@ export function Inspections() {
               placeholder="Pesquisar veículo ou placa..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm"
+              onFocus={(e) => e.target.select()}
+              className="w-full !bg-white dark:!bg-white border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none transition-all shadow-sm text-slate-800 dark:text-slate-800"
             />
             {searchQuery && (
               <button
@@ -3037,6 +3047,7 @@ export function Inspections() {
             label="Obra"
             placeholder="Todas as Obras"
             multiple={true}
+            forceLightBg={true}
             options={[
               ...works.map((work) => ({ value: work.name, label: work.name })),
             ]}
@@ -3049,11 +3060,14 @@ export function Inspections() {
             label="Status"
             placeholder="Todos os Status"
             multiple={true}
+            forceLightBg={true}
             options={[
               { value: "Ativo", label: "Ativo" },
               { value: "Inativo", label: "Inativo" },
               { value: "Em Manutenção", label: "Em Manutenção" },
-              ...statuses.map((s) => ({ value: s.name, label: s.name })),
+              ...statuses
+                .filter((s) => s.name !== "Ativo" && s.name !== "Inativo" && s.name !== "Em Manutenção")
+                .map((s) => ({ value: s.name, label: s.name })),
             ]}
             value={filterStatus}
             onChange={(val) => setFilterStatus(val)}
@@ -3164,10 +3178,10 @@ export function Inspections() {
         ) : (
           <motion.div
             layout
-            className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm"
+            className="bg-white dark:bg-surface-container border border-outline-variant rounded-2xl overflow-hidden shadow-sm"
           >
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left min-w-[800px]">
                 <thead>
                   <tr className="bg-surface-container-low border-b border-outline-variant text-[12px] font-bold text-on-surface-variant uppercase tracking-wider">
                     <th className="px-6 py-4">Veículo</th>
@@ -3185,7 +3199,7 @@ export function Inspections() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded overflow-hidden bg-white p-0.5">
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-white p-1 border border-outline-variant/30 shadow-sm flex items-center justify-center">
                             <img
                               src={
                                 vehicle.imageUrl ||
@@ -3261,10 +3275,10 @@ export function Inspections() {
       ) : (
         <motion.div
           layout
-          className="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden shadow-sm"
+          className="bg-white dark:bg-surface-container border border-outline-variant rounded-2xl overflow-hidden shadow-sm"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left min-w-[800px]">
               <thead>
                 <tr className="bg-surface-container-low border-b border-outline-variant text-[12px] font-bold text-on-surface-variant uppercase tracking-wider">
                   <th className="px-6 py-4">Data</th>
@@ -3499,37 +3513,36 @@ export function Inspections() {
     </motion.div>
   )}
 
-  {/* Vehicle Details Modal */}
   <AnimatePresence>
     {detailsModalVehicle && (
         <div 
           className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto" 
           onClick={() => setDetailsModalVehicle(null)}
         >
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="bg-[#f8fafc] rounded-3xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col relative my-8" 
-            onClick={e => e.stopPropagation()}
-          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-[#f8fafc] dark:bg-[#f8fafc] rounded-3xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col relative my-8" 
+              onClick={e => e.stopPropagation()}
+            >
             {/* Header / Top Bar */}
-            <div className="p-6 border-b border-outline-variant/30 flex justify-between items-center bg-white shadow-sm">
-              <h3 className="text-xl font-bold text-primary flex items-center gap-2">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white dark:bg-white shadow-sm">
+              <h3 className="text-xl font-bold text-primary dark:text-primary flex items-center gap-2">
                 <span className="material-symbols-outlined">info</span>
                 Detalhes do Veículo: {detailsModalVehicle.plate}
               </h3>
               <div className="flex gap-2">
                 <button 
                   onClick={() => navigate(`/fleet?editId=${detailsModalVehicle.id}`)}
-                  className="flex items-center gap-2 px-4 py-2 border border-outline-variant bg-white text-on-surface font-semibold rounded-lg hover:bg-surface-container transition-colors shadow-sm text-sm"
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white dark:bg-white text-slate-700 dark:text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors shadow-sm text-sm"
                 >
                   <span className="material-symbols-outlined text-[18px]">edit</span>
                   Editar
                 </button>
                 <button 
                   onClick={() => setDetailsModalVehicle(null)}
-                  className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-error transition-all"
+                  className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-100 flex items-center justify-center text-slate-500 dark:text-slate-500 hover:text-error transition-all"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
@@ -3539,16 +3552,16 @@ export function Inspections() {
             <div className="p-8 overflow-y-auto max-h-[80vh] custom-scrollbar">
               <div className="grid grid-cols-12 gap-6">
                 {/* Hero Card */}
-                <div className="col-span-12 lg:col-span-8 h-[380px] rounded-2xl overflow-hidden relative shadow-sm border border-outline-variant group">
+                <div className="col-span-12 lg:col-span-8 h-[380px] rounded-2xl overflow-hidden relative shadow-sm border border-slate-200 dark:border-slate-200 group bg-white dark:bg-white">
                   <img 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                    className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
                     src={detailsModalVehicle.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=1200"} 
                     alt={detailsModalVehicle.model} 
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/20 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-blue-600/80 via-blue-400/20 to-transparent pointer-events-none"></div>
                   <div className="absolute bottom-8 left-8 text-on-primary">
                     <div className="flex items-center gap-3 mb-4">
-                      <span className={`px-3 py-1 rounded font-bold text-[10px] uppercase tracking-wider ${detailsModalVehicle.status === 'Ativo' ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-error-container text-on-error-container'}`}>
+                      <span className={`px-3 py-1 rounded font-bold text-[10px] uppercase tracking-wider ${detailsModalVehicle.status === 'Ativo' ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-red-100 dark:bg-red-100 text-red-700 dark:text-red-700 font-bold'}`}>
                         {detailsModalVehicle.status}
                       </span>
                       <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded font-bold text-[10px] tracking-wider">
@@ -3562,30 +3575,30 @@ export function Inspections() {
 
                 <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
                   {/* Status Documentation */}
-                  <div className={`p-6 rounded-2xl border-l-4 flex items-start gap-4 shadow-sm h-full ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'bg-red-50 border-red-500' : 'bg-blue-50 border-primary'}`}>
-                    <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'bg-red-100' : 'bg-primary/20'}`}>
-                      <span className={`material-symbols-outlined ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'text-red-500' : 'text-primary'}`}>
+                  <div className={`p-6 rounded-2xl border-l-4 flex items-start gap-4 shadow-sm h-full ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'bg-red-50 border-red-500' : 'bg-blue-50 border-blue-500'}`}>
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'bg-red-100' : 'bg-blue-100'}`}>
+                      <span className={`material-symbols-outlined ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'text-red-500' : 'text-blue-600'}`}>
                         {detailsModalVehicle.exerciceStatus === 'Vencido' ? 'warning' : 'verified'}
                       </span>
                     </div>
                     <div>
-                      <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Status Documentação</h3>
-                      <p className="text-[20px] font-bold mb-1">Exercício {detailsModalVehicle.exerciceYear || '2026'}</p>
-                      <p className={`text-sm font-medium ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'text-red-600' : 'text-on-surface-variant opacity-70'}`}>
+                      <h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest mb-1">Status Documentação</h3>
+                      <p className="text-[20px] font-bold mb-1 text-slate-800 dark:text-slate-800">Exercício {detailsModalVehicle.exerciceYear || '2026'}</p>
+                      <p className={`text-sm font-medium ${detailsModalVehicle.exerciceStatus === 'Vencido' ? 'text-red-600' : 'text-slate-500 dark:text-slate-500 opacity-70'}`}>
                         {detailsModalVehicle.exerciceStatus === 'Vencido' ? 'O licenciamento está atrasado.' : 'Documentação em dia e verificada.'}
                       </p>
                     </div>
                   </div>
 
                   {/* Odometer Card */}
-                  <div className="bg-white border border-outline-variant/30 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-full">
+                  <div className="bg-white dark:bg-white border border-slate-100 dark:border-slate-100 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-full">
                     <div>
                       <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Status do Odômetro</h3>
+                        <h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest">Status do Odômetro</h3>
                         <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
                           detailsModalVehicle.lastSyncStatus === 'success' || !detailsModalVehicle.lastSyncStatus
-                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
-                            : 'bg-red-50 text-red-600 border-red-200'
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-50 dark:text-emerald-600 dark:border-emerald-200' 
+                            : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-50 dark:text-red-600 dark:border-red-200'
                         }`}>
                           <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
                             detailsModalVehicle.lastSyncStatus === 'failed' ? 'bg-red-600' : 'bg-emerald-600'
@@ -3594,15 +3607,15 @@ export function Inspections() {
                         </div>
                       </div>
                       <div className="flex justify-between items-baseline mb-2">
-                        <span className="text-[48px] font-bold text-primary leading-none tracking-tight">{(detailsModalVehicle.currentKM || 0).toLocaleString('pt-BR')}</span>
-                        <span className="text-[20px] font-bold text-on-surface-variant">KM</span>
+                        <span className="text-[48px] font-bold text-blue-600 dark:text-blue-600 leading-none tracking-tight">{(detailsModalVehicle.currentKM || 0).toLocaleString('pt-BR')}</span>
+                        <span className="text-[20px] font-bold text-slate-800 dark:text-slate-800">KM</span>
                       </div>
                       <div className="flex flex-col gap-1 mb-4 opacity-70">
-                        <p className="text-[10px] text-on-surface-variant font-bold uppercase flex items-center gap-1">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase flex items-center gap-1">
                           <span className="material-symbols-outlined text-[14px]">sync</span>
                           Última sincronização
                         </p>
-                        <p className="text-xs font-bold text-primary">
+                        <p className="text-xs font-bold text-blue-600 dark:text-blue-600">
                           {new Date(detailsModalVehicle.lastSyncCheck || detailsModalVehicle.updatedAt || Date.now()).toLocaleString('pt-BR')}
                         </p>
                       </div>
@@ -3612,17 +3625,17 @@ export function Inspections() {
                             detail: { vehicleId: detailsModalVehicle.id, plate: detailsModalVehicle.plate } 
                           }));
                         }}
-                        className="w-full py-2.5 bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                        className="w-full py-2.5 bg-blue-50 border border-blue-200 dark:bg-blue-50 dark:border-blue-200 text-blue-600 dark:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
                       >
                         <span className="material-symbols-outlined text-[18px]">refresh</span>
                         Sincronizar Agora
                       </button>
                     </div>
                     <div className="space-y-2 mt-6">
-                      <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: '65%' }}></div>
+                      <div className="h-2 w-full bg-slate-100 dark:bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-600 dark:bg-blue-600 rounded-full transition-all duration-1000" style={{ width: '65%' }}></div>
                       </div>
-                      <div className="flex justify-between text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider">
                         <span>Último: {((detailsModalVehicle.currentKM || 0) - 5000).toLocaleString('pt-BR')}</span>
                         <span>Próximo: {((detailsModalVehicle.currentKM || 0) + 5000).toLocaleString('pt-BR')}</span>
                       </div>
@@ -3631,12 +3644,12 @@ export function Inspections() {
                 </div>
 
                 {/* Bottom Bento Grid */}
-                <div className="col-span-12 lg:col-span-4 bg-white border border-outline-variant/30 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-                  <div className="px-6 py-4 border-b border-outline-variant/30 bg-surface-container-low/30 flex justify-between items-center">
-                    <h3 className="text-[10px] font-bold text-on-surface uppercase tracking-widest">Informações Técnicas</h3>
-                    <span className="material-symbols-outlined text-primary text-[20px]">precision_manufacturing</span>
+                <div className="col-span-12 lg:col-span-4 bg-white dark:bg-white border border-slate-100 dark:border-slate-100 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 dark:bg-slate-50 flex justify-between items-center">
+                    <h3 className="text-[10px] font-bold text-slate-700 dark:text-slate-700 uppercase tracking-widest">Informações Técnicas</h3>
+                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-600 text-[20px]">precision_manufacturing</span>
                   </div>
-                  <div className="p-6 divide-y divide-outline-variant/30 flex-1">
+                  <div className="p-6 divide-y divide-slate-100 dark:divide-slate-100 flex-1">
                     {[
                       { label: 'Cor Predominante', value: detailsModalVehicle.color || 'BRANCA', isBadge: true },
                       { label: 'Ano do Modelo', value: detailsModalVehicle.modelYear || '2023' },
@@ -3648,78 +3661,78 @@ export function Inspections() {
                       { label: 'CNPJ / CPF', value: detailsModalVehicle.ownerCnpj || '26.005.751/0001-94' },
                     ].map((spec, i) => (
                       <div key={i} className="py-3 flex justify-between items-center">
-                        <span className="text-on-surface-variant text-sm font-medium">{spec.label}</span>
+                        <span className="text-slate-500 dark:text-slate-500 text-sm font-medium">{spec.label}</span>
                         <div className="flex items-center gap-2">
-                          <span className={`font-bold text-sm ${spec.font || ''}`}>{spec.value}</span>
+                          <span className={`font-bold text-sm ${spec.font || ''} text-slate-800 dark:text-slate-800`}>{spec.value}</span>
                           {spec.isBadge && (
-                            <div className="w-4 h-4 rounded-full border border-outline-variant" style={{ backgroundColor: spec.value.toLowerCase().includes('bran') ? '#ffffff' : spec.value.toLowerCase().includes('pret') ? '#1f2937' : '#ccc' }}></div>
+                            <div className="w-4 h-4 rounded-full border border-slate-200" style={{ backgroundColor: spec.value.toLowerCase().includes('bran') ? '#ffffff' : spec.value.toLowerCase().includes('pret') ? '#1f2937' : '#ccc' }}></div>
                           )}
                         </div>
                       </div>
                     ))}
                     <div className="pt-4">
-                      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Observação</p>
-                      <p className="text-sm font-medium text-on-surface p-3 bg-surface-container-low rounded-xl">
+                      <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest mb-2">Observação</p>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-700 p-3 bg-slate-50 dark:bg-slate-50 rounded-xl">
                         {detailsModalVehicle.observation || 'SEM OBSERVAÇÕES'}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="col-span-12 lg:col-span-5 bg-white border border-outline-variant/30 rounded-2xl shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 border-b border-outline-variant/30 bg-surface-container-low/30 flex justify-between items-center">
-                    <h3 className="text-[10px] font-bold text-on-surface uppercase tracking-widest">Distribuição Mensal</h3>
-                    <span className="material-symbols-outlined text-primary text-[20px]">payments</span>
+                <div className="col-span-12 lg:col-span-5 bg-white dark:bg-white border border-slate-100 dark:border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 dark:bg-slate-50 flex justify-between items-center">
+                    <h3 className="text-[10px] font-bold text-slate-700 dark:text-slate-700 uppercase tracking-widest">Distribuição Mensal</h3>
+                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-600 text-[20px]">payments</span>
                   </div>
                   <div className="p-8 flex items-center gap-10 h-full">
                     <div className="relative h-40 w-40 shrink-0">
                        <svg className="h-full w-full transform -rotate-90">
-                        <circle className="text-slate-100" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeWidth="15"></circle>
+                        <circle className="text-slate-100 dark:text-slate-100" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeWidth="15"></circle>
                         <circle className="text-primary" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeDasharray="408" strokeDashoffset="180" strokeWidth="15"></circle>
                         <circle className="text-orange-500" cx="80" cy="80" fill="transparent" r="65" stroke="currentColor" strokeDasharray="408" strokeDashoffset="320" strokeWidth="15"></circle>
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-[10px] font-bold text-on-surface-variant uppercase">Total</span>
-                        <span className="text-sm font-bold">R$ 1.2k</span>
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase">Total</span>
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-800">R$ 1.2k</span>
                       </div>
                     </div>
                     <div className="flex-1 space-y-5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="h-2.5 w-2.5 rounded-full bg-primary"></div>
-                          <span className="text-sm font-bold text-on-surface-variant">Combustível</span>
+                          <span className="text-sm font-bold text-slate-500 dark:text-slate-500">Combustível</span>
                         </div>
-                        <span className="text-sm font-bold">55%</span>
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-800">55%</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="h-2.5 w-2.5 rounded-full bg-orange-500"></div>
-                          <span className="text-sm font-bold text-on-surface-variant">Manutenção</span>
+                          <span className="text-sm font-bold text-slate-500 dark:text-slate-500">Manutenção</span>
                         </div>
-                        <span className="text-sm font-bold">30%</span>
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-800">30%</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="h-2.5 w-2.5 rounded-full bg-slate-200"></div>
-                          <span className="text-sm font-bold text-on-surface-variant">Outros</span>
+                          <div className="h-2.5 w-2.5 rounded-full bg-slate-200 dark:bg-slate-200"></div>
+                          <span className="text-sm font-bold text-slate-500 dark:text-slate-500">Outros</span>
                         </div>
-                        <span className="text-sm font-bold">15%</span>
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-800">15%</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="col-span-12 lg:col-span-3 bg-white border border-outline-variant/30 p-6 rounded-2xl shadow-sm flex flex-col items-center text-center">
+                <div className="col-span-12 lg:col-span-3 bg-white dark:bg-white border border-slate-100 dark:border-slate-100 p-6 rounded-2xl shadow-sm flex flex-col items-center text-center">
                   <div className="flex justify-between items-center w-full mb-6">
-                    <h3 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Motoristas Atribuídos</h3>
-                    <span className="material-symbols-outlined text-primary text-[20px]">person_add</span>
+                    <h3 className="text-[10px] font-bold text-slate-700 dark:text-slate-700 uppercase tracking-widest">Motoristas Atribuídos</h3>
+                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-600 text-[20px]">person_add</span>
                   </div>
                   <div className="w-full flex-1 flex flex-col items-center justify-center">
                     {assignedDriversForModal.length > 0 ? (
-                      <div className="w-full space-y-4">
+                      <div className="w-full space-y-4 text-slate-800 dark:text-slate-800">
                          {assignedDriversForModal.map(driver => (
                           <div key={driver.id} className="flex flex-col items-center">
-                            <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary p-1 bg-surface-container-low shadow-md">
+                            <div className="h-20 w-20 rounded-full mx-auto overflow-hidden mb-3 border-2 border-primary p-1 bg-slate-55 shadow-md">
                               {driver.imageUrl ? (
                                 <img 
                                   src={driver.imageUrl} 
@@ -3727,20 +3740,20 @@ export function Inspections() {
                                   className={`h-full w-full rounded-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
                                 />
                               ) : (
-                                <div className="h-full w-full rounded-full bg-secondary-container flex items-center justify-center font-bold text-primary text-xl">
+                                <div className="h-full w-full rounded-full bg-blue-50 dark:bg-blue-50 flex items-center justify-center font-bold text-blue-600 dark:text-blue-600 text-xl">
                                   {driver.name?.charAt(0).toUpperCase()}
                                 </div>
                               )}
                             </div>
-                            <h4 className="text-base font-bold text-on-surface leading-tight"><PrivateValue value={driver.name} /></h4>
-                            <p className="text-[10px] text-on-surface-variant font-bold uppercase mt-1">Status: {driver.status}</p>
+                            <h4 className="text-base font-bold text-slate-800 dark:text-slate-800 leading-tight"><PrivateValue value={driver.name} /></h4>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase mt-1">Status: {driver.status}</p>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-10">
-                        <span className="material-symbols-outlined text-4xl text-on-surface-variant opacity-20 mb-4 scale-150">person_off</span>
-                        <p className="text-sm font-bold text-on-surface-variant opacity-60">Nenhum motorista atribuído</p>
+                        <span className="material-symbols-outlined text-4xl text-slate-500 dark:text-slate-500 opacity-20 mb-4 scale-150">person_off</span>
+                        <p className="text-sm font-bold text-slate-500 dark:text-slate-500 opacity-60">Nenhum motorista atribuído</p>
                         <button 
                           onClick={() => navigate('/drivers')}
                           className="mt-6 px-6 py-2 rounded-full border border-primary text-primary text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-white transition-all"

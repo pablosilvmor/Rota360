@@ -60,41 +60,59 @@ export function KmSyncService() {
         // Pequeno atraso para o usuário perceber o início
         await new Promise(r => setTimeout(r, 600));
 
-        console.log("[SYNC DEBUG] Pegando integrations_sync");
-        const syncRef = doc(db, "settings", "integrations_sync");
-        const syncSnap = await getDoc(syncRef);
-        
         setSyncStatus(prev => ({ ...prev, progress: 20, label: "Carregando configurações..." }));
 
-        console.log("[SYNC DEBUG] Pegando telemetry config");
-        const configDoc = await getDoc(doc(db, 'config', 'telemetry'));
-        const telemetryConfig = configDoc.exists() ? configDoc.data() : {
-          syncIntervalMinutes: 30,
-          peakHoursStart: '08:00',
-          peakHoursEnd: '18:00',
-          peakIntervalMinutes: 15
-        };
+        let telemetryConfig;
+        const cachedTelemetryConfigStr = localStorage.getItem("telemetryConfigCache");
+        const cachedTelemetryConfigTime = Number(localStorage.getItem("telemetryConfigCacheTime") || "0");
+        
+        if (cachedTelemetryConfigStr && (Date.now() - cachedTelemetryConfigTime < 4 * 60 * 60 * 1000)) {
+          telemetryConfig = JSON.parse(cachedTelemetryConfigStr);
+        } else {
+          console.log("[SYNC DEBUG] Pegando telemetry config");
+          const configDoc = await getDoc(doc(db, 'config', 'telemetry'));
+          telemetryConfig = configDoc.exists() ? configDoc.data() : {
+            syncIntervalMinutes: 30,
+            peakHoursStart: '08:00',
+            peakHoursEnd: '18:00',
+            peakIntervalMinutes: 15
+          };
+          localStorage.setItem("telemetryConfigCache", JSON.stringify(telemetryConfig));
+          localStorage.setItem("telemetryConfigCacheTime", String(Date.now()));
+        }
+
+        const peakStart = (telemetryConfig.peakHoursStart || '08:00').split(':').map(Number);
+        const peakEnd = (telemetryConfig.peakHoursEnd || '18:00').split(':').map(Number);
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const startMinutes = peakStart[0] * 60 + (peakStart[1] || 0);
+        const endMinutes = peakEnd[0] * 60 + (peakEnd[1] || 0);
+        
+        const isPeak = nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+        const interval = isPeak ? (telemetryConfig.peakIntervalMinutes || 15) : (telemetryConfig.syncIntervalMinutes || 30);
+        
+        const slotMinute = Math.floor(now.getMinutes() / interval) * interval;
+        const currentSlotId = `${todayStr}_${now.getHours()}_${slotMinute}`;
 
         if (!isManual) {
+          const localLastSyncSlot = localStorage.getItem("lastSyncSlotKm") || "";
+          if (localLastSyncSlot === currentSlotId) {
+            console.log("[SYNC DEBUG] checkAndSync: Slot automático já executado recentemente (cache local), abortando.");
+            setSyncStatus({ active: false, progress: 0, label: "" });
+            isSyncing.current = false;
+            return;
+          }
+
+          console.log("[SYNC DEBUG] Pegando integrations_sync");
+          const syncRef = doc(db, "settings", "integrations_sync");
+          const syncSnap = await getDoc(syncRef);
+          
           let lastSyncSlot = "";
           if (syncSnap.exists()) {
             lastSyncSlot = syncSnap.data().lastSyncSlot || "";
           }
-
-          // Lógica de intervalo baseada na config
-          const peakStart = (telemetryConfig.peakHoursStart || '08:00').split(':').map(Number);
-          const peakEnd = (telemetryConfig.peakHoursEnd || '18:00').split(':').map(Number);
-          const nowMinutes = now.getHours() * 60 + now.getMinutes();
-          const startMinutes = peakStart[0] * 60 + (peakStart[1] || 0);
-          const endMinutes = peakEnd[0] * 60 + (peakEnd[1] || 0);
-          
-          const isPeak = nowMinutes >= startMinutes && nowMinutes <= endMinutes;
-          const interval = isPeak ? (telemetryConfig.peakIntervalMinutes || 15) : (telemetryConfig.syncIntervalMinutes || 30);
-          
-          const slotMinute = Math.floor(now.getMinutes() / interval) * interval;
-          const currentSlotId = `${todayStr}_${now.getHours()}_${slotMinute}`;
           
           if (lastSyncSlot === currentSlotId) {
+            localStorage.setItem("lastSyncSlotKm", currentSlotId);
             setSyncStatus({ active: false, progress: 0, label: "" });
             isSyncing.current = false;
             return;
@@ -446,12 +464,15 @@ export function KmSyncService() {
           const slotMinute = Math.floor(now.getMinutes() / interval) * interval;
           const currentSlotId = `${todayStr}_${now.getHours()}_${slotMinute}`;
 
+          const syncRef = doc(db, "settings", "integrations_sync");
           await setDoc(syncRef, {
             lastSyncDate: todayStr,
             lastSyncSlot: currentSlotId,
             lastSyncTime: generalLastCheck,
             status: hasError ? "partial_error" : "success",
           }, { merge: true });
+
+          localStorage.setItem("lastSyncSlotKm", currentSlotId);
         }
 
         const summaryLabel = updatesCount > 0 

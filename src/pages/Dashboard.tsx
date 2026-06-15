@@ -71,6 +71,14 @@ const itemVariants = {
   },
 };
 
+let globalDashboardCache: {
+  itemsMap: Record<string, any>;
+  allRecords: any[];
+  openAutoAlertsCount: number;
+  openAutoOSCount: number;
+  lastFetch: number;
+} | null = null;
+
 export function Dashboard() {
   const navigate = useNavigate();
   const { cachedVehicles } = useAuth();
@@ -98,6 +106,16 @@ export function Dashboard() {
     let isMounted = true;
     
     const fetchInitialData = async () => {
+      const now = Date.now();
+      if (globalDashboardCache && (now - globalDashboardCache.lastFetch < 5 * 60 * 1000)) {
+        if (!isMounted) return;
+        setOpenAutoAlertsCount(globalDashboardCache.openAutoAlertsCount);
+        setOpenAutoOSCount(globalDashboardCache.openAutoOSCount);
+        setItemsMap(globalDashboardCache.itemsMap);
+        setAllRecords(globalDashboardCache.allRecords);
+        return;
+      }
+
       try {
         const itemsQ = query(collectionGroup(db, "items"), limit(200));
         const recordsQ = query(collectionGroup(db, "records"), limit(200));
@@ -118,7 +136,8 @@ export function Dashboard() {
 
         // Filtro em memória para incluir todos os AutoAlertas (remover o filtro de status para coincidir com a página de gestão)
         const activeAlerts = autoAlertsSnap.docs;
-        setOpenAutoAlertsCount(activeAlerts.length);
+        const autoAlertsCount = activeAlerts.length;
+        setOpenAutoAlertsCount(autoAlertsCount);
 
         let openOsCount = 0;
         maintenanceSnap.forEach(doc => {
@@ -142,6 +161,15 @@ export function Dashboard() {
           rList.push({ ...doc.data(), id: doc.id, path: doc.ref.path });
         });
         setAllRecords(rList);
+
+        // Guardando no cache global
+        globalDashboardCache = {
+          itemsMap: iMap,
+          allRecords: rList,
+          openAutoAlertsCount: autoAlertsCount,
+          openAutoOSCount: openOsCount,
+          lastFetch: now
+        };
       } catch (error) {
         console.error("Error fetching initial data:", error);
       }
@@ -546,7 +574,7 @@ export function Dashboard() {
         className="grid grid-cols-12 gap-6 mb-6"
         variants={itemVariants}
       >
-        <div className="col-span-12 lg:col-span-6 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div className="col-span-12 lg:col-span-6 bg-surface-container-lowest dark:glass-panel border border-outline-variant dark:border-blue-500/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-outline-variant flex items-center justify-between">
             <div>
               <h3 className="text-[20px] font-semibold">
@@ -746,7 +774,7 @@ export function Dashboard() {
       </motion.div>
 
       <motion.div className="grid grid-cols-12 gap-6" variants={itemVariants}>
-        <div className="col-span-12 lg:col-span-7 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div className="col-span-12 lg:col-span-7 bg-surface-container-lowest dark:glass-panel border border-outline-variant dark:border-blue-500/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-outline-variant flex items-center justify-between bg-white z-10">
             <h3 className="text-[24px] font-semibold">Mapa de Manutenção</h3>
             <div className="flex gap-4">
@@ -799,7 +827,7 @@ export function Dashboard() {
                     >
                       <Popup>
                         <div className="text-xs">
-                          {v.imageUrl && <img src={v.imageUrl} alt={v.plate} className="w-16 h-10 object-cover rounded mb-1" />}
+                          {v.imageUrl && <img src={v.imageUrl} alt={v.plate} className="w-16 h-10 object-cover rounded-lg mb-1" />}
                           <strong className="text-primary"><PrivateValue value={v.plate} /></strong><br/>
                           {v.model}
                         </div>
@@ -825,7 +853,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="col-span-12 lg:col-span-5 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div className="col-span-12 lg:col-span-5 bg-surface-container-lowest dark:glass-panel border border-outline-variant dark:border-blue-500/20 rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-outline-variant bg-white z-10">
             <h3 className="text-[24px] font-semibold">Próximos Serviços</h3>
           </div>

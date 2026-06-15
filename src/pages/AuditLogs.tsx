@@ -129,6 +129,7 @@ export function AuditLogs() {
                 placeholder="Pesquisa avançada (Nomes, e-mails, IDs, conteúdos gerados)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="w-full bg-surface-container border border-outline-variant rounded-2xl pl-12 pr-4 h-[52px] focus:ring-2 focus:ring-primary outline-none transition-shadow shadow-sm font-medium"
               />
             </div>
@@ -212,7 +213,7 @@ export function AuditLogs() {
       </div>
 
       <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto w-full">
           <table className="w-full text-left border-collapse min-w-[800px]">
              <thead>
                 <tr className="bg-surface-container-low/50 border-b border-outline-variant">

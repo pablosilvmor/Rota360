@@ -480,11 +480,11 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
 
   if (success) {
     return (
-      <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-surface dark:bg-surface-container flex flex-col items-center justify-center p-6 text-center">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="w-24 h-24 bg-primary-container text-primary rounded-full flex items-center justify-center mb-6"
+          className="w-24 h-24 bg-primary-container dark:bg-primary/20 text-primary dark:text-blue-400 rounded-full flex items-center justify-center mb-6"
         >
           <span className="material-symbols-outlined text-5xl">
             check_circle
@@ -493,13 +493,13 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
         <h2 className="text-3xl font-bold text-on-surface mb-4">
           Checklist Enviado com Sucesso!
         </h2>
-        <p className="text-on-surface-variant mb-8 max-w-sm">
+        <p className="text-on-surface-variant dark:text-on-surface/60 mb-8 max-w-sm">
           Suas verificações foram enviadas ao controle de frota. Você será
           redirecionado em instantes.
         </p>
         <button
           onClick={() => navigate("/inspections")}
-          className="bg-primary text-on-primary font-bold px-8 py-3 rounded-full shadow-lg"
+          className="bg-primary text-on-primary font-bold px-8 py-3 rounded-full shadow-lg transition-transform active:scale-95"
         >
           Voltar para Inspeções
         </button>
@@ -508,7 +508,7 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
   }
 
   return (
-    <div className="min-h-screen bg-surface pb-24">
+    <div className="min-h-screen bg-surface dark:bg-surface-container-lowest pb-24">
       <AnimatePresence>
         {isUploading && (
           <motion.div
@@ -517,27 +517,27 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
           >
-            <div className="bg-white rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="material-symbols-outlined text-primary animate-bounce">
+            <div className="bg-white dark:bg-surface-container rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl border dark:border-white/10">
+              <div className="w-16 h-16 bg-primary/10 dark:bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="material-symbols-outlined text-primary dark:text-blue-400 animate-bounce">
                   cloud_upload
                 </span>
               </div>
               <h3 className="text-xl font-bold mb-2 text-on-surface">
                 Enviando Checklist...
               </h3>
-              <p className="text-sm text-on-surface-variant mb-6">
+              <p className="text-sm text-on-surface-variant dark:text-on-surface/60 mb-6">
                 Aguarde enquanto processamos os dados.
               </p>
 
-              <div className="h-3 w-full bg-surface-container-high rounded-full overflow-hidden mb-2">
+              <div className="h-3 w-full bg-surface-container-high dark:bg-surface-container-highest rounded-full overflow-hidden mb-2">
                 <motion.div
                   className="h-full bg-primary"
                   initial={{ width: 0 }}
                   animate={{ width: `${uploadProgress}%` }}
                 />
               </div>
-              <p className="text-xs font-bold text-primary">
+              <p className="text-xs font-bold text-primary dark:text-blue-400">
                 {uploadProgress}% concluído
               </p>
             </div>
@@ -581,14 +581,14 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
               exit={{ x: -20, opacity: 0 }}
               className="space-y-6"
             >
-              <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-outline-variant space-y-6">
+              <div className="bg-white dark:bg-white p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-200 space-y-6">
                 <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">
-                    Nome
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-700 mb-2">
+                    NOME
                   </label>
                   <input
                     type="text"
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 focus:border-primary focus:outline-none transition-colors"
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-800 focus:border-primary focus:outline-none transition-colors"
                     placeholder="Seu nome completo"
                     value={driverName}
                     onChange={(e) => setDriverName(e.target.value)}
@@ -596,12 +596,12 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">
-                    Data
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-700 mb-2">
+                    DATA
                   </label>
                   <input
                     type="date"
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 focus:border-primary focus:outline-none transition-colors"
+                    className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-800 focus:border-primary focus:outline-none transition-colors"
                     value={checklistDate}
                     onChange={(e) => setChecklistDate(e.target.value)}
                   />
@@ -609,8 +609,9 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
 
                 <div>
                   <SearchableSelect
-                    label="Veículo"
+                    label="VEÍCULO"
                     placeholder="Selecione o veículo"
+                    forceLightBg={true}
                     options={vehicles.map((v) => ({
                       value: v.id,
                       label: v.plate + " - " + v.model,
@@ -626,12 +627,12 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-center mt-2 mb-4"
+                      className="flex justify-center mt-2 mb-4 bg-white dark:bg-white p-2 rounded-2xl border border-slate-200 dark:border-slate-200 shadow-sm"
                     >
                       <img
                         src={vehicles.find((v) => v.id === vehicleId)?.imageUrl}
                         alt="Veículo Selecionado"
-                        className="w-full max-w-[200px] h-32 object-cover rounded-xl border border-outline-variant/50 shadow-sm"
+                        className="h-32 object-contain"
                       />
                     </motion.div>
                   )}
@@ -658,17 +659,17 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
               {(() => {
                 const vehicle = vehicles.find((v) => v.id === vehicleId);
                 return (
-                  <div className="flex items-center gap-3 mb-6 bg-surface-container-lowest p-4 border border-outline-variant rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-3 mb-6 bg-white dark:bg-white p-4 border border-slate-100 dark:border-slate-100 rounded-3xl shadow-md">
                     <button
                       onClick={() => setStep(1)}
-                      className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                      className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 transition-colors"
                     >
                       <span className="material-symbols-outlined">
                         arrow_back
                       </span>
                     </button>
                     {vehicle?.imageUrl && (
-                      <div className="w-14 h-14 rounded-lg bg-surface-container border border-outline-variant/50 overflow-hidden flex items-center justify-center shrink-0 shadow-sm p-1">
+                      <div className="w-14 h-14 rounded-lg bg-white dark:bg-white border border-slate-100 overflow-hidden flex items-center justify-center shrink-0 shadow-sm p-1">
                         <img
                           src={vehicle.imageUrl}
                           alt={vehicle.plate}
@@ -677,11 +678,11 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                       </div>
                     )}
                     <div>
-                      <h3 className="text-lg font-bold text-on-surface leading-tight">
+                      <h3 className="text-lg font-bold text-slate-800 leading-tight">
                         Inspeção de Itens
                       </h3>
-                      <p className="text-sm font-medium text-on-surface-variant flex items-center gap-1 mt-0.5">
-                        <span className="material-symbols-outlined text-[16px]">
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-500 flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[16px] text-slate-400">
                           directions_car
                         </span>
                         {vehicle?.plate} - {vehicle?.model}
@@ -692,7 +693,7 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
               })()}
 
               {items.length === 0 && (
-                <div className="text-center p-6 text-on-surface-variant bg-surface-container-low rounded-xl">
+                <div className="text-center p-6 text-slate-500 dark:text-slate-500 bg-white dark:bg-white border border-slate-100 rounded-2xl">
                   Este veículo não possui itens cadastrados na sua ficha de
                   inspeção.
                 </div>
@@ -717,40 +718,41 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                   descRemaining,
                 } = calculateProgress(pseudoItem, record, currentVehicleKM);
 
-                let progressColor = "bg-primary";
-                if (progressPercent > 80) progressColor = "bg-tertiary";
+                let progressColor = "bg-blue-600";
+                if (progressPercent > 80) progressColor = "bg-warning";
                 if (progressPercent >= 100) progressColor = "bg-error";
 
                 return (
                   <div
                     key={idx}
-                    className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant flex flex-col gap-4"
+                    className="bg-white dark:bg-white p-6 rounded-3xl shadow-md border border-slate-100 dark:border-slate-100 flex flex-col gap-5 animate-in fade-in duration-300"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0">
+                    <div className="flex items-start gap-4">
+                      <span className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-50 text-blue-600 dark:text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
                         {idx + 1}
                       </span>
                       <div className="flex-1">
-                        <p className="font-bold text-on-surface leading-tight">
+                        <p className="font-bold text-slate-800 dark:text-slate-800 text-[15px] leading-tight-snug">
                           {item.item}
                         </p>
-                        <p className="text-[11px] text-on-surface-variant uppercase tracking-widest">
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mt-1">
                           {item.category}
                         </p>
                       </div>
                     </div>
 
                     {/* Linha Fina */}
-                    <div className="w-full h-px bg-outline-variant/30"></div>
+                    <div className="w-full h-px bg-slate-100 dark:bg-slate-100"></div>
 
                     {/* Controles: Atualizar Manutenção e Conformidade */}
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
-                          Conformidade
+                    <div className="grid grid-cols-1 gap-5">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest">
+                          CONFORMIDADE
                         </label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-3">
                           <button
+                            type="button"
                             onClick={() =>
                               handleUpdateItem(
                                 idx,
@@ -758,11 +760,12 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                                 "Em conformidade",
                               )
                             }
-                            className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${item.conformidade === "Em conformidade" ? "bg-primary-container border-primary-container text-on-primary-container" : "border-outline-variant text-on-surface-variant bg-surface-container-low"}`}
+                            className={`flex-1 py-3 rounded-xl text-sm font-bold border transition-all ${item.conformidade === "Em conformidade" ? "bg-slate-900 dark:bg-slate-900 border-slate-900 dark:border-slate-900 text-white shadow-md active:scale-95" : "border-slate-200 text-slate-500 bg-white hover:bg-slate-50"}`}
                           >
                             OK
                           </button>
                           <button
+                            type="button"
                             onClick={() =>
                               handleUpdateItem(
                                 idx,
@@ -770,7 +773,7 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                                 "Não conforme",
                               )
                             }
-                            className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${item.conformidade === "Não conforme" ? "bg-error-container border-error-container text-on-error-container" : "border-outline-variant text-on-surface-variant bg-surface-container-low"}`}
+                            className={`flex-1 py-3 rounded-xl text-sm font-bold border transition-all ${item.conformidade === "Não conforme" ? "bg-red-50 dark:bg-red-50 border-2 border-slate-900 dark:border-slate-900 text-red-600 dark:text-red-700 shadow-md active:scale-95" : "border-slate-200 text-slate-400 bg-white hover:bg-slate-50"}`}
                           >
                             Com Problema
                           </button>
@@ -781,9 +784,10 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
+                          className="space-y-1.5"
                         >
-                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 block">
-                            Ação Executada / Necessária
+                          <label className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest block">
+                            AÇÃO EXECUTADA / NECESSÁRIA
                           </label>
                           <input
                             type="text"
@@ -791,15 +795,15 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                             onChange={(e) =>
                               handleUpdateItem(idx, "service", e.target.value)
                             }
-                            className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                            className="w-full bg-[#f8fafc] dark:bg-[#f8fafc] border border-slate-230 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-800 focus:border-slate-400 focus:outline-none transition-colors"
                             placeholder="Ex: Completou água..."
                           />
                         </motion.div>
                       )}
 
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
-                          Última Manut. (KM)
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest">
+                          ÚLTIMA MANUT. (KM)
                         </label>
                         <input
                           type="text"
@@ -819,44 +823,30 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                               parseKM(e.target.value),
                             )
                           }
-                          className="w-full md:w-44 bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-sm font-mono focus:border-primary focus:ring-2 focus:ring-primary outline-none transition-all"
-                          placeholder="Ex: 10.000"
+                          className="w-full md:w-44 bg-[#f8fafc] dark:bg-[#f8fafc] border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 dark:text-slate-800 focus:border-slate-400 focus:outline-none transition-all"
+                          placeholder="Ex: 59.022"
                         />
                       </div>
                     </div>
 
-                    {/* Progresso Igual ao de Inspeções */}
-                    <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/30 mt-1">
-                      <div className="flex justify-between w-full text-xs font-bold font-mono mb-1.5">
-                        <span
-                          className={
-                            progressPercent >= 100
-                              ? "text-error"
-                              : "text-on-surface-variant"
-                          }
-                        >
+                    {/* Progresso de Manutenção */}
+                    <div className="bg-[#f8fafc] dark:bg-[#f8fafc] rounded-2xl p-4 border border-slate-100 dark:border-slate-100 mt-2">
+                      <div className="flex justify-between w-full text-[11px] font-bold font-mono mb-2">
+                        <span className="text-slate-500 dark:text-slate-500">
                           Próx: {formatKM(record.nextMaintenanceKM || 0)}
                         </span>
-                        <span
-                          className={
-                            progressPercent >= 100
-                              ? "text-error"
-                              : "text-primary"
-                          }
-                        >
+                        <span className="text-blue-600 dark:text-blue-600">
                           {Math.round(progressPercent)}%
                         </span>
                       </div>
-                      <div className="w-full bg-surface-container-high rounded-full h-2.5 overflow-hidden">
+                      <div className="w-full bg-slate-200 dark:bg-slate-200 rounded-full h-2 overflow-hidden">
                         <div
                           className={`h-full ${progressColor} transition-all duration-500`}
                           style={{ width: `${progressPercent}%` }}
                         ></div>
                       </div>
-                      <div className="flex justify-between w-full mt-1.5 items-center">
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-tight ${isOutdated ? "text-error" : remainingNumber <= 1000 ? "text-warning" : "text-on-surface-variant/60"}`}
-                        >
+                      <div className="flex justify-between w-full mt-2 items-center">
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest">
                           {descRemaining}
                         </span>
                       </div>

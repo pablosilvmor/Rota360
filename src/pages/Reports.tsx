@@ -30,14 +30,14 @@ const DriverPhotoReport = ({ url }: { url: string }) => {
   
   if (!url) {
     return (
-      <div className="w-12 h-12 rounded-full bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-on-surface-variant/30 mx-auto">
+      <div className="w-12 h-12 rounded-full bg-surface-container-low dark:bg-surface border border-outline-variant/30 dark:border-blue-500/20 flex items-center justify-center text-on-surface-variant/30 mx-auto">
         <span className="material-symbols-outlined text-[16px]">person</span>
       </div>
     );
   }
 
   return (
-    <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0 mx-auto flex items-center justify-center">
+    <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-low dark:bg-surface border border-outline-variant/30 dark:border-blue-500/20 shrink-0 mx-auto flex items-center justify-center">
       <img 
         src={url} 
         alt="Motorista" 
@@ -59,7 +59,7 @@ const MODULES: ModuleData[] = [
         label: 'Foto', 
         align: 'center',
         renderer: (val: any) => val ? (
-          <div className="w-16 h-12 rounded-lg overflow-hidden bg-surface-container-low border border-outline-variant/30 shrink-0 flex items-center justify-center">
+          <div className="w-16 h-12 rounded-lg overflow-hidden bg-white shrink-0 flex items-center justify-center border border-outline-variant/30 shadow-sm">
             <img src={val} alt="Veículo" className="w-full h-full object-contain" />
           </div>
         ) : (
@@ -865,7 +865,7 @@ export function Reports() {
               className="flex border border-outline-variant rounded-2xl shadow-sm overflow-hidden bg-surface-container-lowest flex-col xl:flex-row"
             >
               {/* Profiles Sidebar */}
-              <div className="w-full xl:w-[300px] border-b xl:border-b-0 xl:border-r border-outline-variant flex flex-col p-6 overflow-y-auto bg-white custom-scrollbar flex-shrink-0 relative">
+              <div className="w-full xl:w-[300px] border-b xl:border-b-0 xl:border-r border-outline-variant flex flex-col p-6 overflow-y-auto bg-white dark:bg-surface-container-low custom-scrollbar flex-shrink-0 relative">
                   <div className="flex items-center justify-between mb-6">
                     <h4 className="text-lg font-bold text-on-surface flex items-center gap-2">
                        <span className="material-symbols-outlined text-primary">bookmark</span>
@@ -973,7 +973,7 @@ export function Reports() {
                       placeholder="Filtrar dados..."
                       value={reportSearchTerm}
                       onChange={(e) => setReportSearchTerm(e.target.value)}
-                      className="w-full bg-white border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all shadow-sm h-[40px]"
+                      className="w-full bg-white dark:bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all shadow-sm h-[40px]"
                     />
                   </div>
                   {selectedModule?.id === 'vehicles' && (
@@ -1002,7 +1002,7 @@ export function Reports() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto min-h-[400px]">
+              <div className="overflow-x-auto w-full min-h-[400px]">
                 {loadingData ? (
                   <div className="flex flex-col items-center justify-center h-64 gap-4">
                     <span className="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
@@ -1029,7 +1029,7 @@ export function Reports() {
                 ) : (
                   <table className="w-full text-left border-collapse table-auto min-w-max">
                     <thead>
-                      <tr className="bg-surface-container-low/50">
+                      <tr className="bg-surface-container-low dark:bg-surface-variant/50">
                         {activeColumns.map(c => (
                           <th 
                             key={c.key} 

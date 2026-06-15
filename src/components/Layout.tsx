@@ -26,7 +26,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { user, userData, logout } = useAuth();
+  const { user, userData, logout, quotaExceeded } = useAuth();
   const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
   const navigate = useNavigate();
   const location = useLocation();
@@ -41,12 +41,20 @@ export function Layout({ children }: LayoutProps) {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Check saved theme
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+      setIsDarkMode(true);
+    }
+
     const handleScroll = () => {
       setShowBackToTop(window.scrollY > 300);
     };
@@ -101,6 +109,19 @@ export function Layout({ children }: LayoutProps) {
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const toggleTheme = () => {
+    const isCurrentlyDark = document.documentElement.classList.contains('dark');
+    if (isCurrentlyDark) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+      setIsDarkMode(false);
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setIsDarkMode(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -190,7 +211,7 @@ export function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-on-background flex">
+    <div className="min-h-screen flex text-on-background selection:bg-primary/30">
       <KmSyncService />
       <InvoiceSyncService />
       {/* Mobile Sidebar Overlay */}
@@ -433,6 +454,18 @@ export function Layout({ children }: LayoutProps) {
 
               <div className="relative">
                 <button
+                  onClick={toggleTheme}
+                  className={`p-2 transition-all duration-300 rounded-full flex items-center justify-center text-on-primary-container hover:bg-white/10 hover:text-white`}
+                  title={isDarkMode ? "Modo Claro" : "Modo Escuro"}
+                >
+                  <span className="material-symbols-outlined text-[24px]">
+                    {isDarkMode ? "light_mode" : "dark_mode"}
+                  </span>
+                </button>
+              </div>
+
+              <div className="relative">
+                <button
                   onClick={togglePrivacyMode}
                   className={`p-2 transition-all duration-300 rounded-full flex items-center justify-center ${isPrivacyMode ? "bg-primary text-on-primary shadow-lg scale-110" : "text-on-primary-container hover:bg-white/10 hover:text-white"}`}
                   title={isPrivacyMode ? "Desativar Modo Privacidade" : "Ativar Modo Privacidade"}
@@ -504,14 +537,14 @@ export function Layout({ children }: LayoutProps) {
                       animate={{ opacity: 1, x: 0, scale: 1 }}
                       exit={{ opacity: 0, x: -10, scale: 0.95 }}
                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                      className="absolute left-full bottom-0 pl-2 w-56 z-[2000]"
+                      className="static mt-2 lg:absolute lg:left-full lg:bottom-0 lg:pl-2 w-full lg:w-56 z-[2000] lg:mt-0"
                     >
-                      <div className="bg-primary-container rounded-2xl p-2 shadow-2xl border border-white/10">
+                      <div className="bg-white dark:bg-primary-container opacity-100 rounded-2xl p-2 shadow-2xl border border-outline-variant/30 dark:border-white/20 lg:shadow-2xl shadow-none">
                       {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
                       <NavLink
                         to="/drivers"
                         onClick={() => setIsMoreMenuOpen(false)}
-                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container dark:hover:bg-white/10 font-medium transition-colors text-base"
                         title="Motoristas"
                       >
                         <span className="material-symbols-outlined text-[20px]">
@@ -524,7 +557,7 @@ export function Layout({ children }: LayoutProps) {
                       <NavLink
                         to="/maintenance"
                         onClick={() => setIsMoreMenuOpen(false)}
-                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container dark:hover:bg-white/10 font-medium transition-colors text-base"
                         title="Manutenção"
                       >
                         <span className="material-symbols-outlined text-[20px]">
@@ -537,7 +570,7 @@ export function Layout({ children }: LayoutProps) {
                       <NavLink
                         to="/fuel"
                         onClick={() => setIsMoreMenuOpen(false)}
-                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container dark:hover:bg-white/10 font-medium transition-colors text-base"
                         title="Combustível"
                       >
                         <span className="material-symbols-outlined text-[20px]">
@@ -550,7 +583,7 @@ export function Layout({ children }: LayoutProps) {
                       <NavLink
                         to="/tracking"
                         onClick={() => setIsMoreMenuOpen(false)}
-                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container dark:hover:bg-white/10 font-medium transition-colors text-base"
                         title="Rastreamento"
                       >
                         <span className="material-symbols-outlined text-[20px]">
@@ -563,7 +596,7 @@ export function Layout({ children }: LayoutProps) {
                       <NavLink
                         to="/reports"
                         onClick={() => setIsMoreMenuOpen(false)}
-                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-primary-container hover:bg-white/10 font-medium transition-colors text-base"
+                        className="px-4 py-2.5 rounded-xl flex items-center gap-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container dark:hover:bg-white/10 font-medium transition-colors text-base"
                         title="Relatórios"
                       >
                         <span className="material-symbols-outlined text-[20px]">
@@ -675,7 +708,38 @@ export function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Content Canvas */}
-        <div className="flex-1 p-4 md:p-8 overflow-x-hidden">{children}</div>
+        <div className="flex-1 p-4 md:p-8 overflow-x-hidden">
+          {quotaExceeded && (
+            <div className="mb-6 p-5 bg-red-50 border-2 border-red-200 dark:bg-red-950/20 dark:border-red-900/50 rounded-xl text-red-800 dark:text-red-200 flex flex-col sm:flex-row gap-4 items-start shadow-sm animate-in fade-in duration-300">
+              <span className="material-symbols-outlined text-[32px] text-red-600 dark:text-red-400 shrink-0 select-none">warning</span>
+              <div className="space-y-1">
+                <h4 className="font-bold text-base">Limite de Cota do Firestore Excedido (Quota Exceeded)</h4>
+                <p className="text-sm opacity-90 leading-relaxed text-slate-600 dark:text-slate-300">
+                  O banco de dados atingiu o limite da cota gratuita diária de leitura no Firebase. Os limites são renovados diariamente pelo Firebase ou você pode fazer o upgrade/remover os limites abaixo:
+                </p>
+                <div className="pt-2 flex flex-wrap gap-2">
+                  <a 
+                    href="https://console.firebase.google.com/project/gen-lang-client-0705535266/firestore/databases/ai-studio-6b861078-d6df-4a6c-8244-9c8ab9cbc3a6/data?openUpgradeDialog=true" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-lg transition-colors shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                    Acessar Console do Firebase (Upgrade Plan)
+                  </a>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-red-300 text-red-700 dark:bg-slate-900 dark:border-red-900 dark:text-red-300 font-semibold text-xs rounded-lg hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">refresh</span>
+                    Recarregar Página
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
 
       {/* Central de Cadastros / Mass Registration Modal */}

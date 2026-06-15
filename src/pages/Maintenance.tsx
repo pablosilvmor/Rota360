@@ -833,7 +833,7 @@ export function Maintenance() {
                       className="p-5 bg-surface-container-low border border-outline-variant rounded-xl flex items-center justify-between group hover:bg-surface-container transition-colors"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-white border border-outline-variant rounded-lg flex items-center justify-center p-1">
+                        <div className="w-14 h-14 bg-white border border-outline-variant/50 rounded-xl flex items-center justify-center p-1 shadow-sm">
                            {vehicles.find(v => v.plate === res.plate)?.imageUrl ? (
                              <img src={vehicles.find(v => v.plate === res.plate)?.imageUrl} className="w-full h-full object-contain" />
                            ) : (
@@ -1035,7 +1035,7 @@ export function Maintenance() {
         {/* Service Orders List (Right Column) */}
         <motion.div className="col-span-12 lg:col-span-8" variants={itemVariants}>
           <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-            <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-white">
+            <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-white dark:bg-surface">
               <h4 className="text-[18px] font-semibold text-primary">Ordens de Serviço (OS)</h4>
               <div className="flex gap-2">
                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-surface-container-low border-none rounded-lg text-sm font-semibold focus:ring-0 px-4 py-2 outline-none">
@@ -1050,8 +1050,8 @@ export function Maintenance() {
               </div>
             </div>
 
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto flex-1 w-full">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead>
                   <tr className="bg-surface-container-low border-b border-outline-variant">
                     <th className="px-6 py-4 text-sm font-semibold text-on-surface-variant">PLACA DO VEÍCULO</th>
@@ -1153,7 +1153,7 @@ export function Maintenance() {
               </table>
             </div>
             
-            <div className="p-4 border-t border-outline-variant flex justify-between items-center bg-white mt-auto">
+            <div className="p-4 border-t border-outline-variant flex justify-between items-center bg-white dark:bg-surface mt-auto">
               <span className="text-xs text-on-surface-variant">Exibindo 3 de 150 entradas</span>
               <div className="flex gap-1">
                 <button className="px-3 py-1 bg-surface-container-high rounded text-sm font-semibold">1</button>

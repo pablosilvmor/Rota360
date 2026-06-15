@@ -36,12 +36,12 @@ export const usePrivacy = () => {
   return context;
 };
 
-export const PrivateValue: React.FC<{ value: React.ReactNode; original?: string }> = ({ value, original }) => {
+export const PrivateValue: React.FC<{ value?: React.ReactNode; children?: React.ReactNode; original?: string }> = ({ value, children, original }) => {
   const { isPrivacyMode } = usePrivacy();
 
   return (
-    <span className={`transition-all duration-300 ${isPrivacyMode ? 'blur-[5px] select-none' : ''}`}>
-      {value || original || '••••••••'}
+    <span className={`transition-all duration-300 ${isPrivacyMode ? 'blur-[5px] select-none opacity-50' : ''}`}>
+      {children || value || original || '••••••••'}
     </span>
   );
 };
