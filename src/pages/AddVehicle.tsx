@@ -3,8 +3,10 @@ import { GoogleGenAI } from "@google/genai";
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, updateDoc, doc, setDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () => void, onSave: () => void, vehicleToEdit?: any }) {
+  const { isPrivacyMode } = usePrivacy();
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'uploading' | 'processing' | 'done'>('idle');
   const [showRawData, setShowRawData] = useState(false);
   const [rawOcrData, setRawOcrData] = useState<any>(null);
@@ -323,6 +325,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     Código Renavam {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
+                    type={isPrivacyMode ? 'password' : 'text'}
                     className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.renavam} 
                     onChange={(e) => setVehicleData({ ...vehicleData, renavam: e.target.value })}
@@ -394,6 +397,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     Chassi {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
+                    type={isPrivacyMode ? 'password' : 'text'}
                     className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-mono font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.chassis} 
                     onChange={(e) => setVehicleData({ ...vehicleData, chassis: e.target.value })}
@@ -427,6 +431,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                     CNPJ / CPF do Proprietário {ocrStatus === 'done' && <span className="material-symbols-outlined text-[12px] text-blue-600">auto_awesome</span>}
                   </label>
                   <input 
+                    type={isPrivacyMode ? 'password' : 'text'}
                     className="w-full bg-white dark:bg-white border border-slate-200 dark:border-slate-200 rounded-xl px-4 py-3 text-sm font-mono font-semibold text-slate-800 dark:text-slate-800 focus:outline-none focus:border-slate-400 transition-all" 
                     value={vehicleData.ownerCnpj || ''} 
                     onChange={(e) => setVehicleData({ ...vehicleData, ownerCnpj: e.target.value })}
