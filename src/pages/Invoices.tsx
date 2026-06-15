@@ -1772,7 +1772,7 @@ export function Invoices() {
                             title={`Ver veículo ${plate} na Frota`}
                           >
                             <span className="material-symbols-outlined text-[12px]">directions_car</span>
-                            {plate}
+                            <PrivateValue>{plate}</PrivateValue>
                           </button>
                         ))}
                       </div>
