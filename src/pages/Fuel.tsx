@@ -1424,7 +1424,7 @@ export function Fuel() {
           </button>
         </div>
         <div className="overflow-x-auto min-h-[450px] scrollbar-thin w-full">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-collapse min-w-[1000px] hidden md:table">
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
                 {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'fuelType', 'liters', 'totalValue'].includes(opt.id) && opt.label !== 'Combustível').map(opt => (
@@ -1543,6 +1543,74 @@ export function Fuel() {
               )}
             </tbody>
           </table>
+
+          <div className="flex flex-col gap-4 p-4 md:hidden">
+            {sortedRecords.map((item) => (
+              <div 
+                key={item.id} 
+                onClick={() => setSelectedRecord(item)}
+                className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant shadow-sm relative flex flex-col gap-3 cursor-pointer"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Data do Abastec.</span>
+                    <span className="text-sm font-black text-on-surface">{item.date?.toDate ? item.date.toDate().toLocaleDateString('pt-BR') : '-'}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                     <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider mb-1">Placa</span>
+                     <div className="inline-flex items-center gap-1 xl:px-1.5 px-2 py-1 rounded bg-primary/10 text-primary transition-colors text-[11px] font-bold font-mono">
+                       <span className="material-symbols-outlined text-[14px]">directions_car</span>
+                       <PrivateValue>{item.vehiclePlate}</PrivateValue>
+                     </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col border-t border-outline-variant/30 pt-3">
+                  <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Obra/Centro de Custo</span>
+                  <span className="text-sm font-bold text-on-surface bg-surface-container w-max px-2 py-0.5 rounded text-[11px] uppercase tracking-wider">{item.workName || '-'}</span>
+                </div>
+
+                <div className="flex flex-col border-t border-outline-variant/30 pt-3">
+                  <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Posto/Fornecedor</span>
+                  <span className="text-sm font-medium text-on-surface">{item.station || '-'}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-t border-outline-variant/30 pt-3">
+                   <div className="flex justify-between items-end bg-surface-container p-2 rounded relative overflow-hidden">
+                     <div className="flex flex-col relative z-10 w-full">
+                       <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Combustível / Litros</span>
+                       <div className="flex justify-between mt-1 items-end w-full">
+                         <span className="font-black text-lg leading-none">{item.liters}L</span>
+                         <span className="text-xs font-bold text-on-surface-variant uppercase bg-black/5 dark:bg-white/10 px-1.5 py-[2px] rounded">{item.fuelType || '-'}</span>
+                       </div>
+                     </div>
+                   </div>
+                   <div className="flex flex-col text-right justify-center px-2">
+                     <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Valor Total</span>
+                     <span className="text-xl font-black text-primary">
+                        <PrivateValue>R$ {item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue>
+                     </span>
+                   </div>
+                </div>
+
+                <div className="border-t border-outline-variant/50 mt-1 pt-3 flex justify-end">
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); handleDeleteRecord(item.id); }}
+                     className="p-2 flex gap-2 items-center text-error hover:bg-error/10 rounded-lg transition-colors border border-error/30"
+                     title="Excluir abastecimento"
+                   >
+                     <span className="material-symbols-outlined text-[16px]">delete</span>
+                     <span className="text-xs font-bold uppercase tracking-wider">Excluir</span>
+                   </button>
+                </div>
+              </div>
+            ))}
+            {sortedRecords.length === 0 && (
+              <div className="p-8 text-center text-on-surface-variant bg-surface-container-low rounded-2xl border border-outline-variant border-dashed">
+                <p className="font-medium text-sm">Nenhum registro de abastecimento encontrado.</p>
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
 

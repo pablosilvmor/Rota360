@@ -1657,7 +1657,7 @@ export function Invoices() {
         </div>
         {(activeTab === 'invoices' || activeTab === 'draft') ? (
           <div className="w-full overflow-auto max-h-[calc(100vh-320px)]">
-            <table className="w-full text-left border-collapse table-auto min-w-[1000px]">
+            <table className="w-full text-left border-collapse table-auto min-w-[1000px] hidden md:table">
               <thead className="sticky top-0 z-[40] bg-surface-container-low">
               <tr className="border-b border-outline-variant">
                 <th className="p-4 w-12 text-center">
@@ -1859,6 +1859,154 @@ export function Invoices() {
               )}
             </tbody>
           </table>
+
+          <div className="flex flex-col gap-4 p-4 md:hidden">
+            {paginatedInvoices.map((invoice, index) => (
+              <div key={invoice.id} className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant shadow-sm relative pt-10">
+                <div className="absolute top-4 left-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedInvoices.includes(invoice.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedInvoices(prev => [...prev, invoice.id]);
+                      else setSelectedInvoices(prev => prev.filter(id => id !== invoice.id));
+                    }}
+                    className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
+                  />
+                </div>
+                <div className="absolute top-4 right-4">
+                   <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(invoice.status)}`}>
+                     {invoice.status}
+                   </span>
+                </div>
+                
+                <div className="flex flex-col gap-2 relative mt-4">
+                  <div className="flex justify-between items-center">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Número da Nota</span>
+                      <span className="text-sm font-black text-on-surface">{invoice.number}</span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Emissão</span>
+                      <span className="text-sm font-medium text-on-surface-variant">{invoice.issueDate.split('-').reverse().join('/')}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col border-t border-outline-variant/30 pt-3 mt-1">
+                    <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Fornecedor</span>
+                    <span className="text-sm font-bold text-on-surface">{invoice.issuerName}</span>
+                    <span className="text-[11px] font-mono text-on-surface-variant"><PrivateValue>{invoice.issuerCNPJ}</PrivateValue></span>
+                  </div>
+
+                  <div className="flex justify-between items-end border-t border-outline-variant/30 pt-3 mt-1">
+                    <div className="flex flex-col gap-1 w-2/3">
+                       <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider mb-1">Veículo Vinculado</span>
+                       {invoice.linkedVehicle ? (
+                         <div className="flex flex-wrap gap-1">
+                           {invoice.linkedVehicle.split(/[\s,;/]+/).filter(Boolean).map((plate, pIdx) => (
+                             <button 
+                               key={`${plate}-${pIdx}`}
+                               onClick={(e) => {
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 const matchingVehicle = vehicles.find(v => 
+                                   v.plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+                                 );
+                                 if (matchingVehicle) {
+                                   setDetailsModalVehicle(matchingVehicle);
+                                 } else {
+                                   navigate(`/fleet?search=${plate}`);
+                                 }
+                               }}
+                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-[11px] font-bold font-mono group/plate"
+                               title={`Ver veículo ${plate} na Frota`}
+                             >
+                               <span className="material-symbols-outlined text-[14px]">directions_car</span>
+                               <PrivateValue>{plate}</PrivateValue>
+                             </button>
+                           ))}
+                         </div>
+                       ) : (
+                         <span 
+                           onClick={() => openPreviewModal(invoice)}
+                           className="text-xs text-on-surface-variant italic cursor-pointer hover:text-primary transition-colors hover:underline inline-block bg-surface-container px-2 py-1 rounded"
+                         >
+                           Vincular veículo...
+                         </span>
+                       )}
+                    </div>
+                    <div className="flex flex-col items-end w-1/3">
+                      <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Valor Total</span>
+                      <span className="text-sm font-black text-on-surface">
+                         <PrivateValue>{invoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</PrivateValue>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-outline-variant/50 mt-4 pt-3 grid grid-cols-4 gap-2 items-center">
+                  {activeTab === 'invoices' && (
+                    <button 
+                     onClick={(e) => {
+                       e.preventDefault();
+                       e.stopPropagation();
+                       handleCopyToDraft(invoice);
+                     }}
+                     className="col-span-1 p-2 gap-1 flex flex-col justify-center items-center text-on-surface-variant hover:text-secondary hover:bg-secondary/10 rounded-lg transition-colors border border-outline-variant bg-surface" 
+                    >
+                      <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                      <span className="text-[9px] font-bold text-center uppercase tracking-wider">Duplicar</span>
+                    </button>
+                  )}
+                  <button 
+                   onClick={(e) => {
+                     e.preventDefault();
+                     e.stopPropagation();
+                     openPreviewModal(invoice);
+                   }}
+                   className={`p-2 gap-1 flex flex-col justify-center items-center text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors border border-outline-variant bg-surface ${activeTab === 'invoices' ? 'col-span-1' : 'col-span-1'}`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                    <span className="text-[9px] font-bold text-center uppercase tracking-wider">PDF</span>
+                  </button>
+                  <button 
+                   onClick={(e) => {
+                     e.preventDefault();
+                     e.stopPropagation();
+                     const xml = invoice.xmlContent || `<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFeId="NFe${invoice.key}"><ide><nNF>${invoice.number}</nNF></ide></infNFe></NFe></nfeProc>`;
+                     const blob = new Blob([xml], { type: 'text/xml' });
+                     const url = URL.createObjectURL(blob);
+                     const a = document.createElement('a');
+                     a.href = url;
+                     a.download = `NFe_${invoice.number}.xml`;
+                     a.click();
+                   }}
+                   className={`p-2 gap-1 flex flex-col justify-center items-center text-on-surface-variant hover:text-tertiary hover:bg-tertiary/10 rounded-lg transition-colors border border-outline-variant bg-surface ${activeTab === 'invoices' ? 'col-span-1' : 'col-span-1 border-l ml-3 pl-3'}`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">code</span>
+                    <span className="text-[9px] font-bold text-center uppercase tracking-wider">XML</span>
+                  </button>
+                  <button 
+                   onClick={(e) => {
+                     e.preventDefault();
+                     e.stopPropagation();
+                     setConfirmDeleteId(invoice.id);
+                   }}
+                   className={`p-2 gap-1 flex flex-col justify-center items-center text-error hover:bg-error/10 rounded-lg transition-colors border border-error/30 bg-surface ${activeTab === 'invoices' ? 'col-span-1' : 'col-span-2'}`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                    <span className="text-[9px] font-bold text-center uppercase tracking-wider">Excluir</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+            {filteredInvoices.length === 0 && (
+              <div className="p-8 text-center text-on-surface-variant bg-surface-container-low rounded-2xl border border-outline-variant border-dashed">
+                <span className="material-symbols-outlined text-[48px] mb-3 opacity-20">receipt_long</span>
+                <p className="font-medium text-sm">Nenhuma nota fiscal encontrada.</p>
+              </div>
+            )}
+          </div>
 
           {totalPages > 1 && (
             <div className="p-4 border-t border-outline-variant flex items-center justify-between bg-surface-container-low/50 sticky bottom-0 z-20 backdrop-blur-md">
@@ -2142,13 +2290,13 @@ export function Invoices() {
                  onMouseMove={handlePanMouseMove}
                  onMouseUp={handlePanMouseUp}
                  onMouseLeave={handlePanMouseUp}
-                 className={`flex-1 bg-surface-container dark:bg-black/20 overflow-auto p-4 md:p-8 flex items-start justify-center custom-scrollbar scroll-smooth whitespace-nowrap select-none ${isPanDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                 className={`flex-1 bg-surface-container dark:bg-black/20 overflow-auto p-4 md:p-8 flex items-start justify-center custom-scrollbar whitespace-nowrap select-none ${isPanDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                >
                   <div className="transition-transform duration-200 ease-out origin-top" style={{ transform: `scale(${zoom})` }}>
                     <div 
                       ref={invoicePreviewRef} 
                       id="invoice-preview-capture"
-                      className="bg-white shadow-2xl p-8 md:p-12 border border-outline-variant pointer-events-auto"
+                      className={`bg-white shadow-2xl p-8 md:p-12 border border-outline-variant pointer-events-auto ${isPanDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                       style={{ minHeight: '1122px', width: '794px', backgroundColor: '#ffffff' }}
                     >
                     {/* DANFE HTML Representation - Forced Dark Text for Mockup */}

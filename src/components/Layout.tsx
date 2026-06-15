@@ -479,7 +479,7 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-2 px-2">
+        <nav className="flex-1 space-y-2 px-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           {allowedNavItems.map((item) => {
             const isActive =
               location.pathname === item.path ||
@@ -537,7 +537,7 @@ export function Layout({ children }: LayoutProps) {
                       animate={{ opacity: 1, x: 0, scale: 1 }}
                       exit={{ opacity: 0, x: -10, scale: 0.95 }}
                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                      className="static mt-2 lg:absolute lg:left-full lg:bottom-0 lg:pl-2 w-full lg:w-56 z-[2000] lg:mt-0"
+                      className="absolute bottom-full mb-2 left-0 lg:left-full lg:bottom-0 lg:mb-0 lg:pl-2 w-full lg:w-56 z-[2000] lg:mt-0"
                     >
                       <div className="bg-white dark:bg-primary-container opacity-100 rounded-2xl p-2 shadow-2xl border border-outline-variant/30 dark:border-white/20 lg:shadow-2xl shadow-none">
                       {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
