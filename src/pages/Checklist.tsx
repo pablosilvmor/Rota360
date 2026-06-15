@@ -20,6 +20,7 @@ import { SearchableSelect } from "../components/SearchableSelect";
 import { useNavigate, useSearchParams } from "react-router";
 import { calculateProgress } from "../lib/progressUtils";
 import { useAuth } from "../contexts/AuthContext";
+import { PrivateValue } from "../contexts/PrivacyContext";
 
 // Items default
 const defaultItems = [
@@ -685,7 +686,7 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
                         <span className="material-symbols-outlined text-[16px] text-slate-400">
                           directions_car
                         </span>
-                        {vehicle?.plate} - {vehicle?.model}
+                        <PrivateValue>{vehicle?.plate}</PrivateValue> - {vehicle?.model}
                       </p>
                     </div>
                   </div>
