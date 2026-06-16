@@ -636,131 +636,6 @@ export function Layout({ children }: LayoutProps) {
                     </div>
                   </motion.div>
                   )}
-
-                  {isMoreMenuOpen && typeof window !== 'undefined' && createPortal(
-                    <div className="fixed inset-0 z-[2500] lg:hidden">
-                      {/* Backdrop */}
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setIsMoreMenuOpen(false)}
-                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                      />
-                      {/* Bottom Sheet */}
-                      <motion.div
-                        initial={{ y: "100%" }}
-                        animate={{ y: 0 }}
-                        exit={{ y: "100%" }}
-                        transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                        className="absolute bottom-0 left-0 right-0 bg-surface-container-lowest dark:bg-surface-container-low rounded-t-[32px] border-t border-outline-variant/30 p-6 pb-12 shadow-[0_-12px_40px_rgba(0,0,0,0.15)] flex flex-col gap-6"
-                      >
-                        {/* Drag Handle */}
-                        <div className="w-12 h-1.5 bg-outline-variant/40 rounded-full mx-auto cursor-pointer" onClick={() => setIsMoreMenuOpen(false)} />
-                        
-                        <div className="flex justify-between items-center px-1">
-                          <h3 className="text-[11px] font-black tracking-widest uppercase text-on-surface-variant font-sans">
-                            Mais Opções
-                          </h3>
-                          <button
-                            onClick={() => setIsMoreMenuOpen(false)}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container/30 dark:bg-white/10 text-on-surface-variant"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">close</span>
-                          </button>
-                        </div>
-
-                        {/* Grid container with modern visual design */}
-                        <div className="grid grid-cols-2 gap-3 mt-2">
-                          {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
-                            <Link
-                              to="/drivers"
-                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
-                            >
-                              <span className="material-symbols-outlined text-[26px] opacity-80">group</span>
-                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
-                                Motoristas
-                              </span>
-                            </Link>
-                          )}
-                          {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
-                            <Link
-                              to="/maintenance"
-                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
-                            >
-                              <span className="material-symbols-outlined text-[26px] opacity-80">build</span>
-                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
-                                Manutenção
-                              </span>
-                            </Link>
-                          )}
-                          {((userData?.allowedScreens || []).includes('/fuel') || userData?.role?.toLowerCase() === 'admin') && (
-                            <Link
-                              to="/fuel"
-                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
-                            >
-                              <span className="material-symbols-outlined text-[26px] opacity-80">local_gas_station</span>
-                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
-                                Combustível
-                              </span>
-                            </Link>
-                          )}
-                          {((userData?.allowedScreens || []).includes('/tracking') || userData?.role?.toLowerCase() === 'admin') && (
-                            <Link
-                              to="/tracking"
-                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
-                            >
-                              <span className="material-symbols-outlined text-[26px] opacity-80">map</span>
-                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
-                                Rastreamento
-                              </span>
-                            </Link>
-                          )}
-                          {((userData?.allowedScreens || []).includes('/reports') || userData?.role?.toLowerCase() === 'admin') && (
-                            <Link
-                              to="/reports"
-                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
-                            >
-                              <span className="material-symbols-outlined text-[26px] opacity-80">analytics</span>
-                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
-                                Relatórios
-                              </span>
-                            </Link>
-                          )}
-                          {((userData?.allowedScreens || []).includes('/autoalerta-admin') || userData?.role?.toLowerCase() === 'admin') && (
-                            <Link
-                              to="/autoalerta-admin"
-                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
-                            >
-                              <span className="material-symbols-outlined text-[26px] opacity-80">admin_panel_settings</span>
-                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
-                                Gestão Autoalerta
-                              </span>
-                            </Link>
-                          )}
-                          {(userData?.role?.toLowerCase() === 'admin' || (userData?.allowedScreens || []).includes('/audit')) && (
-                            <Link
-                              to="/audit"
-                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
-                            >
-                              <span className="material-symbols-outlined text-[26px] opacity-80">history</span>
-                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
-                                Auditoria de Ações
-                              </span>
-                            </Link>
-                          )}
-                        </div>
-                      </motion.div>
-                    </div>,
-                    document.body
-                  )}
                 </AnimatePresence>
             </div>
           </div>
@@ -1018,6 +893,133 @@ export function Layout({ children }: LayoutProps) {
           </span>
         </button>
       )}
+
+      {/* Mobile Bottom Sheet for Mais Opções */}
+      <AnimatePresence>
+        {isMoreMenuOpen && (
+          <div className="fixed inset-0 z-[2500] lg:hidden flex flex-col justify-end">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMoreMenuOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            {/* Bottom Sheet Modal */}
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              className="relative bg-surface-container-lowest dark:bg-surface-container-low rounded-t-[32px] border-t border-outline-variant/30 p-6 pb-12 shadow-[0_-12px_40px_rgba(0,0,0,0.15)] flex flex-col gap-6"
+            >
+              {/* Drag Handle */}
+              <div aria-hidden="true" className="w-12 h-1.5 bg-outline-variant/40 rounded-full mx-auto cursor-pointer" onClick={() => setIsMoreMenuOpen(false)} />
+              
+              <div className="flex justify-between items-center px-1">
+                <h3 className="text-[11px] font-black tracking-widest uppercase text-on-surface-variant font-sans">
+                  Mais Opções
+                </h3>
+                <button
+                  onClick={() => setIsMoreMenuOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container/30 dark:bg-white/10 text-on-surface-variant hover:bg-surface-container/50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              {/* Grid container with modern visual design */}
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
+                  <Link
+                    to="/drivers"
+                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                  >
+                    <span className="material-symbols-outlined text-[26px] opacity-80">group</span>
+                    <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                      Motoristas
+                    </span>
+                  </Link>
+                )}
+                {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
+                  <Link
+                    to="/maintenance"
+                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                  >
+                    <span className="material-symbols-outlined text-[26px] opacity-80">build</span>
+                    <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                      Manutenção
+                    </span>
+                  </Link>
+                )}
+                {((userData?.allowedScreens || []).includes('/fuel') || userData?.role?.toLowerCase() === 'admin') && (
+                  <Link
+                    to="/fuel"
+                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                  >
+                    <span className="material-symbols-outlined text-[26px] opacity-80">local_gas_station</span>
+                    <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                      Combustível
+                    </span>
+                  </Link>
+                )}
+                {((userData?.allowedScreens || []).includes('/tracking') || userData?.role?.toLowerCase() === 'admin') && (
+                  <Link
+                    to="/tracking"
+                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                  >
+                    <span className="material-symbols-outlined text-[26px] opacity-80">map</span>
+                    <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                      Rastreamento
+                    </span>
+                  </Link>
+                )}
+                {((userData?.allowedScreens || []).includes('/reports') || userData?.role?.toLowerCase() === 'admin') && (
+                  <Link
+                    to="/reports"
+                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                  >
+                    <span className="material-symbols-outlined text-[26px] opacity-80">analytics</span>
+                    <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                      Relatórios
+                    </span>
+                  </Link>
+                )}
+                {((userData?.allowedScreens || []).includes('/autoalerta-admin') || userData?.role?.toLowerCase() === 'admin') && (
+                  <Link
+                    to="/autoalerta-admin"
+                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                  >
+                    <span className="material-symbols-outlined text-[26px] opacity-80">admin_panel_settings</span>
+                    <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                      Gestão Autoalerta
+                    </span>
+                  </Link>
+                )}
+                {(userData?.role?.toLowerCase() === 'admin' || (userData?.allowedScreens || []).includes('/audit')) && (
+                  <Link
+                    to="/audit"
+                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                  >
+                    <span className="material-symbols-outlined text-[26px] opacity-80">history</span>
+                    <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                      Auditoria de Ações
+                    </span>
+                  </Link>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
