@@ -8,6 +8,7 @@ import autoTable from "jspdf-autotable";
 import html2canvas from 'html2canvas';
 import JSZip from 'jszip';
 import { useAuth } from '../contexts/AuthContext';
+import { useData } from '../contexts/DataContext';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { useNavigate } from 'react-router';
 import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
@@ -67,11 +68,18 @@ export function Invoices() {
   const navigate = useNavigate();
   const { userData } = useAuth();
   const { isPrivacyMode } = usePrivacy();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const { 
+    invoices, 
+    drafts, 
+    invoiceHistory: importHistory, 
+    vehicles, 
+    drivers, 
+    loadingInvoices: loading 
+  } = useData();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterLinkedOnly, setFilterLinkedOnly] = useState<boolean>(false);
-  const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -84,8 +92,6 @@ export function Invoices() {
   const [zoom, setZoom] = useState(1);
   const [originalHadNoPlate, setOriginalHadNoPlate] = useState(false);
   const [activeTab, setActiveTab] = useState<'invoices' | 'history' | 'draft'>('invoices');
-  const [importHistory, setImportHistory] = useState<any[]>([]);
-  const [drafts, setDrafts] = useState<Invoice[]>([]);
   const [copyAnimationState, setCopyAnimationState] = useState<{ active: boolean, invoiceNumber?: string } | null>(null);
   const invoicePreviewRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -375,8 +381,6 @@ export function Invoices() {
     }
   }, [notification]);
 
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [drivers, setDrivers] = useState<any[]>([]);
   const [detailsModalVehicle, setDetailsModalVehicle] = useState<any>(null);
 
   const assignedDriversForModal = detailsModalVehicle
@@ -388,36 +392,6 @@ export function Invoices() {
     : [];
 
   useEffect(() => {
-    const q = query(collection(db, 'invoices'), orderBy('issueDate', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice));
-      setInvoices(docs);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'invoices');
-      setLoading(false);
-    });
-
-    const qDrafts = query(collection(db, 'invoice_drafts'), orderBy('issueDate', 'desc'));
-    const unsubscribeDrafts = onSnapshot(qDrafts, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice));
-      setDrafts(docs);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'invoice_drafts');
-    });
-
-    const qVehicles = query(collection(db, 'vehicles'));
-    const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      setVehicles(docs);
-    });
-
-    const qDrivers = query(collection(db, 'drivers'));
-    const unsubscribeDrivers = onSnapshot(qDrivers, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      setDrivers(docs);
-    });
-
     const handleSyncStatus = (e: any) => {
       if (e.detail?.type === 'INVOICE') {
         setSyncing(e.detail.status === 'syncing');
@@ -426,21 +400,8 @@ export function Invoices() {
     window.addEventListener('SYNC_STATUS_CHANGE', handleSyncStatus);
 
     return () => {
-      unsubscribe();
-      unsubscribeDrafts();
-      unsubscribeVehicles();
-      unsubscribeDrivers();
       window.removeEventListener('SYNC_STATUS_CHANGE', handleSyncStatus);
     };
-  }, []);
-
-  useEffect(() => {
-    const q = query(collection(db, 'invoice_imports'), orderBy('date', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setImportHistory(docs);
-    });
-    return unsubscribe;
   }, []);
 
   const handleManualSync = () => {

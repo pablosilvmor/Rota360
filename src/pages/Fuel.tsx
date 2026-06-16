@@ -5,6 +5,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { PrivateValue } from '../contexts/PrivacyContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useData } from '../contexts/DataContext';
 import * as xlsx from 'xlsx';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area } from 'recharts';
 import jsPDF from 'jspdf';
@@ -22,11 +23,14 @@ const itemVariants = {
 };
 
 export function Fuel() {
+  const { 
+    fuelRecords, 
+    vehicles, 
+    drivers, 
+    fuelHistory: importLogs, 
+    loadingFuel: loading 
+  } = useData();
   const [works, setWorks] = useState<any[]>([]);
-  const [fuelRecords, setFuelRecords] = useState<any[]>([]);
-  const [importLogs, setImportLogs] = useState<any[]>([]);
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [drivers, setDrivers] = useState<any[]>([]);
   const [filterWork, setFilterWork] = useLocalStorageState('fuel_filterWork', 'Todas as Obras');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useLocalStorageState('fuel_filterMonth', 'Todos');
@@ -621,36 +625,8 @@ export function Fuel() {
       handleFirestoreError(error, OperationType.LIST, 'works');
     });
 
-    const qVehicles = query(collection(db, 'vehicles'));
-    const unsubscribeVehicles = onSnapshot(qVehicles, (snapshot) => {
-      setVehicles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    const qDrivers = query(collection(db, 'drivers'));
-    const unsubscribeDrivers = onSnapshot(qDrivers, (snapshot) => {
-      setDrivers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    const qFuel = query(collection(db, 'fuel_records'), orderBy('date', 'desc'));
-    const unsubscribeFuel = onSnapshot(qFuel, (snapshot) => {
-      setFuelRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'fuel_records');
-    });
-
-    const qLogs = query(collection(db, 'fuel_imports'), orderBy('createdAt', 'desc'));
-    const unsubscribeLogs = onSnapshot(qLogs, (snapshot) => {
-      setImportLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'fuel_imports');
-    });
-
     return () => {
       unsubscribeWorks();
-      unsubscribeVehicles();
-      unsubscribeDrivers();
-      unsubscribeFuel();
-      unsubscribeLogs();
     };
   }, []);
 

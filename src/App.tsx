@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { DataProvider } from './contexts/DataContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 import { Layout } from './components/Layout';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -95,7 +96,8 @@ function PlaceholderPage({ title, description, icon }: { title: string, descript
 export default function App() {
   return (
     <AuthProvider>
-      <PrivacyProvider>
+      <DataProvider>
+        <PrivacyProvider>
         <BrowserRouter>
           <ToastProvider>
             <ErrorBoundary>
@@ -129,7 +131,8 @@ export default function App() {
         </ErrorBoundary>
         </ToastProvider>
       </BrowserRouter>
-    </PrivacyProvider>
-  </AuthProvider>
+        </PrivacyProvider>
+      </DataProvider>
+    </AuthProvider>
 );
 }
