@@ -671,17 +671,15 @@ export function Layout({ children }: LayoutProps) {
                         </div>
 
                         {/* Grid container with modern visual design */}
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3 mt-2">
                           {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
                             <Link
                               to="/drivers"
-                              onClick={() => setIsMoreMenuOpen(false)}
-                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
                             >
-                              <div className="w-11 h-11 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary">
-                                <span className="material-symbols-outlined text-[22px]">group</span>
-                              </div>
-                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                              <span className="material-symbols-outlined text-[26px] opacity-80">group</span>
+                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                                 Motoristas
                               </span>
                             </Link>
@@ -689,13 +687,11 @@ export function Layout({ children }: LayoutProps) {
                           {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
                             <Link
                               to="/maintenance"
-                              onClick={() => setIsMoreMenuOpen(false)}
-                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-secondary/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
                             >
-                              <div className="w-11 h-11 rounded-full bg-secondary/10 dark:bg-secondary/20 flex items-center justify-center text-secondary">
-                                <span className="material-symbols-outlined text-[22px]">build</span>
-                              </div>
-                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                              <span className="material-symbols-outlined text-[26px] opacity-80">build</span>
+                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                                 Manutenção
                               </span>
                             </Link>
@@ -703,13 +699,11 @@ export function Layout({ children }: LayoutProps) {
                           {((userData?.allowedScreens || []).includes('/fuel') || userData?.role?.toLowerCase() === 'admin') && (
                             <Link
                               to="/fuel"
-                              onClick={() => setIsMoreMenuOpen(false)}
-                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-tertiary/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
                             >
-                              <div className="w-11 h-11 rounded-full bg-tertiary/10 dark:bg-tertiary/20 flex items-center justify-center text-tertiary">
-                                <span className="material-symbols-outlined text-[22px]">local_gas_station</span>
-                              </div>
-                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                              <span className="material-symbols-outlined text-[26px] opacity-80">local_gas_station</span>
+                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                                 Combustível
                               </span>
                             </Link>
@@ -717,27 +711,23 @@ export function Layout({ children }: LayoutProps) {
                           {((userData?.allowedScreens || []).includes('/tracking') || userData?.role?.toLowerCase() === 'admin') && (
                             <Link
                               to="/tracking"
-                              onClick={() => setIsMoreMenuOpen(false)}
-                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
                             >
-                              <div className="w-11 h-11 rounded-full bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center text-blue-500">
-                                <span className="material-symbols-outlined text-[22px]">map</span>
-                              </div>
-                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
-                                Rastreio
+                              <span className="material-symbols-outlined text-[26px] opacity-80">map</span>
+                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                                Rastreamento
                               </span>
                             </Link>
                           )}
                           {((userData?.allowedScreens || []).includes('/reports') || userData?.role?.toLowerCase() === 'admin') && (
                             <Link
                               to="/reports"
-                              onClick={() => setIsMoreMenuOpen(false)}
-                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-success/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
                             >
-                              <div className="w-11 h-11 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-500">
-                                <span className="material-symbols-outlined text-[22px]">analytics</span>
-                              </div>
-                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                              <span className="material-symbols-outlined text-[26px] opacity-80">analytics</span>
+                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                                 Relatórios
                               </span>
                             </Link>
@@ -745,28 +735,24 @@ export function Layout({ children }: LayoutProps) {
                           {((userData?.allowedScreens || []).includes('/autoalerta-admin') || userData?.role?.toLowerCase() === 'admin') && (
                             <Link
                               to="/autoalerta-admin"
-                              onClick={() => setIsMoreMenuOpen(false)}
-                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-warning/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
                             >
-                              <div className="w-11 h-11 rounded-full bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center text-amber-500">
-                                <span className="material-symbols-outlined text-[22px]">admin_panel_settings</span>
-                              </div>
-                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
-                                G. Alerta
+                              <span className="material-symbols-outlined text-[26px] opacity-80">admin_panel_settings</span>
+                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                                Gestão Autoalerta
                               </span>
                             </Link>
                           )}
                           {(userData?.role?.toLowerCase() === 'admin' || (userData?.allowedScreens || []).includes('/audit')) && (
                             <Link
                               to="/audit"
-                              onClick={() => setIsMoreMenuOpen(false)}
-                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-slate-500/5 dark:hover:bg-white/10 transition-all text-center gap-2 group text-on-surface"
+                              onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                              className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
                             >
-                              <div className="w-11 h-11 rounded-full bg-slate-500/10 dark:bg-slate-500/20 flex items-center justify-center text-slate-500">
-                                <span className="material-symbols-outlined text-[22px]">history</span>
-                              </div>
-                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
-                                Auditoria
+                              <span className="material-symbols-outlined text-[26px] opacity-80">history</span>
+                              <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
+                                Auditoria de Ações
                               </span>
                             </Link>
                           )}
