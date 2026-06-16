@@ -660,7 +660,7 @@ export function Invoices() {
   const openPreviewModal = (invoice: Invoice) => {
     setPreviewInvoice(invoice);
     setInvoiceNotes("");
-    setZoom(1);
+    setZoom(window.innerWidth < 1024 ? 0.45 : 1);
     setOriginalHadNoPlate(!invoice.linkedVehicle);
   };
 
@@ -1656,8 +1656,9 @@ export function Invoices() {
           )}
         </div>
         {(activeTab === 'invoices' || activeTab === 'draft') ? (
-          <div className="w-full overflow-auto max-h-[calc(100vh-320px)]">
-            <table className="w-full text-left border-collapse table-auto min-w-[1000px] hidden md:table">
+          <div className="w-full overflow-y-auto overflow-x-hidden md:overflow-auto max-h-[calc(100vh-320px)]">
+            <div className="hidden md:block">
+              <table className="w-full text-left border-collapse table-auto min-w-[1000px]">
               <thead className="sticky top-0 z-[40] bg-surface-container-low">
               <tr className="border-b border-outline-variant">
                 <th className="p-4 w-12 text-center">
@@ -1859,11 +1860,23 @@ export function Invoices() {
               )}
             </tbody>
           </table>
+          </div>
 
-          <div className="flex flex-col gap-4 p-4 md:hidden">
-            {paginatedInvoices.map((invoice, index) => (
-              <div key={invoice.id} className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant shadow-sm relative pt-10">
-                <div className="absolute top-4 left-4">
+          {/* Cards responsivos para Mobile */}
+          <div className="md:hidden flex flex-col gap-4 p-4">
+            {paginatedInvoices.map((invoice) => (
+              <div key={invoice.id} className="bg-surface-container border border-outline-variant/30 rounded-xl p-4 shadow-sm relative group flex flex-col gap-3">
+                <div className="flex justify-between items-start border-b border-outline-variant/30 pb-3">
+                  <div>
+                    <span className={`px-2.5 py-1 mb-2 inline-block rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(invoice.status)}`}>
+                      {invoice.status}
+                    </span>
+                    <div className="font-bold text-base text-on-surface flex items-center gap-2">
+                       <span className="material-symbols-outlined text-[16px] text-on-surface-variant">receipt_long</span>
+                       {invoice.number}
+                    </div>
+                    <div className="text-xs text-on-surface-variant mt-1">Emitida em {invoice.issueDate.split('-').reverse().join('/')}</div>
+                  </div>
                   <input
                     type="checkbox"
                     checked={selectedInvoices.includes(invoice.id)}
@@ -1871,140 +1884,124 @@ export function Invoices() {
                       if (e.target.checked) setSelectedInvoices(prev => [...prev, invoice.id]);
                       else setSelectedInvoices(prev => prev.filter(id => id !== invoice.id));
                     }}
-                    className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
+                    className="w-5 h-5 rounded text-primary focus:ring-primary cursor-pointer mt-1"
                   />
                 </div>
-                <div className="absolute top-4 right-4">
-                   <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(invoice.status)}`}>
-                     {invoice.status}
-                   </span>
-                </div>
                 
-                <div className="flex flex-col gap-2 relative mt-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Número da Nota</span>
-                      <span className="text-sm font-black text-on-surface">{invoice.number}</span>
-                    </div>
-                    <div className="flex flex-col text-right">
-                      <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Emissão</span>
-                      <span className="text-sm font-medium text-on-surface-variant">{invoice.issueDate.split('-').reverse().join('/')}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col border-t border-outline-variant/30 pt-3 mt-1">
-                    <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Fornecedor</span>
-                    <span className="text-sm font-bold text-on-surface">{invoice.issuerName}</span>
-                    <span className="text-[11px] font-mono text-on-surface-variant"><PrivateValue>{invoice.issuerCNPJ}</PrivateValue></span>
-                  </div>
+                <div>
+                  <div className="text-xs text-on-surface-variant font-medium uppercase tracking-wider mb-1">Fornecedor</div>
+                  <div className="text-sm font-bold text-on-surface">{invoice.issuerName}</div>
+                  <div className="text-xs text-on-surface-variant"><PrivateValue>{invoice.issuerCNPJ}</PrivateValue></div>
+                </div>
 
-                  <div className="flex justify-between items-end border-t border-outline-variant/30 pt-3 mt-1">
-                    <div className="flex flex-col gap-1 w-2/3">
-                       <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider mb-1">Veículo Vinculado</span>
-                       {invoice.linkedVehicle ? (
-                         <div className="flex flex-wrap gap-1">
-                           {invoice.linkedVehicle.split(/[\s,;/]+/).filter(Boolean).map((plate, pIdx) => (
-                             <button 
-                               key={`${plate}-${pIdx}`}
-                               onClick={(e) => {
-                                 e.preventDefault();
-                                 e.stopPropagation();
-                                 const matchingVehicle = vehicles.find(v => 
-                                   v.plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
-                                 );
-                                 if (matchingVehicle) {
-                                   setDetailsModalVehicle(matchingVehicle);
-                                 } else {
-                                   navigate(`/fleet?search=${plate}`);
-                                 }
-                               }}
-                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-[11px] font-bold font-mono group/plate"
-                               title={`Ver veículo ${plate} na Frota`}
-                             >
-                               <span className="material-symbols-outlined text-[14px]">directions_car</span>
-                               <PrivateValue>{plate}</PrivateValue>
-                             </button>
-                           ))}
-                         </div>
-                       ) : (
-                         <span 
-                           onClick={() => openPreviewModal(invoice)}
-                           className="text-xs text-on-surface-variant italic cursor-pointer hover:text-primary transition-colors hover:underline inline-block bg-surface-container px-2 py-1 rounded"
-                         >
-                           Vincular veículo...
-                         </span>
-                       )}
+                <div className="flex justify-between items-end">
+                  <div>
+                    <div className="text-xs text-on-surface-variant font-medium uppercase tracking-wider mb-1">Valor</div>
+                    <div className="text-lg font-bold text-on-surface text-primary">
+                      <PrivateValue>{invoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</PrivateValue>
                     </div>
-                    <div className="flex flex-col items-end w-1/3">
-                      <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Valor Total</span>
-                      <span className="text-sm font-black text-on-surface">
-                         <PrivateValue>{invoice.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</PrivateValue>
+                  </div>
+                  <div className="text-right flex flex-col items-end">
+                    <div className="text-xs text-on-surface-variant font-medium uppercase tracking-wider mb-1">Vínculo</div>
+                    {invoice.linkedVehicle ? (
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {invoice.linkedVehicle.split(/[\s,;/]+/).filter(Boolean).map((plate, pIdx) => (
+                          <button 
+                            key={`${plate}-${pIdx}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const matchingVehicle = vehicles.find(v => 
+                                v.plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+                              );
+                              if (matchingVehicle) {
+                                setDetailsModalVehicle(matchingVehicle);
+                              } else {
+                                navigate(`/fleet?search=${plate}`);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-[10px] font-bold font-mono group/plate"
+                          >
+                            <span className="material-symbols-outlined text-[12px]">directions_car</span>
+                            <PrivateValue>{plate}</PrivateValue>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span 
+                        onClick={() => openPreviewModal(invoice)}
+                        className="text-xs text-on-surface-variant italic cursor-pointer hover:text-primary transition-colors hover:underline"
+                      >
+                        Vincular...
                       </span>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="border-t border-outline-variant/50 mt-4 pt-3 grid grid-cols-4 gap-2 items-center">
-                  {activeTab === 'invoices' && (
-                    <button 
-                     onClick={(e) => {
-                       e.preventDefault();
-                       e.stopPropagation();
-                       handleCopyToDraft(invoice);
-                     }}
-                     className="col-span-1 p-2 gap-1 flex flex-col justify-center items-center text-on-surface-variant hover:text-secondary hover:bg-secondary/10 rounded-lg transition-colors border border-outline-variant bg-surface" 
-                    >
-                      <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                      <span className="text-[9px] font-bold text-center uppercase tracking-wider">Duplicar</span>
-                    </button>
-                  )}
-                  <button 
-                   onClick={(e) => {
-                     e.preventDefault();
-                     e.stopPropagation();
-                     openPreviewModal(invoice);
-                   }}
-                   className={`p-2 gap-1 flex flex-col justify-center items-center text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors border border-outline-variant bg-surface ${activeTab === 'invoices' ? 'col-span-1' : 'col-span-1'}`}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-                    <span className="text-[9px] font-bold text-center uppercase tracking-wider">PDF</span>
-                  </button>
-                  <button 
-                   onClick={(e) => {
-                     e.preventDefault();
-                     e.stopPropagation();
-                     const xml = invoice.xmlContent || `<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFeId="NFe${invoice.key}"><ide><nNF>${invoice.number}</nNF></ide></infNFe></NFe></nfeProc>`;
-                     const blob = new Blob([xml], { type: 'text/xml' });
-                     const url = URL.createObjectURL(blob);
-                     const a = document.createElement('a');
-                     a.href = url;
-                     a.download = `NFe_${invoice.number}.xml`;
-                     a.click();
-                   }}
-                   className={`p-2 gap-1 flex flex-col justify-center items-center text-on-surface-variant hover:text-tertiary hover:bg-tertiary/10 rounded-lg transition-colors border border-outline-variant bg-surface ${activeTab === 'invoices' ? 'col-span-1' : 'col-span-1 border-l ml-3 pl-3'}`}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">code</span>
-                    <span className="text-[9px] font-bold text-center uppercase tracking-wider">XML</span>
-                  </button>
-                  <button 
-                   onClick={(e) => {
-                     e.preventDefault();
-                     e.stopPropagation();
-                     setConfirmDeleteId(invoice.id);
-                   }}
-                   className={`p-2 gap-1 flex flex-col justify-center items-center text-error hover:bg-error/10 rounded-lg transition-colors border border-error/30 bg-surface ${activeTab === 'invoices' ? 'col-span-1' : 'col-span-2'}`}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                    <span className="text-[9px] font-bold text-center uppercase tracking-wider">Excluir</span>
-                  </button>
+                <div className="flex border-t border-outline-variant/30 pt-3 mt-1 justify-between">
+                     <div className="flex gap-2">
+                       {activeTab === 'invoices' && (
+                         <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleCopyToDraft(invoice);
+                          }}
+                          className="p-2 bg-secondary/10 text-secondary hover:bg-secondary/20 rounded-lg transition-colors flex items-center justify-center flex-1" 
+                          title="Copiar para Rascunho"
+                         >
+                           <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                         </button>
+                       )}
+                       <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openPreviewModal(invoice);
+                        }}
+                        className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center justify-center flex-1" 
+                        title="Visualizar PDF"
+                       >
+                         <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                       </button>
+                       <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const xml = invoice.xmlContent || `<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFeId="NFe${invoice.key}"><ide><nNF>${invoice.number}</nNF></ide></infNFe></NFe></nfeProc>`;
+                          const blob = new Blob([xml], { type: 'text/xml' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `NFe_${invoice.number}.xml`;
+                          a.click();
+                        }}
+                        className="p-2 bg-tertiary/10 text-tertiary hover:bg-tertiary/20 rounded-lg transition-colors flex items-center justify-center flex-1" 
+                        title="Download XML"
+                       >
+                         <span className="material-symbols-outlined text-[18px]">code</span>
+                       </button>
+                     </div>
+                     <button 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setConfirmDeleteId(invoice.id);
+                      }}
+                      className="p-2 bg-error/10 text-error hover:bg-error/20 rounded-lg transition-colors flex items-center justify-center" 
+                      title="Excluir Nota"
+                     >
+                       <span className="material-symbols-outlined text-[18px]">delete</span>
+                     </button>
                 </div>
               </div>
             ))}
+            
             {filteredInvoices.length === 0 && (
-              <div className="p-8 text-center text-on-surface-variant bg-surface-container-low rounded-2xl border border-outline-variant border-dashed">
-                <span className="material-symbols-outlined text-[48px] mb-3 opacity-20">receipt_long</span>
-                <p className="font-medium text-sm">Nenhuma nota fiscal encontrada.</p>
-              </div>
+               <div className="p-8 text-center bg-surface-container border border-outline-variant/30 rounded-xl">
+                 <span className="material-symbols-outlined text-[48px] mb-3 text-on-surface-variant opacity-30">receipt_long</span>
+                 <p className="text-on-surface-variant font-medium">Nenhuma nota fiscal encontrada.</p>
+               </div>
             )}
           </div>
 
@@ -2148,45 +2145,45 @@ export function Invoices() {
     </div>
 
       {previewInvoice && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 lg:py-8 lg:pr-8 lg:pl-[312px]" onClick={handleCloseModal}>
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 lg:py-8 lg:pr-8 lg:pl-[312px]" onClick={handleCloseModal}>
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-surface border border-outline-variant rounded-2xl shadow-2xl flex flex-col w-full max-w-7xl h-full max-h-[95vh] overflow-hidden"
+            className="bg-surface border border-outline-variant rounded-2xl shadow-2xl flex flex-col w-full max-w-7xl h-full max-h-[96vh] md:max-h-[95vh] overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-4 border-b border-outline-variant bg-white dark:bg-surface-container flex justify-between items-center">
+            <div className="p-4 border-b border-outline-variant bg-white dark:bg-surface-container flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center shrink-0">
                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                      <span className="material-symbols-outlined text-primary dark:text-blue-400">picture_as_pdf</span>
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-on-surface">Visualização de DANFE / Edição</h2>
-                    <p className="text-xs text-on-surface-variant font-medium uppercase tracking-tighter italic">NF {previewInvoice.number} • {previewInvoice.issuerName}</p>
+                    <h2 className="text-base md:text-lg font-bold text-on-surface leading-tight">Visualização de DANFE / Edição</h2>
+                    <p className="text-[11px] md:text-xs text-on-surface-variant font-medium uppercase tracking-tighter italic">NF {previewInvoice.number} • {previewInvoice.issuerName}</p>
                   </div>
                </div>
-               <div className="flex items-center gap-3">
+               <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                   <button 
                    onClick={handleExportSingle}
                    disabled={isExporting}
-                   className="px-6 py-2 bg-primary text-white text-sm font-bold rounded-full hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                   className="px-4 md:px-6 py-2 bg-primary text-white text-xs md:text-sm font-bold rounded-full hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2 text-nowrap"
                   >
-                    <span className={`material-symbols-outlined text-[18px] ${isExporting ? 'animate-spin' : ''}`}>
+                    <span className={`material-symbols-outlined text-[16px] md:text-[18px] ${isExporting ? 'animate-spin' : ''}`}>
                       {isExporting ? 'progress_activity' : 'save'}
                     </span>
-                    {isExporting ? 'Salvando...' : 'Salvar com Edições / Exportar PDF'}
+                    {isExporting ? 'Salvando...' : 'Exportar PDF'}
                   </button>
-                  <button onClick={handleCloseModal} className="w-8 h-8 rounded-full bg-surface-container-low dark:bg-surface-container-high hover:bg-surface-container-high dark:hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors">
+                  <button onClick={handleCloseModal} className="w-8 h-8 rounded-full bg-surface-container-low dark:bg-surface-container-high hover:bg-surface-container-high dark:hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors shrink-0">
                     <span className="material-symbols-outlined text-[18px]">close</span>
                   </button>
                </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
                {/* Left sidebar: Editor */}
-               <div className="w-[300px] border-r border-outline-variant bg-white dark:bg-surface-container p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+               <div className="w-full lg:w-[300px] border-b lg:border-b-0 lg:border-r border-outline-variant bg-white dark:bg-surface-container p-4 lg:p-6 flex flex-col gap-4 lg:gap-6 shrink-0 h-[30vh] lg:h-auto overflow-y-auto custom-scrollbar">
                   <div>
                     <h3 className="text-sm font-bold text-on-surface mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[18px] text-primary dark:text-blue-400">edit_note</span> Anotações</h3>
                     <p className="text-[10px] text-on-surface-variant mb-4 font-bold uppercase tracking-wider mb-3 italic">Estes comentários serão anexados ao final do PDF exportado.</p>
@@ -2290,13 +2287,13 @@ export function Invoices() {
                  onMouseMove={handlePanMouseMove}
                  onMouseUp={handlePanMouseUp}
                  onMouseLeave={handlePanMouseUp}
-                 className={`flex-1 bg-surface-container dark:bg-black/20 overflow-auto p-4 md:p-8 flex items-start justify-center custom-scrollbar whitespace-nowrap select-none ${isPanDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                 className={`flex-1 bg-surface-container dark:bg-black/20 overflow-auto p-4 md:p-8 flex items-start justify-center custom-scrollbar scroll-smooth whitespace-nowrap select-none ${isPanDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                >
                   <div className="transition-transform duration-200 ease-out origin-top" style={{ transform: `scale(${zoom})` }}>
                     <div 
                       ref={invoicePreviewRef} 
                       id="invoice-preview-capture"
-                      className={`bg-white shadow-2xl p-8 md:p-12 border border-outline-variant pointer-events-auto ${isPanDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                      className="bg-white shadow-2xl p-8 md:p-12 border border-outline-variant pointer-events-auto"
                       style={{ minHeight: '1122px', width: '794px', backgroundColor: '#ffffff' }}
                     >
                     {/* DANFE HTML Representation - Forced Dark Text for Mockup */}

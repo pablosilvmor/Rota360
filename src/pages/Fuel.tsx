@@ -1423,8 +1423,9 @@ export function Fuel() {
             Ver Relatório Completo
           </button>
         </div>
-        <div className="overflow-x-auto min-h-[450px] scrollbar-thin w-full">
-          <table className="w-full text-left border-collapse min-w-[1000px] hidden md:table">
+        <div className="overflow-x-auto overflow-y-auto md:overflow-auto min-h-[450px] scrollbar-thin w-full">
+          <div className="hidden md:block">
+            <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
                 {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'fuelType', 'liters', 'totalValue'].includes(opt.id) && opt.label !== 'Combustível').map(opt => (
@@ -1543,72 +1544,76 @@ export function Fuel() {
               )}
             </tbody>
           </table>
+          </div>
 
-          <div className="flex flex-col gap-4 p-4 md:hidden">
+          {/* Cards responsivos para Mobile no Histórico de Abastecimento */}
+          <div className="md:hidden flex flex-col p-4 gap-4 bg-surface-container-low">
             {sortedRecords.map((item) => (
               <div 
                 key={item.id} 
+                className="bg-surface-container rounded-xl p-4 flex flex-col gap-3 border border-outline-variant/30 shadow-sm relative active:scale-[0.98] transition-transform"
                 onClick={() => setSelectedRecord(item)}
-                className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant shadow-sm relative flex flex-col gap-3 cursor-pointer"
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Data do Abastec.</span>
-                    <span className="text-sm font-black text-on-surface">{item.date?.toDate ? item.date.toDate().toLocaleDateString('pt-BR') : '-'}</span>
+                <div className="flex justify-between items-start border-b border-outline-variant/30 pb-3">
+                  <div className="flex gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <span className="material-symbols-outlined">local_gas_station</span>
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-on-surface leading-none mb-1">{item.date?.toDate ? item.date.toDate().toLocaleDateString('pt-BR') : '-'}</div>
+                      <div className="text-xs text-on-surface-variant font-medium truncate max-w-[160px]">{item.station || '-'}</div>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end">
-                     <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider mb-1">Placa</span>
-                     <div className="inline-flex items-center gap-1 xl:px-1.5 px-2 py-1 rounded bg-primary/10 text-primary transition-colors text-[11px] font-bold font-mono">
-                       <span className="material-symbols-outlined text-[14px]">directions_car</span>
-                       <PrivateValue>{item.vehiclePlate}</PrivateValue>
-                     </div>
+                  <div className="text-right">
+                    <div className="text-base font-black text-primary">
+                      <PrivateValue>R$ {item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue>
+                    </div>
+                    <div className="text-[10px] font-bold text-on-surface-variant uppercase mt-1">
+                      {item.liters} L • {item.fuelType || '-'}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col border-t border-outline-variant/30 pt-3">
-                  <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Obra/Centro de Custo</span>
-                  <span className="text-sm font-bold text-on-surface bg-surface-container w-max px-2 py-0.5 rounded text-[11px] uppercase tracking-wider">{item.workName || '-'}</span>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-0.5">Veículo</div>
+                    <div className="text-sm font-bold text-on-surface">{item.vehicleModel || '-'}</div>
+                    <div className="text-xs font-mono font-bold text-primary bg-primary/10 inline-block px-1.5 py-0.5 rounded mt-1">
+                      <PrivateValue>{item.vehiclePlate}</PrivateValue>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-0.5">Obra/CC</div>
+                    <div className="text-xs text-on-surface font-medium border-l-2 border-primary/30 pl-2">
+                      {(() => {
+                        const v = vehicles.find(v => v.plate === item.vehiclePlate);
+                        const cc = (Array.isArray(v?.costCenter) ? v.costCenter.join(', ') : v?.costCenter) || v?.workName || item.workName || 'Não informada';
+                        return String(cc).replace(/logística\s*-\s*região\s*sul/gi, "").replace(/,\s*,/g, ",").replace(/^[\s,]+|[\s,]+$/g, "").trim() || 'Não informada';
+                      })()}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col border-t border-outline-variant/30 pt-3">
-                  <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Posto/Fornecedor</span>
-                  <span className="text-sm font-medium text-on-surface">{item.station || '-'}</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 border-t border-outline-variant/30 pt-3">
-                   <div className="flex justify-between items-end bg-surface-container p-2 rounded relative overflow-hidden">
-                     <div className="flex flex-col relative z-10 w-full">
-                       <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Combustível / Litros</span>
-                       <div className="flex justify-between mt-1 items-end w-full">
-                         <span className="font-black text-lg leading-none">{item.liters}L</span>
-                         <span className="text-xs font-bold text-on-surface-variant uppercase bg-black/5 dark:bg-white/10 px-1.5 py-[2px] rounded">{item.fuelType || '-'}</span>
-                       </div>
-                     </div>
-                   </div>
-                   <div className="flex flex-col text-right justify-center px-2">
-                     <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-wider">Valor Total</span>
-                     <span className="text-xl font-black text-primary">
-                        <PrivateValue>R$ {item.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</PrivateValue>
-                     </span>
-                   </div>
-                </div>
-
-                <div className="border-t border-outline-variant/50 mt-1 pt-3 flex justify-end">
-                   <button 
-                     onClick={(e) => { e.stopPropagation(); handleDeleteRecord(item.id); }}
-                     className="p-2 flex gap-2 items-center text-error hover:bg-error/10 rounded-lg transition-colors border border-error/30"
-                     title="Excluir abastecimento"
-                   >
-                     <span className="material-symbols-outlined text-[16px]">delete</span>
-                     <span className="text-xs font-bold uppercase tracking-wider">Excluir</span>
-                   </button>
+                <div className="flex justify-between items-center border-t border-outline-variant/30 pt-3 mt-1">
+                  <div className="text-xs font-mono text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">receipt</span>
+                    {item.transactionId || '-'}
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDeleteRecord(item.id); }}
+                    className="w-8 h-8 rounded-full bg-error/10 text-error flex items-center justify-center flex-shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                  </button>
                 </div>
               </div>
             ))}
+            
             {sortedRecords.length === 0 && (
-              <div className="p-8 text-center text-on-surface-variant bg-surface-container-low rounded-2xl border border-outline-variant border-dashed">
-                <p className="font-medium text-sm">Nenhum registro de abastecimento encontrado.</p>
-              </div>
+               <div className="p-8 text-center bg-surface-container border border-outline-variant/30 rounded-xl">
+                 <span className="material-symbols-outlined text-[48px] mb-3 text-on-surface-variant opacity-30">local_gas_station</span>
+                 <p className="text-on-surface-variant font-medium">Nenhum registro de abastecimento encontrado.</p>
+               </div>
             )}
           </div>
         </div>
@@ -1621,36 +1626,36 @@ export function Fuel() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 lg:pl-[280px]"
+            className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/60 backdrop-blur-md p-2 sm:p-4 lg:pl-[280px]"
             onClick={() => setShowReportPreview(false)}
           >
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white dark:bg-surface-container-low rounded-[32px] w-full max-w-[95vw] h-[98vh] shadow-2xl flex flex-col overflow-hidden border dark:border-white/10"
+              className="bg-white dark:bg-surface-container-low rounded-2xl md:rounded-[32px] w-full max-w-[98vw] lg:max-w-[95vw] h-[96vh] md:h-[98vh] shadow-2xl flex flex-col overflow-hidden border dark:border-white/10"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-outline-variant dark:border-white/10 flex justify-between items-center bg-surface-container-low dark:bg-surface-container">
+              <div className="p-4 md:p-6 border-b border-outline-variant dark:border-white/10 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-surface-container-low dark:bg-surface-container shrink-0">
                 <div>
-                  <h3 className="text-xl font-bold text-primary dark:text-blue-400 flex items-center gap-2">
+                  <h3 className="text-lg md:text-xl font-bold text-primary dark:text-blue-400 flex items-center gap-2">
                     <span className="material-symbols-outlined">description</span>
                     Relatório Customizado
                   </h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${selectedColumns.length > 5 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className={`text-[9px] md:text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${selectedColumns.length > 5 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
                       Formato {selectedColumns.length > 5 ? 'Paisagem' : 'Retrato'}
                     </span>
-                    <span className="text-xs text-on-surface-variant font-medium dark:text-on-surface/60">• Escolha as colunas abaixo</span>
+                    <span className="text-[11px] md:text-xs text-on-surface-variant font-medium dark:text-on-surface/60">• Colunas ativas</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                   <button 
                     onClick={exportPDF}
-                    className="h-11 px-6 bg-primary text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                    className="h-10 md:h-11 px-4 md:px-6 bg-primary text-white rounded-xl text-xs md:text-sm font-black flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all text-nowrap"
                   >
-                    <span className="material-symbols-outlined text-[20px]">verified</span>
-                    Exportar com Assinatura
+                    <span className="material-symbols-outlined text-[18px] md:text-[20px]">verified</span>
+                    Exportar PDF
                   </button>
                   <button 
                     onClick={() => setShowReportPreview(false)}
@@ -1662,18 +1667,18 @@ export function Fuel() {
               </div>
 
               {/* Column Selector */}
-              <div className="p-4 bg-white dark:bg-surface-container-highest border-b border-outline-variant dark:border-white/10 flex flex-wrap gap-2 justify-center">
+              <div className="p-3 md:p-4 bg-white dark:bg-surface-container-highest border-b border-outline-variant dark:border-white/10 flex flex-wrap gap-2 justify-center shrink-0 overflow-y-auto max-h-[15vh] lg:max-h-none custom-scrollbar">
                 {columnOptions.map(opt => (
                   <button
                     key={opt.id}
                     onClick={() => handleToggleColumn(opt.id)}
-                    className={`h-9 px-4 rounded-full text-xs font-bold transition-all border flex items-center gap-2 ${
+                    className={`h-8 md:h-9 px-3 md:px-4 rounded-full text-[10px] md:text-xs font-bold transition-all border flex items-center gap-1.5 md:gap-2 ${
                       selectedColumns.includes(opt.id) 
-                        ? 'bg-primary text-white border-primary shadow-md' 
-                        : 'bg-white dark:bg-surface-container border-outline-variant dark:border-white/10 text-on-surface-variant hover:bg-surface-container hover:text-on-surface dark:hover:bg-surface-variant transition-all'
+                        ? 'bg-primary text-white border-primary shadow-sm' 
+                        : 'bg-white dark:bg-surface-container border-outline-variant dark:border-white/10 text-on-surface-variant hover:bg-surface-container hover:text-on-surface dark:hover:bg-surface-variant'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[16px]">
+                    <span className="material-symbols-outlined text-[14px] md:text-[16px]">
                       {selectedColumns.includes(opt.id) ? 'check_circle' : 'circle'}
                     </span>
                     {opt.label}
@@ -1681,9 +1686,9 @@ export function Fuel() {
                 ))}
               </div>
 
-              <div className="flex flex-1 overflow-hidden">
+              <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
                 {/* Profiles Sidebar */}
-                <div className="w-[300px] bg-white dark:bg-surface-container border-r border-outline-variant flex flex-col p-6 overflow-y-auto custom-scrollbar">
+                <div className="w-full lg:w-[300px] bg-white dark:bg-surface-container border-b lg:border-b-0 lg:border-r border-outline-variant flex flex-col p-4 md:p-6 shrink-0 h-[22vh] lg:h-auto overflow-y-auto custom-scrollbar">
                   <div className="flex items-center justify-between mb-6">
                     <h4 className="text-lg font-bold text-on-surface flex items-center gap-2">
                        <span className="material-symbols-outlined text-primary dark:text-blue-400">bookmark</span>
@@ -1755,8 +1760,8 @@ export function Fuel() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-auto p-8 bg-slate-100 dark:bg-slate-950/40 scrollbar-thin scrollbar-thumb-primary/20">
-                  <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-12 min-h-full border border-slate-200 text-slate-950 ${selectedColumns.length > 5 ? 'w-fit min-w-[1000px]' : 'max-w-[800px]'}`}>
+                <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-100 dark:bg-slate-950/40 scrollbar-thin scrollbar-thumb-primary/20">
+                  <div className={`bg-white shadow-2xl transition-all duration-500 mx-auto p-6 md:p-12 min-h-full border border-slate-200 text-slate-950 ${selectedColumns.length > 5 ? 'w-fit min-w-[1000px]' : 'w-full max-w-[800px]'}`}>
                   {/* PDF header mockup - Forced Light Theme for Mockup */}
                   <div className="flex justify-between items-start border-b-4 border-slate-100 pb-8 mb-8">
                     <div className="flex flex-col items-start gap-1 text-slate-950">

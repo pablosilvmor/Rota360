@@ -611,175 +611,349 @@ export function Drivers() {
           )}
         </div>
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse min-w-[800px]">
-            <thead>
-              <tr className="bg-surface-container-low text-on-surface-variant text-sm font-semibold">
-                <SortButton column="name" label="Perfil do Motorista" />
-                <SortButton column="vehicleAssigned" label="Placa do Veículo" />
-                <SortButton column="cnhCategory" label="Status da CNH" />
-                <SortButton column="rating" label="Desempenho" />
-                <SortButton column="status" label="Status" />
-                <th className="px-6 py-4 uppercase tracking-wider text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/30">
-              {sortedDrivers.map(driver => (
-                <tr key={driver.id} className="hover:bg-surface-container transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {driver.imageUrl ? (
-                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-outline-variant/30">
-                          <img 
-                            src={driver.imageUrl} 
-                            alt={driver.name} 
-                            className={`w-full h-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
-                            referrerPolicy="no-referrer"
-                          />
+          <div className="hidden lg:block">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-surface-container-low text-on-surface-variant text-sm font-semibold">
+                  <SortButton column="name" label="Perfil do Motorista" />
+                  <SortButton column="vehicleAssigned" label="Placa do Veículo" />
+                  <SortButton column="cnhCategory" label="Status da CNH" />
+                  <SortButton column="rating" label="Desempenho" />
+                  <SortButton column="status" label="Status" />
+                  <th className="px-6 py-4 uppercase tracking-wider text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/30">
+                {sortedDrivers.map(driver => (
+                  <tr key={driver.id} className="hover:bg-surface-container transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {driver.imageUrl ? (
+                          <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-outline-variant/30">
+                            <img 
+                              src={driver.imageUrl} 
+                              alt={driver.name} 
+                              className={`w-full h-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-secondary-container border border-outline-variant flex items-center justify-center font-bold text-primary">
+                            {driver.name ? driver.name.charAt(0).toUpperCase() : '?'}
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-base text-on-surface font-semibold"><PrivateValue value={driver.name || 'Sem Nome'} /></p>
+                          <p className="text-[12px] text-on-surface-variant flex gap-2"><span>CPF: <PrivateValue value={driver.cpf || '---'} /></span> {driver.phone && <span>• Tel: <PrivateValue value={driver.phone} /></span>}</p>
                         </div>
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-secondary-container border border-outline-variant flex items-center justify-center font-bold text-primary">
-                          {driver.name ? driver.name.charAt(0).toUpperCase() : '?'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-mono bg-on-primary-fixed-variant/5 px-2 py-1 rounded text-on-surface border border-outline-variant/50">
+                        <PrivateValue value={Array.isArray(driver.vehicleAssigned) 
+                          ? (driver.vehicleAssigned.length > 0 ? driver.vehicleAssigned.join(', ') : 'Não Atribuído') 
+                          : (driver.vehicleAssigned || 'Não Atribuído')} />
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>
+                        <span className="text-base">Cat. {driver.cnhCategory}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-surface-container-high rounded-full overflow-hidden">
+                          <div className="h-full bg-primary" style={{ width: `${(driver.rating / 5) * 100}%` }}></div>
                         </div>
-                      )}
-                      <div>
-                        <p className="text-base text-on-surface font-semibold"><PrivateValue value={driver.name || 'Sem Nome'} /></p>
-                        <p className="text-[12px] text-on-surface-variant flex gap-2"><span>CPF: <PrivateValue value={driver.cpf || '---'} /></span> {driver.phone && <span>• Tel: <PrivateValue value={driver.phone} /></span>}</p>
+                        <span className="font-bold text-sm">{driver.rating}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[12px] font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                        {driver.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        {!driver.vehicleAssigned && (
+                           <button 
+                           onClick={() => {
+                             setAssignment({...assignment, driverId: driver.id});
+                             setSearchParams({ assign: 'true' });
+                           }}
+                           className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
+                           title="Atribuir Veículo"
+                         >
+                           <span className="material-symbols-outlined text-[20px]">link</span>
+                         </button>
+                        )}
+                        {driver.vehicleAssigned && (Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned.length > 0 : true) && (
+                          <button 
+                           onClick={() => {
+                             setAssignment({
+                               driverId: driver.id, 
+                               vehiclePlates: Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned : [driver.vehicleAssigned], 
+                               workId: driver.workId || '', 
+                               workName: driver.workName || ''
+                             });
+                             setSearchParams({ assign: 'true' });
+                           }}
+                           className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
+                           title="Editar Atribuição"
+                         >
+                           <span className="material-symbols-outlined text-[20px]">edit_document</span>
+                         </button>
+                        )}
+                        {driver.vehicleAssigned && (Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned.length > 0 : true) && (
+                          <button 
+                            onClick={async () => {
+                              if(window.confirm('Deseja desvincular o(s) veículo(s) do motorista?')) {
+                                try {
+                                  await updateDoc(doc(db, 'drivers', driver.id), { 
+                                    vehicleAssigned: [],
+                                    status: 'Disponível',
+                                    updatedAt: Date.now()
+                                  });
+                                } catch(e) {
+                                  handleFirestoreError(e, OperationType.UPDATE, 'drivers');
+                                }
+                              }
+                            }}
+                            className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
+                            title="Desvincular Veículo"
+                          >
+                            <span className="material-symbols-outlined text-[20px]">link_off</span>
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => setNewOccurrence({...newOccurrence, driverId: driver.id})}
+                          className="text-warning-dark hover:text-warning-dark/80 transition-colors p-1.5 hover:bg-warning/10 rounded-lg"
+                          title="Registrar Ocorrência"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">report</span>
+                        </button>
+                        <button 
+                          onClick={() => setSearchParams({ editId: driver.id })}
+                          className="text-on-surface-variant hover:text-primary transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
+                          title="Editar Motorista"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">edit</span>
+                        </button>
+                        <button 
+                          onClick={async () => await auditDelete('drivers', driver.id, 'Geral')} 
+                          className="text-error hover:text-error/80 transition-colors p-1.5 hover:bg-error/10 rounded-lg"
+                          title="Excluir Motorista"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">delete</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {drivers.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center pointer-events-none">
+                      <div className="flex flex-col items-center opacity-40">
+                        <span className="material-symbols-outlined text-[64px] mb-2">person_off</span>
+                        <p className="text-lg font-medium">Nenhum motorista cadastrado</p>
+                        <p className="text-sm">Os dados sincronizados aparecerão aqui.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {drivers.length > 0 && sortedDrivers.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant">
+                      <div className="flex flex-col items-center">
+                        <span className="material-symbols-outlined text-[48px] text-on-surface-variant/30 mb-2">filter_alt_off</span>
+                        <p className="font-medium">Nenhum resultado para os filtros atuais.</p>
+                        <button 
+                          onClick={clearFilters}
+                          className="mt-4 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold hover:opacity-90 transition-all shadow-sm"
+                        >
+                          LIMPAR TODOS OS FILTROS
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Cards responsivos para Mobile no Gestão de Motoristas */}
+          <div className="lg:hidden flex flex-col p-4 gap-4 bg-surface-container-low/40">
+            {sortedDrivers.map(driver => (
+              <div 
+                key={driver.id} 
+                className="bg-surface-container border border-outline-variant/30 rounded-xl p-4 shadow-sm flex flex-col gap-3 relative group"
+              >
+                <div className="flex justify-between items-start border-b border-outline-variant/25 pb-3">
+                  <div className="flex gap-3">
+                    {driver.imageUrl ? (
+                      <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-outline-variant/30">
+                        <img 
+                          src={driver.imageUrl} 
+                          alt={driver.name} 
+                          className={`w-full h-full object-cover transition-all duration-300 ${isPrivacyMode ? 'blur-[8px]' : ''}`} 
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-secondary-container border border-outline-variant flex items-center justify-center font-bold text-primary">
+                        {driver.name ? driver.name.charAt(0).toUpperCase() : '?'}
+                      </div>
+                    )}
+                    <div>
+                      <div className="font-bold text-base text-on-surface leading-tight">
+                        <PrivateValue value={driver.name || 'Sem Nome'} />
+                      </div>
+                      <div className="text-[11px] text-on-surface-variant mt-1 flex flex-wrap gap-2">
+                        <span>CPF: <PrivateValue value={driver.cpf || '---'} /></span>
+                        {driver.phone && <span>• Tel: <PrivateValue value={driver.phone} /></span>}
                       </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-mono bg-on-primary-fixed-variant/5 px-2 py-1 rounded text-on-surface border border-outline-variant/50">
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    driver.status === 'Em Rota' ? 'bg-emerald-100 text-emerald-700' :
+                    driver.status === 'Em Intervalo' ? 'bg-amber-100 text-amber-700' :
+                    'bg-slate-100 text-slate-700'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      driver.status === 'Em Rota' ? 'bg-emerald-600' :
+                      driver.status === 'Em Intervalo' ? 'bg-amber-600' :
+                      'bg-slate-600'
+                    }`}></span>
+                    {driver.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Veículo Atribuído</div>
+                    <span className="font-mono bg-on-primary-fixed-variant/5 px-2.5 py-1 rounded-lg text-xs font-bold text-primary border border-outline-variant/30 inline-block">
                       <PrivateValue value={Array.isArray(driver.vehicleAssigned) 
                         ? (driver.vehicleAssigned.length > 0 ? driver.vehicleAssigned.join(', ') : 'Não Atribuído') 
                         : (driver.vehicleAssigned || 'Não Atribuído')} />
                     </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>
-                      <span className="text-base">Cat. {driver.cnhCategory}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-surface-container-high rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: `${(driver.rating / 5) * 100}%` }}></div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">CNH & Avaliação</div>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="material-symbols-outlined text-emerald-500 text-[14px]">check_circle</span>
+                        <span className="font-medium">Cat. {driver.cnhCategory}</span>
                       </div>
-                      <span className="font-bold text-sm">{driver.rating}</span>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="material-symbols-outlined text-amber-500 text-[14px]" style={{fontVariationSettings: "'FILL' 1"}}>star</span>
+                        <span className="font-bold">{driver.rating} / 5</span>
+                      </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[12px] font-bold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                      {driver.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      {!driver.vehicleAssigned && (
-                         <button 
-                         onClick={() => {
-                           setAssignment({...assignment, driverId: driver.id});
-                           setSearchParams({ assign: 'true' });
-                         }}
-                         className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
-                         title="Atribuir Veículo"
-                       >
-                         <span className="material-symbols-outlined text-[20px]">link</span>
-                       </button>
-                      )}
-                      {driver.vehicleAssigned && (Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned.length > 0 : true) && (
-                        <button 
-                         onClick={() => {
-                           setAssignment({
-                             driverId: driver.id, 
-                             vehiclePlates: Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned : [driver.vehicleAssigned], 
-                             workId: driver.workId || '', 
-                             workName: driver.workName || ''
-                           });
-                           setSearchParams({ assign: 'true' });
-                         }}
-                         className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
-                         title="Editar Atribuição"
-                       >
-                         <span className="material-symbols-outlined text-[20px]">edit_document</span>
-                       </button>
-                      )}
-                      {driver.vehicleAssigned && (Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned.length > 0 : true) && (
-                        <button 
-                          onClick={async () => {
-                            if(window.confirm('Deseja desvincular o(s) veículo(s) do motorista?')) {
-                              try {
-                                await updateDoc(doc(db, 'drivers', driver.id), { 
-                                  vehicleAssigned: [],
-                                  status: 'Disponível',
-                                  updatedAt: Date.now()
-                                });
-                              } catch(e) {
-                                handleFirestoreError(e, OperationType.UPDATE, 'drivers');
-                              }
+                  </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="flex border-t border-outline-variant/20 pt-3 mt-1 justify-between items-center">
+                  <div className="flex gap-2">
+                    {!driver.vehicleAssigned && (
+                      <button 
+                        onClick={() => {
+                          setAssignment({...assignment, driverId: driver.id});
+                          setSearchParams({ assign: 'true' });
+                        }}
+                        className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center justify-center shrink-0"
+                        title="Atribuir Veículo"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">link</span>
+                      </button>
+                    )}
+                    {driver.vehicleAssigned && (Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned.length > 0 : true) && (
+                      <button 
+                        onClick={() => {
+                          setAssignment({
+                            driverId: driver.id, 
+                            vehiclePlates: Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned : [driver.vehicleAssigned], 
+                            workId: driver.workId || '', 
+                            workName: driver.workName || ''
+                          });
+                          setSearchParams({ assign: 'true' });
+                        }}
+                        className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center justify-center shrink-0"
+                        title="Editar Atribuição"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">edit_document</span>
+                      </button>
+                    )}
+                    {driver.vehicleAssigned && (Array.isArray(driver.vehicleAssigned) ? driver.vehicleAssigned.length > 0 : true) && (
+                      <button 
+                        onClick={async () => {
+                          if(window.confirm('Deseja desvincular o(s) veículo(s) do motorista?')) {
+                            try {
+                              await updateDoc(doc(db, 'drivers', driver.id), { 
+                                vehicleAssigned: [],
+                                status: 'Disponível',
+                                updatedAt: Date.now()
+                              });
+                            } catch(e) {
+                              handleFirestoreError(e, OperationType.UPDATE, 'drivers');
                             }
-                          }}
-                          className="text-primary hover:text-primary/80 transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
-                          title="Desvincular Veículo"
-                        >
-                          <span className="material-symbols-outlined text-[20px]">link_off</span>
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => setNewOccurrence({...newOccurrence, driverId: driver.id})}
-                        className="text-warning-dark hover:text-warning-dark/80 transition-colors p-1.5 hover:bg-warning/10 rounded-lg"
-                        title="Registrar Ocorrência"
+                          }
+                        }}
+                        className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors flex items-center justify-center shrink-0"
+                        title="Desvincular Veículo"
                       >
-                        <span className="material-symbols-outlined text-[20px]">report</span>
+                        <span className="material-symbols-outlined text-[18px]">link_off</span>
                       </button>
-                      <button 
-                        onClick={() => setSearchParams({ editId: driver.id })}
-                        className="text-on-surface-variant hover:text-primary transition-colors p-1.5 hover:bg-primary/10 rounded-lg"
-                        title="Editar Motorista"
-                      >
-                        <span className="material-symbols-outlined text-[20px]">edit</span>
-                      </button>
-                      <button 
-                        onClick={async () => await auditDelete('drivers', driver.id, 'Geral')} 
-                        className="text-error hover:text-error/80 transition-colors p-1.5 hover:bg-error/10 rounded-lg"
-                        title="Excluir Motorista"
-                      >
-                        <span className="material-symbols-outlined text-[20px]">delete</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {drivers.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center pointer-events-none">
-                    <div className="flex flex-col items-center opacity-40">
-                      <span className="material-symbols-outlined text-[64px] mb-2">person_off</span>
-                      <p className="text-lg font-medium">Nenhum motorista cadastrado</p>
-                      <p className="text-sm">Os dados sincronizados aparecerão aqui.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {drivers.length > 0 && sortedDrivers.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant">
-                    <div className="flex flex-col items-center">
-                      <span className="material-symbols-outlined text-[48px] text-on-surface-variant/30 mb-2">filter_alt_off</span>
-                      <p className="font-medium">Nenhum resultado para os filtros atuais.</p>
-                      <button 
-                        onClick={clearFilters}
-                        className="mt-4 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold hover:opacity-90 transition-all shadow-sm"
-                      >
-                        LIMPAR TODOS OS FILTROS
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    )}
+                    <button 
+                      onClick={() => setNewOccurrence({...newOccurrence, driverId: driver.id})}
+                      className="p-2 bg-warning/10 text-warning-dark hover:bg-warning/20 rounded-lg transition-colors flex items-center justify-center shrink-0"
+                      title="Registrar Ocorrência"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">report</span>
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setSearchParams({ editId: driver.id })}
+                      className="p-2 bg-secondary/10 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors flex items-center justify-center shrink-0"
+                      title="Editar Motorista"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">edit</span>
+                    </button>
+                    <button 
+                      onClick={async () => await auditDelete('drivers', driver.id, 'Geral')} 
+                      className="p-2 bg-error/10 text-error hover:bg-error/20 rounded-lg transition-colors flex items-center justify-center shrink-0"
+                      title="Excluir Motorista"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {drivers.length === 0 && !loading && (
+              <div className="p-8 text-center bg-surface-container rounded-xl">
+                <span className="material-symbols-outlined text-[48px] mb-2 text-on-surface-variant opacity-30">person_off</span>
+                <p className="text-on-surface-variant font-medium">Nenhum motorista cadastrado</p>
+              </div>
+            )}
+            {drivers.length > 0 && sortedDrivers.length === 0 && !loading && (
+              <div className="p-8 text-center bg-surface-container rounded-xl flex flex-col items-center">
+                <span className="material-symbols-outlined text-[48px] text-on-surface-variant/30 mb-2">filter_alt_off</span>
+                <p className="font-medium text-on-surface-variant">Nenhum resultado para os filtros atuais.</p>
+                <button 
+                  onClick={clearFilters}
+                  className="mt-4 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold hover:opacity-90 transition-all shadow-sm"
+                >
+                  LIMPAR TODOS OS FILTROS
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </motion.div>

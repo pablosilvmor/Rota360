@@ -1,4 +1,5 @@
 import { ReactNode, useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, useNavigate, useLocation, Link } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { usePrivacy } from "../contexts/PrivacyContext";
@@ -479,7 +480,7 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-2 px-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        <nav className="flex-1 space-y-2 px-2">
           {allowedNavItems.map((item) => {
             const isActive =
               location.pathname === item.path ||
@@ -537,7 +538,7 @@ export function Layout({ children }: LayoutProps) {
                       animate={{ opacity: 1, x: 0, scale: 1 }}
                       exit={{ opacity: 0, x: -10, scale: 0.95 }}
                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                      className="absolute bottom-full mb-2 left-0 lg:left-full lg:bottom-0 lg:mb-0 lg:pl-2 w-full lg:w-56 z-[2000] lg:mt-0"
+                      className="hidden lg:block static mt-2 lg:absolute lg:left-full lg:bottom-0 lg:pl-2 w-full lg:w-56 z-[2000] lg:mt-0"
                     >
                       <div className="bg-white dark:bg-primary-container opacity-100 rounded-2xl p-2 shadow-2xl border border-outline-variant/30 dark:border-white/20 lg:shadow-2xl shadow-none">
                       {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
@@ -634,6 +635,145 @@ export function Layout({ children }: LayoutProps) {
                       )}
                     </div>
                   </motion.div>
+                  )}
+
+                  {isMoreMenuOpen && typeof window !== 'undefined' && createPortal(
+                    <div className="fixed inset-0 z-[2500] lg:hidden">
+                      {/* Backdrop */}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setIsMoreMenuOpen(false)}
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                      />
+                      {/* Bottom Sheet */}
+                      <motion.div
+                        initial={{ y: "100%" }}
+                        animate={{ y: 0 }}
+                        exit={{ y: "100%" }}
+                        transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                        className="absolute bottom-0 left-0 right-0 bg-surface-container-lowest dark:bg-surface-container-low rounded-t-[32px] border-t border-outline-variant/30 p-6 pb-12 shadow-[0_-12px_40px_rgba(0,0,0,0.15)] flex flex-col gap-6"
+                      >
+                        {/* Drag Handle */}
+                        <div className="w-12 h-1.5 bg-outline-variant/40 rounded-full mx-auto cursor-pointer" onClick={() => setIsMoreMenuOpen(false)} />
+                        
+                        <div className="flex justify-between items-center px-1">
+                          <h3 className="text-[11px] font-black tracking-widest uppercase text-on-surface-variant font-sans">
+                            Mais Opções
+                          </h3>
+                          <button
+                            onClick={() => setIsMoreMenuOpen(false)}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container/30 dark:bg-white/10 text-on-surface-variant"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">close</span>
+                          </button>
+                        </div>
+
+                        {/* Grid container with modern visual design */}
+                        <div className="grid grid-cols-3 gap-3">
+                          {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
+                            <Link
+                              to="/drivers"
+                              onClick={() => setIsMoreMenuOpen(false)}
+                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                            >
+                              <div className="w-11 h-11 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary">
+                                <span className="material-symbols-outlined text-[22px]">group</span>
+                              </div>
+                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                                Motoristas
+                              </span>
+                            </Link>
+                          )}
+                          {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
+                            <Link
+                              to="/maintenance"
+                              onClick={() => setIsMoreMenuOpen(false)}
+                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-secondary/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                            >
+                              <div className="w-11 h-11 rounded-full bg-secondary/10 dark:bg-secondary/20 flex items-center justify-center text-secondary">
+                                <span className="material-symbols-outlined text-[22px]">build</span>
+                              </div>
+                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                                Manutenção
+                              </span>
+                            </Link>
+                          )}
+                          {((userData?.allowedScreens || []).includes('/fuel') || userData?.role?.toLowerCase() === 'admin') && (
+                            <Link
+                              to="/fuel"
+                              onClick={() => setIsMoreMenuOpen(false)}
+                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-tertiary/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                            >
+                              <div className="w-11 h-11 rounded-full bg-tertiary/10 dark:bg-tertiary/20 flex items-center justify-center text-tertiary">
+                                <span className="material-symbols-outlined text-[22px]">local_gas_station</span>
+                              </div>
+                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                                Combustível
+                              </span>
+                            </Link>
+                          )}
+                          {((userData?.allowedScreens || []).includes('/tracking') || userData?.role?.toLowerCase() === 'admin') && (
+                            <Link
+                              to="/tracking"
+                              onClick={() => setIsMoreMenuOpen(false)}
+                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-primary/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                            >
+                              <div className="w-11 h-11 rounded-full bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center text-blue-500">
+                                <span className="material-symbols-outlined text-[22px]">map</span>
+                              </div>
+                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                                Rastreio
+                              </span>
+                            </Link>
+                          )}
+                          {((userData?.allowedScreens || []).includes('/reports') || userData?.role?.toLowerCase() === 'admin') && (
+                            <Link
+                              to="/reports"
+                              onClick={() => setIsMoreMenuOpen(false)}
+                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-success/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                            >
+                              <div className="w-11 h-11 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                                <span className="material-symbols-outlined text-[22px]">analytics</span>
+                              </div>
+                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                                Relatórios
+                              </span>
+                            </Link>
+                          )}
+                          {((userData?.allowedScreens || []).includes('/autoalerta-admin') || userData?.role?.toLowerCase() === 'admin') && (
+                            <Link
+                              to="/autoalerta-admin"
+                              onClick={() => setIsMoreMenuOpen(false)}
+                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-warning/5 dark:hover:bg-white/10 transition-colors text-center gap-2 group text-on-surface"
+                            >
+                              <div className="w-11 h-11 rounded-full bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center text-amber-500">
+                                <span className="material-symbols-outlined text-[22px]">admin_panel_settings</span>
+                              </div>
+                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                                G. Alerta
+                              </span>
+                            </Link>
+                          )}
+                          {(userData?.role?.toLowerCase() === 'admin' || (userData?.allowedScreens || []).includes('/audit')) && (
+                            <Link
+                              to="/audit"
+                              onClick={() => setIsMoreMenuOpen(false)}
+                              className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-surface-container dark:bg-white/5 border border-outline-variant/10 hover:bg-slate-500/5 dark:hover:bg-white/10 transition-all text-center gap-2 group text-on-surface"
+                            >
+                              <div className="w-11 h-11 rounded-full bg-slate-500/10 dark:bg-slate-500/20 flex items-center justify-center text-slate-500">
+                                <span className="material-symbols-outlined text-[22px]">history</span>
+                              </div>
+                              <span className="text-[9px] font-black tracking-wider uppercase text-on-surface-variant">
+                                Auditoria
+                              </span>
+                            </Link>
+                          )}
+                        </div>
+                      </motion.div>
+                    </div>,
+                    document.body
                   )}
                 </AnimatePresence>
             </div>
