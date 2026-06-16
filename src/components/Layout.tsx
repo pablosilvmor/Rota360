@@ -491,6 +491,7 @@ export function Layout({ children }: LayoutProps) {
                 key={item.path}
                 to={item.path}
                 title={item.name}
+                onClick={() => setIsSidebarOpen(false)}
                 className={`px-4 py-3 mx-2 rounded-lg flex items-center gap-3 cursor-pointer transition-colors duration-200 ${
                   isActive
                     ? "text-primary-fixed bg-on-primary-fixed-variant font-medium"
@@ -904,7 +905,7 @@ export function Layout({ children }: LayoutProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMoreMenuOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
             />
             {/* Bottom Sheet Modal */}
             <motion.div
@@ -912,20 +913,20 @@ export function Layout({ children }: LayoutProps) {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="relative bg-surface-container-lowest dark:bg-surface-container-low rounded-t-[32px] border-t border-outline-variant/30 p-6 pb-12 shadow-[0_-12px_40px_rgba(0,0,0,0.15)] flex flex-col gap-6"
+              className="relative bg-white dark:bg-surface-container-low rounded-t-[32px] border-t border-outline-variant/30 p-6 pb-12 shadow-[0_-12px_40px_rgba(0,0,0,0.15)] flex flex-col gap-6"
             >
               {/* Drag Handle */}
-              <div aria-hidden="true" className="w-12 h-1.5 bg-outline-variant/40 rounded-full mx-auto cursor-pointer" onClick={() => setIsMoreMenuOpen(false)} />
+              <div aria-hidden="true" className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto cursor-pointer" onClick={() => setIsMoreMenuOpen(false)} />
               
               <div className="flex justify-between items-center px-1">
-                <h3 className="text-[11px] font-black tracking-widest uppercase text-on-surface-variant font-sans">
+                <h3 className="text-[11px] font-black tracking-widest uppercase text-slate-500 dark:text-slate-400 font-sans">
                   Mais Opções
                 </h3>
                 <button
                   onClick={() => setIsMoreMenuOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container/30 dark:bg-white/10 text-on-surface-variant hover:bg-surface-container/50 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
@@ -934,10 +935,10 @@ export function Layout({ children }: LayoutProps) {
                 {((userData?.allowedScreens || []).includes('/drivers') || userData?.role?.toLowerCase() === 'admin') && (
                   <Link
                     to="/drivers"
-                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                    onClick={(e) => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-center gap-2 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[26px] opacity-80">group</span>
+                    <span className="material-symbols-outlined text-[28px] opacity-80">group</span>
                     <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                       Motoristas
                     </span>
@@ -946,10 +947,10 @@ export function Layout({ children }: LayoutProps) {
                 {((userData?.allowedScreens || []).includes('/maintenance') || userData?.role?.toLowerCase() === 'admin') && (
                   <Link
                     to="/maintenance"
-                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                    onClick={(e) => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-center gap-2 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[26px] opacity-80">build</span>
+                    <span className="material-symbols-outlined text-[28px] opacity-80">build</span>
                     <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                       Manutenção
                     </span>
@@ -958,10 +959,10 @@ export function Layout({ children }: LayoutProps) {
                 {((userData?.allowedScreens || []).includes('/fuel') || userData?.role?.toLowerCase() === 'admin') && (
                   <Link
                     to="/fuel"
-                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                    onClick={(e) => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-center gap-2 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[26px] opacity-80">local_gas_station</span>
+                    <span className="material-symbols-outlined text-[28px] opacity-80">local_gas_station</span>
                     <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                       Combustível
                     </span>
@@ -970,10 +971,10 @@ export function Layout({ children }: LayoutProps) {
                 {((userData?.allowedScreens || []).includes('/tracking') || userData?.role?.toLowerCase() === 'admin') && (
                   <Link
                     to="/tracking"
-                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                    onClick={(e) => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-center gap-2 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[26px] opacity-80">map</span>
+                    <span className="material-symbols-outlined text-[28px] opacity-80">map</span>
                     <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                       Rastreamento
                     </span>
@@ -982,10 +983,10 @@ export function Layout({ children }: LayoutProps) {
                 {((userData?.allowedScreens || []).includes('/reports') || userData?.role?.toLowerCase() === 'admin') && (
                   <Link
                     to="/reports"
-                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                    onClick={(e) => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-center gap-2 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[26px] opacity-80">analytics</span>
+                    <span className="material-symbols-outlined text-[28px] opacity-80">analytics</span>
                     <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                       Relatórios
                     </span>
@@ -994,10 +995,10 @@ export function Layout({ children }: LayoutProps) {
                 {((userData?.allowedScreens || []).includes('/autoalerta-admin') || userData?.role?.toLowerCase() === 'admin') && (
                   <Link
                     to="/autoalerta-admin"
-                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                    onClick={(e) => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-center gap-2 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[26px] opacity-80">admin_panel_settings</span>
+                    <span className="material-symbols-outlined text-[28px] opacity-80">admin_panel_settings</span>
                     <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                       Gestão Autoalerta
                     </span>
@@ -1006,10 +1007,10 @@ export function Layout({ children }: LayoutProps) {
                 {(userData?.role?.toLowerCase() === 'admin' || (userData?.allowedScreens || []).includes('/audit')) && (
                   <Link
                     to="/audit"
-                    onClick={() => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
-                    className="flex flex-col items-center justify-center p-5 rounded-[16px] bg-[#F4F6F9] dark:bg-white/5 hover:bg-[#EAEFF4] dark:hover:bg-white/10 transition-colors text-center gap-2 text-[#1C2C3E] dark:text-white border border-transparent dark:border-white/5"
+                    onClick={(e) => { setIsMoreMenuOpen(false); setIsSidebarOpen(false); }}
+                    className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-center gap-2 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[26px] opacity-80">history</span>
+                    <span className="material-symbols-outlined text-[28px] opacity-80">history</span>
                     <span className="text-[10px] font-black tracking-widest uppercase opacity-90">
                       Auditoria de Ações
                     </span>
