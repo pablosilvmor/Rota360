@@ -767,26 +767,40 @@ export function Reports() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h2 className="text-[32px] font-bold text-on-surface tracking-tight mb-2">Central de Relatórios</h2>
-          <p className="text-on-surface-variant font-medium">Extraia informações e gere arquivos profissionais em PDF da base de dados.</p>
+    <div className="min-h-screen bg-surface dark:bg-surface-container-lowest pb-24">
+      <header className="bg-primary text-on-primary p-6 rounded-b-3xl shadow-md sticky top-0 z-10 transition-all mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.history.back()}
+              className="w-10 h-10 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
+            >
+              <span className="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold">Central de Relatórios</h1>
+              <p className="text-primary-container text-sm opacity-80">
+                Extraia informações e gere arquivos profissionais em PDF
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleExportPDF}
+            disabled={!selectedModule || selectedColumns.length === 0 || loadingData}
+            className="relative px-6 py-3 bg-white text-primary rounded-xl font-bold shadow-lg shadow-black/10 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:hover:shadow-lg flex items-center gap-2 justify-center overflow-hidden"
+          >
+            {loadingData && exportProgress > 0 && (
+              <div className="absolute bottom-0 left-0 h-1 bg-primary/20" style={{ width: `${exportProgress}%` }} />
+            )}
+            <span className="material-symbols-outlined">
+              {loadingData ? 'progress_activity' : 'picture_as_pdf'}
+            </span>
+            {loadingData ? `Exportando (${exportProgress}%)` : 'Exportar PDF'}
+          </button>
         </div>
-        <button
-          onClick={handleExportPDF}
-          disabled={!selectedModule || selectedColumns.length === 0 || loadingData}
-          className="relative px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:hover:shadow-lg flex items-center gap-2 justify-center overflow-hidden"
-        >
-          {loadingData && exportProgress > 0 && (
-            <div className="absolute bottom-0 left-0 h-1 bg-primary-container" style={{ width: `${exportProgress}%` }} />
-          )}
-          <span className="material-symbols-outlined">
-            {loadingData ? 'progress_activity' : 'picture_as_pdf'}
-          </span>
-          {loadingData ? `Exportando (${exportProgress}%)` : 'Exportar PDF Selecionado'}
-        </button>
-      </div>
+      </header>
+
+      <div className="w-full px-4 lg:px-6">
 
       <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-8">
         <div className="space-y-6">
@@ -1076,6 +1090,7 @@ export function Reports() {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

@@ -80,7 +80,7 @@ function ProtectedRoute({ children, path }: { children: ReactNode, path: string 
       </Layout>
     );
   }
-  return <Layout>{children}</Layout>;
+  return path === '/reports' ? <>{children}</> : <Layout>{children}</Layout>;
 }
 
 function PlaceholderPage({ title, description, icon }: { title: string, description: string, icon: string }) {
