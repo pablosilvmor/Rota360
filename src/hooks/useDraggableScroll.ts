@@ -23,9 +23,12 @@ export function useDraggableScroll<T extends HTMLElement>() {
 
   const onMouseMove = useCallback((e: MouseEvent<T>) => {
     if (!isDragging || !scrollRef.current) return;
+    
+    // Stop selections while dragging
     e.preventDefault();
+    
     const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX) * 2; // scroll-fast
+    const walk = (x - startX) * 1.5; // multiplicador de velocidade
     scrollRef.current.scrollLeft = scrollLeft - walk;
   }, [isDragging, startX, scrollLeft]);
 

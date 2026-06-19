@@ -1022,7 +1022,7 @@ export function Reports() {
               <div 
                 ref={scrollRef}
                 {...events}
-                className={`overflow-x-auto w-full min-h-[400px] ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+                className={`overflow-x-auto w-full min-h-[400px] select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
               >
                 {loadingData ? (
                   <div className="flex flex-col items-center justify-center h-64 gap-4">
