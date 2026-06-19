@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, MouseEvent } from 'react';
+import { useRef, useState, useCallback, PointerEvent, DragEvent } from 'react';
 
 export function useDraggableScroll<T extends HTMLElement>() {
   const scrollRef = useRef<T>(null);
@@ -6,40 +6,65 @@ export function useDraggableScroll<T extends HTMLElement>() {
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
 
-  const onMouseDown = useCallback((e: MouseEvent<T>) => {
+  const onPointerDown = useCallback((e: PointerEvent<T>) => {
+    if (e.button !== 0) return; // Only left-click
     if (!scrollRef.current) return;
+    
+    // Set the pointer capture so we don't lose the event when leaving the element bounds
+    try {
+      scrollRef.current.setPointerCapture(e.pointerId);
+    } catch (err) {
+      console.warn('Failed to set pointer capture', err);
+    }
+    
     setIsDragging(true);
     setStartX(e.pageX - scrollRef.current.offsetLeft);
     setScrollLeft(scrollRef.current.scrollLeft);
   }, []);
 
-  const onMouseLeave = useCallback(() => {
+  const onPointerUp = useCallback((e: PointerEvent<T>) => {
+    if (!scrollRef.current) return;
+    try {
+      scrollRef.current.releasePointerCapture(e.pointerId);
+    } catch (err) {
+      // ignore
+    }
     setIsDragging(false);
   }, []);
 
-  const onMouseUp = useCallback(() => {
+  const onPointerCancel = useCallback((e: PointerEvent<T>) => {
+    if (!scrollRef.current) return;
+    try {
+      scrollRef.current.releasePointerCapture(e.pointerId);
+    } catch (err) {
+      // ignore
+    }
     setIsDragging(false);
   }, []);
 
-  const onMouseMove = useCallback((e: MouseEvent<T>) => {
+  const onPointerMove = useCallback((e: PointerEvent<T>) => {
     if (!isDragging || !scrollRef.current) return;
-    
-    // Stop selections while dragging
-    e.preventDefault();
+    e.preventDefault(); // Prevent text selection/scrolling natively during movement
     
     const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // multiplicador de velocidade
+    const walk = (x - startX) * 1.5; // Drag speed multiplier
     scrollRef.current.scrollLeft = scrollLeft - walk;
   }, [isDragging, startX, scrollLeft]);
+
+  // Prevent native HTML5 drag and drop from interfering
+  const onDragStart = useCallback((e: DragEvent<T>) => {
+    e.preventDefault();
+  }, []);
 
   return {
     scrollRef,
     isDragging,
     events: {
-      onMouseDown,
-      onMouseLeave,
-      onMouseUp,
-      onMouseMove,
+      onPointerDown,
+      onPointerUp,
+      onPointerCancel,
+      onPointerMove,
+      onDragStart,
     }
   };
 }

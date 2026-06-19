@@ -1792,7 +1792,7 @@ export function Fuel() {
                   <div 
                     ref={scrollRef}
                     {...events}
-                    className={`overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent select-none ${isPreviewDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    className={`overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent ${isPreviewDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
                   >
                     <table className="w-full min-w-max text-[11px] border-collapse">
                       <thead>
