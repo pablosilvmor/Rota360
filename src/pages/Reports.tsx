@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { createSignature, getQRCodeDataUrl, generateVerificationUrl } from '../utils/pdfSignature';
 import { PrivateValue, usePrivacy } from '../contexts/PrivacyContext';
+import { useDraggableScroll } from '../hooks/useDraggableScroll';
 
 type ModuleData = {
   id: string;
@@ -237,6 +238,8 @@ export function Reports() {
   const [reportProfiles, setReportProfiles] = useLocalStorageState<ReportProfile[]>('reports_savedProfiles', []);
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [editingProfileName, setEditingProfileName] = useState('');
+
+  const { scrollRef, isDragging, events } = useDraggableScroll<HTMLDivElement>();
 
   const handleSaveProfile = () => {
     if (!editingProfileName.trim()) return;
@@ -1016,7 +1019,11 @@ export function Reports() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto w-full min-h-[400px]">
+              <div 
+                ref={scrollRef}
+                {...events}
+                className={`overflow-x-auto w-full min-h-[400px] ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+              >
                 {loadingData ? (
                   <div className="flex flex-col items-center justify-center h-64 gap-4">
                     <span className="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>

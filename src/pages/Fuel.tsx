@@ -11,6 +11,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, A
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { createSignature } from '../utils/pdfSignature';
+import { useDraggableScroll } from '../hooks/useDraggableScroll';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -35,6 +36,8 @@ export function Fuel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useLocalStorageState('fuel_filterMonth', 'Todos');
   const [filterYear, setFilterYear] = useLocalStorageState('fuel_filterYear', 'Todos');
+  
+  const { scrollRef, isDragging: isPreviewDragging, events } = useDraggableScroll<HTMLDivElement>();
   
   const [openFilter, setOpenFilter] = useState<string | null>(null);
 
@@ -1786,7 +1789,11 @@ export function Fuel() {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent">
+                  <div 
+                    ref={scrollRef}
+                    {...events}
+                    className={`overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent ${isPreviewDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+                  >
                     <table className="w-full min-w-max text-[11px] border-collapse">
                       <thead>
                         <tr className="bg-primary text-white">
