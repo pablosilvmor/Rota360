@@ -610,10 +610,10 @@ export function Drivers() {
             </button>
           )}
         </div>
-        <div className="overflow-x-auto w-full">
-          <div className="hidden lg:block">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] w-full scrollbar-thin scrollbar-thumb-outline-variant scrollbar-track-transparent">
+          <div className="hidden lg:block min-w-[800px]">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 z-20 shadow-sm border-b border-outline-variant/50">
                 <tr className="bg-surface-container-low text-on-surface-variant text-sm font-semibold">
                   <SortButton column="name" label="Perfil do Motorista" />
                   <SortButton column="vehicleAssigned" label="Placa do Veículo" />

@@ -1846,10 +1846,10 @@ function InspectionForm({
           )}
         </div>
 
-        <div className="overflow-x-auto w-full">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] w-full scrollbar-thin scrollbar-thumb-outline-variant scrollbar-track-transparent">
           <table className="w-full text-left border-collapse min-w-[800px]">
-            <thead>
-              <tr className="bg-surface-container-low/50 dark:bg-surface-variant/50 border-b border-outline-variant dark:border-outline/50">
+            <thead className="sticky top-0 z-20 shadow-sm border-b border-outline-variant dark:border-outline/50 bg-surface-container-low/50 dark:bg-surface-variant/50 backdrop-blur-md">
+              <tr>
                 {isAdmin && (
                   <th
                     className="p-4 w-12 text-center border-r border-outline-variant/30 dark:border-outline/50"
