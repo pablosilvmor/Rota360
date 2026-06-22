@@ -1402,11 +1402,11 @@ export function Fuel() {
             Ver Relatório Completo
           </button>
         </div>
-        <div className="overflow-x-auto overflow-y-auto md:overflow-auto min-h-[450px] scrollbar-thin w-full">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-220px)] min-h-[450px] scrollbar-thin scrollbar-thumb-outline-variant scrollbar-track-transparent w-full">
           <div className="hidden md:block">
             <table className="w-full text-left border-collapse min-w-[1000px]">
-            <thead>
-              <tr className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
+            <thead className="sticky top-0 z-20 shadow-sm">
+              <tr className="bg-surface-container-low border-b border-outline-variant">
                 {columnOptions.filter(opt => ['date', 'vehiclePlate', 'workName', 'station', 'transactionCode', 'odometer', 'fuelType', 'liters', 'totalValue'].includes(opt.id) && opt.label !== 'Combustível').map(opt => (
                   <th key={opt.id} className="p-0 relative group">
                     <div className="flex items-center">
