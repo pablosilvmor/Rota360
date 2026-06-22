@@ -551,7 +551,7 @@ export function Invoices() {
           value: parseFloat(vNF),
           status: 'autorizada',
           key: finalKey,
-          linkedVehicle: linkedVehicle || undefined,
+          linkedVehicle: linkedVehicle || null,
           xmlContent: content,
           lastSync: importDate,
           importMode: 'manual',
