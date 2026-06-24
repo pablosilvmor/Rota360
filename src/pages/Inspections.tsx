@@ -3102,9 +3102,9 @@ export function Inspections() {
               options={[
                 { value: 'plate', label: 'Placa' },
                 { value: 'color', label: 'Cor do Veículo' },
-                { value: 'fuel', label: 'Tipo de Combustível' },
-                { value: 'year', label: 'Exercício' },
-                { value: 'type', label: 'Espécie / Tipo' },
+                { value: 'fuelType', label: 'Tipo de Combustível' },
+                { value: 'exerciceYear', label: 'Exercício' },
+                { value: 'bodywork', label: 'Espécie / Tipo' },
                 { value: 'modelYear', label: 'Ano do Modelo' },
                 { value: 'model', label: 'Modelo' },
                 { value: 'brand', label: 'Marca' }
