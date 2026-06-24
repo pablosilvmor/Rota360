@@ -50,6 +50,9 @@ export function Fleet() {
   const [filterStatus, setFilterStatus] = useLocalStorageState<string[]>('fleet_filterStatusArr', []);
   const [viewMode, setViewMode] = useLocalStorageState<'grid' | 'list'>('fleet_viewMode', 'grid');
 
+  const [sortField, setSortField] = useLocalStorageState<string>('fleet_sortField', '');
+  const [sortOrder, setSortOrder] = useLocalStorageState<'asc' | 'desc'>('fleet_sortOrder', 'asc');
+
   const editingVehicle = vehicles.find(v => v.id === editingVehicleId) || null;
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId) || null;
   const assignedDrivers = drivers.filter(d => Array.isArray(d.vehicleAssigned) ? d.vehicleAssigned.includes(selectedVehicle?.plate) : d.vehicleAssigned === selectedVehicle?.plate);
@@ -144,7 +147,7 @@ export function Fleet() {
     setVehicleToDelete(vehicleId);
   };
 
-  const filteredVehicles = vehicles.filter(v => {
+  let filteredVehicles = vehicles.filter(v => {
     const matchesSearch = searchTerm === '' || 
       (v.plate || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (v.brand || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -157,6 +160,20 @@ export function Fleet() {
 
     return matchesSearch && matchesWork && matchesStatus;
   });
+
+  if (sortField) {
+    filteredVehicles.sort((a, b) => {
+      let valA = a[sortField] || '';
+      let valB = b[sortField] || '';
+      
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
 
   if (isAdding || editingVehicle) {
     return <AddVehicle vehicleToEdit={editingVehicle} onCancel={() => setSearchParams({})} onSave={() => setSearchParams({})} />;
@@ -265,6 +282,40 @@ export function Fleet() {
           />
         </div>
         
+        <div className="flex-1 min-w-[200px] flex items-end gap-2">
+          <div className="flex-1">
+            <SearchableSelect 
+              label="Ordenar por"
+              placeholder="Padrão"
+              multiple={false}
+              forceLightBg={true}
+              options={[
+                { value: 'plate', label: 'Placa' },
+                { value: 'color', label: 'Cor do Veículo' },
+                { value: 'fuel', label: 'Tipo de Combustível' },
+                { value: 'year', label: 'Exercício' },
+                { value: 'type', label: 'Espécie / Tipo' },
+                { value: 'modelYear', label: 'Ano do Modelo' },
+                { value: 'model', label: 'Modelo' },
+                { value: 'brand', label: 'Marca' }
+              ]}
+              value={sortField}
+              onChange={(val) => setSortField(val as string)}
+            />
+          </div>
+          {sortField && (
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="h-[42px] px-3 flex items-center justify-center bg-white border border-outline-variant rounded-xl text-on-surface-variant hover:bg-surface-container transition-colors"
+              title={sortOrder === 'asc' ? 'Ordem Crescente' : 'Ordem Decrescente'}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+              </span>
+            </button>
+          )}
+        </div>
+        
         {/* Contadores por Centro de Custo */}
         <div className="w-full mt-4 pt-4 border-t border-outline-variant/30 flex flex-wrap gap-2">
             {Object.entries(
@@ -288,9 +339,9 @@ export function Fleet() {
         </div>
         
         <div className="flex items-center gap-4 pt-6">
-          {(searchTerm || filterWork.length > 0 || filterStatus.length > 0) && (
+          {(searchTerm || filterWork.length > 0 || filterStatus.length > 0 || sortField) && (
             <button 
-              onClick={() => { setSearchTerm(''); setFilterWork([]); setFilterStatus([]); }}
+              onClick={() => { setSearchTerm(''); setFilterWork([]); setFilterStatus([]); setSortField(''); setSortOrder('asc'); }}
               className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant dark:text-on-surface/60 hover:text-primary dark:hover:text-blue-400 transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-surface-container-low dark:hover:bg-white/5"
             >
               LIMPAR FILTRO
