@@ -23,7 +23,7 @@ app.post("/api/chat", async (req, res) => {
     const systemInstruction = "Você é um assistente virtual especialista no sistema Rota 360 (desenvolvido por Bemon Engenharia e Montagens Ltda). O Rota 360 é um sistema de Gestão de Frota, com funcionalidades de Painel, Frota (cadastro de veículos), Inspeções, Checklist, Combustível, Rastreamento, Relatórios, Motoristas, AutoAlerta e Central de Cadastros. Seja prestativo, educado, forneça respostas em português do Brasil e ajude o usuário com suas dúvidas de forma detalhada sobre os processos do sistema Rota 360. Seja minimalista mas claro.";
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       contents: message,
       config: {
         systemInstruction,
