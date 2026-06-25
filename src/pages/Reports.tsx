@@ -182,23 +182,31 @@ const MultiSelect = ({ label, options, selected, onChange, placeholder }: { labe
                 <span className="text-xs font-bold uppercase text-on-surface-variant">Selecionar Todos</span>
               </div>
               <div className="h-px bg-outline-variant/30 my-1" />
-              {options.map(opt => (
-                <div 
-                  key={opt.id || opt.name} 
-                  className="px-3 py-2 hover:bg-surface-container-low cursor-pointer flex items-center gap-2"
-                  onClick={() => {
-                    const next = selected.includes(opt.name) 
-                      ? selected.filter(s => s !== opt.name) 
-                      : [...selected, opt.name];
-                    onChange(next);
-                  }}
-                >
-                  <div className={`w-4 h-4 border border-outline-variant rounded flex items-center justify-center ${selected.includes(opt.name) ? 'bg-primary border-primary' : ''}`}>
-                    {selected.includes(opt.name) && <span className="material-symbols-outlined text-white text-[12px]">check</span>}
+              {(() => {
+                const allOptions = [...options];
+                selected.forEach(s => {
+                  if (!allOptions.find(o => o.name === s)) {
+                    allOptions.push({ id: s, name: s });
+                  }
+                });
+                return allOptions.map(opt => (
+                  <div 
+                    key={opt.id || opt.name} 
+                    className="px-3 py-2 hover:bg-surface-container-low cursor-pointer flex items-center gap-2"
+                    onClick={() => {
+                      const next = selected.includes(opt.name) 
+                        ? selected.filter(s => s !== opt.name) 
+                        : [...selected, opt.name];
+                      onChange(next);
+                    }}
+                  >
+                    <div className={`w-4 h-4 border border-outline-variant rounded flex items-center justify-center ${selected.includes(opt.name) ? 'bg-primary border-primary' : ''}`}>
+                      {selected.includes(opt.name) && <span className="material-symbols-outlined text-white text-[12px]">check</span>}
+                    </div>
+                    <span className="text-sm truncate">{opt.name}</span>
                   </div>
-                  <span className="text-sm truncate">{opt.name}</span>
-                </div>
-              ))}
+                ));
+              })()}
             </motion.div>
           </>
         )}

@@ -39,7 +39,19 @@ export function SearchableSelect({
   const [direction, setDirection] = useState<"down" | "up">("down");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const uniqueOptions = options.filter(
+  // Add missing values to uniqueOptions so they can be rendered and deselected
+  let allOptions = [...options];
+  if (multiple) {
+    (value as string[]).forEach((v) => {
+      if (!allOptions.find((o) => o.value === v)) {
+        allOptions.push({ value: v, label: v });
+      }
+    });
+  } else if (value && !allOptions.find((o) => o.value === value)) {
+    allOptions.push({ value: value as string, label: value as string });
+  }
+
+  const uniqueOptions = allOptions.filter(
     (opt, index, self) => self.findIndex((o) => o.value === opt.value) === index
   );
 
@@ -47,7 +59,7 @@ export function SearchableSelect({
     ? undefined
     : uniqueOptions.find((o) => o.value === value);
   const selectedOptions = multiple
-    ? uniqueOptions.filter((o) => (value as string[]).includes(o.value))
+    ? (value as string[]).map(v => uniqueOptions.find((o) => o.value === v)!)
     : [];
 
   const filteredOptions = uniqueOptions.filter(
