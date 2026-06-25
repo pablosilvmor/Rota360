@@ -226,6 +226,7 @@ export function Reports() {
   const [filterWork, setFilterWork] = useLocalStorageState<string[]>('reports_filterWork', []);
   const [filterStatus, setFilterStatus] = useLocalStorageState<string[]>('reports_filterStatus', []);
   const [works, setWorks] = useState<any[]>([]);
+  const [worksLoaded, setWorksLoaded] = useState(false);
   const [statuses, setStatuses] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [headerLogo, setHeaderLogo] = useState<{src: string, ratio: number} | null>(null);
@@ -290,8 +291,10 @@ export function Reports() {
     const qWorks = query(collection(db, 'works'), orderBy('name', 'asc'));
     const unsubWorks = onSnapshot(qWorks, (snapshot) => {
       setWorks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setWorksLoaded(true);
     }, (err) => {
       console.error("Error listening to works in Reports", err);
+      setWorksLoaded(true);
     });
 
     const qStatuses = query(collection(db, 'statuses'), orderBy('name', 'asc'));
@@ -450,7 +453,17 @@ export function Reports() {
 
   const activeColumns = selectedModule?.columns.filter(c => selectedColumns.includes(c.key)) || [];
 
-  const filteredData = data.filter(item => {
+  const validWorksList = works.map(w => w.name);
+  const displayData = worksLoaded ? data.map(item => {
+    if (selectedModule?.id === 'vehicles') {
+      const itemWorks = Array.isArray(item.costCenter) ? item.costCenter : (item.costCenter ? [item.costCenter] : []);
+      const validItemWorks = itemWorks.filter((c: string) => validWorksList.includes(c) || c === 'Sede Administrativa');
+      return { ...item, costCenter: validItemWorks };
+    }
+    return item;
+  }) : data;
+
+  const filteredData = displayData.filter(item => {
     const matchesSearch = !reportSearchTerm || activeColumns.some(c => {
       const val = item[c.key];
       const rendered = c.renderer ? c.renderer(val, item) : (val != null ? String(val) : '');

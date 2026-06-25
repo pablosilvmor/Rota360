@@ -51,6 +51,11 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
     try {
       // Create a clean copy of the data to save
       const dataToSave = { ...vehicleData };
+      if (Array.isArray(dataToSave.costCenter)) {
+        dataToSave.costCenter = dataToSave.costCenter.filter(c => works.some(w => w.name === c) || c === 'Sede Administrativa');
+      } else if (dataToSave.costCenter) {
+        dataToSave.costCenter = [dataToSave.costCenter].filter(c => works.some(w => w.name === c) || c === 'Sede Administrativa');
+      }
       // Explicitly remove the id from the payload so we don't save it inside the document
       delete dataToSave.id;
       
@@ -492,7 +497,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                         ...works.map(w => ({ value: w.name, label: w.name })),
                         { value: 'Sede Administrativa', label: 'Sede Administrativa' }
                       ]}
-                      value={Array.isArray(vehicleData.costCenter) ? vehicleData.costCenter : (vehicleData.costCenter ? [vehicleData.costCenter] : [])}
+                      value={Array.isArray(vehicleData.costCenter) ? vehicleData.costCenter.filter(c => works.some(w => w.name === c) || c === 'Sede Administrativa') : (vehicleData.costCenter ? [vehicleData.costCenter].filter(c => works.some(w => w.name === c) || c === 'Sede Administrativa') : [])}
                       onChange={(val) => setVehicleData({ ...vehicleData, costCenter: val })}
                     />
                   </div>
