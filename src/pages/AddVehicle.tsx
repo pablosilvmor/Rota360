@@ -12,15 +12,38 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
   const [rawOcrData, setRawOcrData] = useState<any>(null);
   const [works, setWorks] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
-  const [vehicleData, setVehicleData] = useState(vehicleToEdit || {
-    plate: '', renavam: '', brand: '', model: '', modelYear: '', chassis: '', fuelType: '', color: '', bodywork: '', costCenter: '', status: 'Ativo',
-    exerciceYear: '', exerciceStatus: '', imageUrl: '', observation: '', capacity: '', grossWeight: '', ownerCnpj: ''
+  const [vehicleData, setVehicleData] = useState(() => {
+    const initial = vehicleToEdit || {
+      plate: '', renavam: '', brand: '', model: '', modelYear: '', chassis: '', fuelType: '', color: '', bodywork: '', costCenter: [], status: 'Ativo',
+      exerciceYear: '', exerciceStatus: '', imageUrl: '', observation: '', capacity: '', grossWeight: '', ownerCnpj: ''
+    };
+    
+    let normalizedCostCenter: string[] = [];
+    if (Array.isArray(initial.costCenter)) {
+      normalizedCostCenter = initial.costCenter;
+    } else if (typeof initial.costCenter === 'string' && initial.costCenter) {
+      normalizedCostCenter = initial.costCenter.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return { ...initial, costCenter: normalizedCostCenter };
   });
 
   useEffect(() => {
     const qWorks = query(collection(db, 'works'), orderBy('name', 'asc'));
     const unsubscribeWorks = onSnapshot(qWorks, (snapshot) => {
-      setWorks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const loadedWorks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setWorks(loadedWorks);
+      
+      // Filter out any invalid cost centers from current vehicleData when works are loaded
+      setVehicleData(prev => {
+        if (!Array.isArray(prev.costCenter)) return prev;
+        const validWorks = loadedWorks.map((w: any) => w.name);
+        const filtered = prev.costCenter.filter(c => validWorks.includes(c) || c === 'Sede Administrativa');
+        // Only update if it actually changed to avoid unnecessary re-renders
+        if (filtered.length !== prev.costCenter.length) {
+          return { ...prev, costCenter: filtered };
+        }
+        return prev;
+      });
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'works');
     });
@@ -173,7 +196,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
         bodywork: data.bodywork || '',
         exerciceYear: data.exerciceYear || '',
         exerciceStatus: computedStatus,
-        costCenter: data.costCenter || 'Logística - Região Sul',
+        costCenter: data.costCenter ? (Array.isArray(data.costCenter) ? data.costCenter : [data.costCenter]) : [],
         status: 'Ativo'
       });
     } catch (error: any) {
@@ -497,7 +520,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                         ...works.map(w => ({ value: w.name, label: w.name })),
                         { value: 'Sede Administrativa', label: 'Sede Administrativa' }
                       ]}
-                      value={Array.isArray(vehicleData.costCenter) ? vehicleData.costCenter.filter(c => works.some(w => w.name === c) || c === 'Sede Administrativa') : (vehicleData.costCenter ? [vehicleData.costCenter].filter(c => works.some(w => w.name === c) || c === 'Sede Administrativa') : [])}
+                      value={Array.isArray(vehicleData.costCenter) ? vehicleData.costCenter : (vehicleData.costCenter ? [vehicleData.costCenter] : [])}
                       onChange={(val) => setVehicleData({ ...vehicleData, costCenter: val })}
                     />
                   </div>

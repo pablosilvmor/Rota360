@@ -456,7 +456,12 @@ export function Reports() {
   const validWorksList = works.map(w => w.name);
   const displayData = worksLoaded ? data.map(item => {
     if (selectedModule?.id === 'vehicles') {
-      const itemWorks = Array.isArray(item.costCenter) ? item.costCenter : (item.costCenter ? [item.costCenter] : []);
+      let itemWorks: string[] = [];
+      if (Array.isArray(item.costCenter)) {
+        itemWorks = item.costCenter;
+      } else if (typeof item.costCenter === 'string' && item.costCenter) {
+        itemWorks = item.costCenter.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
       const validItemWorks = itemWorks.filter((c: string) => validWorksList.includes(c) || c === 'Sede Administrativa');
       return { ...item, costCenter: validItemWorks };
     }
@@ -1089,7 +1094,7 @@ export function Reports() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/20">
-                      {sortedData.slice(0, 15).map((item, idx) => (
+                      {sortedData.map((item, idx) => (
                         <tr key={item.id || idx} className="hover:bg-surface-container transition-colors">
                           {activeColumns.map(c => {
                             const val = item[c.key];
@@ -1108,11 +1113,9 @@ export function Reports() {
                   </table>
                 )}
               </div>
-              {data.length > 15 && (
-                <div className="p-3 bg-surface-container border-t border-outline-variant text-center text-xs font-medium text-on-surface-variant">
-                  Mostrando os primeiros 15 de {data.length} registros. O PDF incluirá todos os registros.
-                </div>
-              )}
+              <div className="p-3 bg-surface-container border-t border-outline-variant text-center text-xs font-medium text-on-surface-variant">
+                Exibindo total de {sortedData.length} registros.
+              </div>
               </div>
             </motion.div>
           )}
