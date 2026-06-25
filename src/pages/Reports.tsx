@@ -454,19 +454,32 @@ export function Reports() {
   const activeColumns = selectedModule?.columns.filter(c => selectedColumns.includes(c.key)) || [];
 
   const validWorksList = works.map(w => w.name);
-  const displayData = worksLoaded ? data.map(item => {
+  const displayData = worksLoaded ? data.reduce((acc: any[], item: any) => {
     if (selectedModule?.id === 'vehicles') {
+      // Deduplicate by plate
+      const existingIdx = acc.findIndex(v => v.plate && item.plate && v.plate.replace(/[^A-Z0-9]/g, '') === item.plate.replace(/[^A-Z0-9]/g, ''));
+      if (existingIdx !== -1) {
+        // Keep the one that was updated more recently, or has more data
+        const existing = acc[existingIdx];
+        const existingTime = existing.updatedAt || 0;
+        const itemTime = item.updatedAt || 0;
+        if (itemTime <= existingTime) return acc; // Skip older duplicate
+        acc.splice(existingIdx, 1); // Remove older duplicate
+      }
+      
       let itemWorks: string[] = [];
       if (Array.isArray(item.costCenter)) {
         itemWorks = item.costCenter;
       } else if (typeof item.costCenter === 'string' && item.costCenter) {
         itemWorks = item.costCenter.split(',').map((s: string) => s.trim()).filter(Boolean);
       }
-      const validItemWorks = itemWorks.filter((c: string) => validWorksList.includes(c) || c === 'Sede Administrativa');
-      return { ...item, costCenter: validItemWorks };
+      const validItemWorks = itemWorks.filter((c: string) => validWorksList.includes(c));
+      acc.push({ ...item, costCenter: validItemWorks });
+    } else {
+      acc.push(item);
     }
-    return item;
-  }) : data;
+    return acc;
+  }, []) : data;
 
   const filteredData = displayData.filter(item => {
     const matchesSearch = !reportSearchTerm || activeColumns.some(c => {

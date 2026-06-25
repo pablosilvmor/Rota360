@@ -37,7 +37,7 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
       setVehicleData(prev => {
         if (!Array.isArray(prev.costCenter)) return prev;
         const validWorks = loadedWorks.map((w: any) => w.name);
-        const filtered = prev.costCenter.filter(c => validWorks.includes(c) || c === 'Sede Administrativa');
+        const filtered = prev.costCenter.filter(c => validWorks.includes(c));
         // Only update if it actually changed to avoid unnecessary re-renders
         if (filtered.length !== prev.costCenter.length) {
           return { ...prev, costCenter: filtered };
@@ -75,9 +75,9 @@ export function AddVehicle({ onCancel, onSave, vehicleToEdit }: { onCancel: () =
       // Create a clean copy of the data to save
       const dataToSave = { ...vehicleData };
       if (Array.isArray(dataToSave.costCenter)) {
-        dataToSave.costCenter = dataToSave.costCenter.filter(c => works.some(w => w.name === c) || c === 'Sede Administrativa');
+        dataToSave.costCenter = dataToSave.costCenter.filter(c => works.some(w => w.name === c));
       } else if (dataToSave.costCenter) {
-        dataToSave.costCenter = [dataToSave.costCenter].filter(c => works.some(w => w.name === c) || c === 'Sede Administrativa');
+        dataToSave.costCenter = [dataToSave.costCenter].filter(c => works.some(w => w.name === c));
       }
       // Explicitly remove the id from the payload so we don't save it inside the document
       delete dataToSave.id;
@@ -516,10 +516,7 @@ Exemplo de saída: { "plate": "ABC-1234", "renavam": "00123456789", "brand": "Me
                       placeholder="Selecione..."
                       multiple={true}
                       forceLightBg={true}
-                      options={[
-                        ...works.map(w => ({ value: w.name, label: w.name })),
-                        { value: 'Sede Administrativa', label: 'Sede Administrativa' }
-                      ]}
+                      options={works.map(w => ({ value: w.name, label: w.name }))}
                       value={Array.isArray(vehicleData.costCenter) ? vehicleData.costCenter : (vehicleData.costCenter ? [vehicleData.costCenter] : [])}
                       onChange={(val) => setVehicleData({ ...vehicleData, costCenter: val })}
                     />
