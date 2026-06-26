@@ -2681,7 +2681,7 @@ export function Invoices() {
                         { label: 'Ano do Modelo', value: detailsModalVehicle.modelYear || '2023' },
                         { label: 'Combustível', value: detailsModalVehicle.fuelType || 'DIESEL' },
                         { label: 'Chassi', value: detailsModalVehicle.chassis || '9535V6TBXPR001424', font: 'font-mono' },
-                        { label: 'Centro de Custo', value: (Array.isArray(detailsModalVehicle.costCenter) ? detailsModalVehicle.costCenter : [detailsModalVehicle.costCenter]).map(v => String(v || '').replace(/logística - região sul/gi, '').trim()).filter(Boolean).join(', ') || 'Sede Adm' },
+                        { label: 'Centro de Custo', value: (Array.isArray(detailsModalVehicle.costCenter) ? detailsModalVehicle.costCenter : [detailsModalVehicle.costCenter]).map(v => String(v || '').replace(/logística - região sul/gi, '').trim()).filter(Boolean).join(', ') || 'NÃO ATRIBUÍDO' },
                         { label: 'Lotação', value: detailsModalVehicle.capacity || '03P' },
                         { label: 'Peso Bruto Total (PBT)', value: detailsModalVehicle.grossWeight || '10.7' },
                         { label: 'CNPJ / CPF', value: detailsModalVehicle.ownerCnpj || '26.005.751/0001-94' },

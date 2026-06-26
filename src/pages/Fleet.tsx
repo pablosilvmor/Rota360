@@ -546,7 +546,7 @@ export function Fleet() {
                         {(Array.isArray(vehicle.costCenter) ? vehicle.costCenter : [vehicle.costCenter])
                           .map(v => String(v || '').replace(/logística - região sul/gi, '').trim())
                           .filter(Boolean)
-                          .join(', ') || 'Sede Adm'}
+                          .join(', ') || 'NÃO ATRIBUÍDO'}
                       </span>
                     </div>
                   </div>

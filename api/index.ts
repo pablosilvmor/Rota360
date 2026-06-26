@@ -23,7 +23,7 @@ app.post("/api/chat", async (req, res) => {
     const systemInstruction = "Você é um assistente virtual especialista no sistema Rota 360 (desenvolvido por Bemon Engenharia e Montagens Ltda). O Rota 360 é um sistema de Gestão de Frota, com funcionalidades de Painel, Frota (cadastro de veículos), Inspeções, Checklist, Combustível, Rastreamento, Relatórios, Motoristas, AutoAlerta e Central de Cadastros. Seja prestativo, educado, forneça respostas em português do Brasil e ajude o usuário com suas dúvidas de forma detalhada sobre os processos do sistema Rota 360. Seja minimalista mas claro.";
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-2.5-flash",
       contents: message,
       config: {
         systemInstruction,
@@ -31,9 +31,9 @@ app.post("/api/chat", async (req, res) => {
     });
 
     res.json({ response: response.text });
-  } catch (error) {
-    console.error("[AI CHAT] Error:", error);
-    res.status(500).json({ error: "Falha ao comunicar com a inteligência artificial." });
+  } catch (error: any) {
+    console.error("[AI CHAT] Error details:", error?.message || error);
+    res.status(500).json({ error: "Falha ao comunicar com a inteligência artificial.", details: error?.message });
   }
 });
 
