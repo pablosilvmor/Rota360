@@ -40,7 +40,7 @@ export function Drivers() {
   const [loading, setLoading] = useState(true);
   const [assignment, setAssignment] = useState({ driverId: '', vehiclePlates: [] as string[], workId: '', workName: '' });
   const [newOccurrence, setNewOccurrence] = useState({ driverId: '', type: 'Multa Leve', description: '', points: 1 });
-  const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '' });
+  const [newDriver, setNewDriver] = useState({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '', costCenter: [] as string[] });
   const [sortConfig, setSortConfig] = useLocalStorageState<{ key: string, direction: 'asc' | 'desc' }>('drivers_sortConfig', { key: 'name', direction: 'asc' });
   const [searchTerm, setSearchTerm] = useLocalStorageState('drivers_searchTerm', '');
   const [statusFilter, setStatusFilter] = useLocalStorageState('drivers_statusFilter', '');
@@ -50,6 +50,13 @@ export function Drivers() {
 
   useEffect(() => {
     if (editingDriver) {
+      let normalizedCostCenter: string[] = [];
+      if (Array.isArray(editingDriver.costCenter)) {
+        normalizedCostCenter = editingDriver.costCenter;
+      } else if (typeof editingDriver.costCenter === 'string' && editingDriver.costCenter) {
+        normalizedCostCenter = editingDriver.costCenter.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+
       setNewDriver({
         name: editingDriver.name || '',
         cpf: editingDriver.cpf || '',
@@ -57,10 +64,11 @@ export function Drivers() {
         cnhCategory: editingDriver.cnhCategory || 'A',
         validUntil: editingDriver.validUntil || '',
         phone: editingDriver.phone || '',
-        imageUrl: editingDriver.imageUrl || ''
+        imageUrl: editingDriver.imageUrl || '',
+        costCenter: normalizedCostCenter
       });
     } else {
-      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '' });
+      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '', costCenter: [] });
     }
   }, [editingDriver]);
 
@@ -133,7 +141,7 @@ export function Drivers() {
         });
       }
       setSearchParams({});
-      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '' });
+      setNewDriver({ name: '', cpf: '', cnh: '', cnhCategory: 'A', validUntil: '', phone: '', imageUrl: '', costCenter: [] });
     } catch(e) {
       handleFirestoreError(e, editingDriverId ? OperationType.UPDATE : OperationType.CREATE, 'drivers');
     }
@@ -177,7 +185,11 @@ export function Drivers() {
       vAssignedStr.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === '' || driver.status === statusFilter;
-    const matchesWork = workFilter === '' || driver.workName === workFilter;
+    const matchesWork = workFilter === '' || 
+      (Array.isArray(driver.costCenter) 
+        ? driver.costCenter.includes(workFilter) 
+        : driver.costCenter === workFilter) ||
+      driver.workName === workFilter;
 
     return matchesSearch && matchesStatus && matchesWork;
   });
@@ -451,6 +463,16 @@ export function Drivers() {
                        ]}
                        value={newDriver.cnhCategory}
                        onChange={val => setNewDriver({...newDriver, cnhCategory: val})}
+                     />
+                   </div>
+                   <div className="col-span-2">
+                     <SearchableSelect 
+                       label="Obra (Centro de Custo)"
+                       placeholder="Selecione as obras..."
+                       multiple={true}
+                       options={works.map(w => ({ value: w.name, label: w.name }))}
+                       value={newDriver.costCenter}
+                       onChange={val => setNewDriver({...newDriver, costCenter: val as string[]})}
                      />
                    </div>
                    <div className="col-span-1">

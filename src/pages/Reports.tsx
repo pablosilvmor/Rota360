@@ -126,6 +126,17 @@ const MODULES: ModuleData[] = [
       { key: 'cnhStatus', label: 'Status CNH', renderer: (val: any, item: any) => item.validUntil ? (new Date(item.validUntil) < new Date() ? 'Vencida' : 'Válida') : 'N/A' },
       { key: 'phone', label: 'Telefone', renderer: (val) => <PrivateValue value={val} /> },
       { key: 'vehicleAssigned', label: 'Veículo Atribuído' },
+      { 
+        key: 'costCenter', 
+        label: 'Obra (Centro de Custo)',
+        renderer: (val: any) => {
+          const clean = (v: any) => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim();
+          if (Array.isArray(val)) {
+            return val.map(clean).filter(Boolean).join(', ') || '-';
+          }
+          return clean(val) || '-';
+        }
+      },
     ]
   }
 ];
@@ -455,16 +466,18 @@ export function Reports() {
 
   const validWorksList = works.map(w => w.name);
   const displayData = worksLoaded ? data.reduce((acc: any[], item: any) => {
-    if (selectedModule?.id === 'vehicles') {
-      // Deduplicate by plate
-      const existingIdx = acc.findIndex(v => v.plate && item.plate && v.plate.replace(/[^A-Z0-9]/g, '') === item.plate.replace(/[^A-Z0-9]/g, ''));
-      if (existingIdx !== -1) {
-        // Keep the one that was updated more recently, or has more data
-        const existing = acc[existingIdx];
-        const existingTime = existing.updatedAt || 0;
-        const itemTime = item.updatedAt || 0;
-        if (itemTime <= existingTime) return acc; // Skip older duplicate
-        acc.splice(existingIdx, 1); // Remove older duplicate
+    if (selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers') {
+      if (selectedModule?.id === 'vehicles') {
+        // Deduplicate by plate
+        const existingIdx = acc.findIndex(v => v.plate && item.plate && v.plate.replace(/[^A-Z0-9]/g, '') === item.plate.replace(/[^A-Z0-9]/g, ''));
+        if (existingIdx !== -1) {
+          // Keep the one that was updated more recently, or has more data
+          const existing = acc[existingIdx];
+          const existingTime = existing.updatedAt || 0;
+          const itemTime = item.updatedAt || 0;
+          if (itemTime <= existingTime) return acc; // Skip older duplicate
+          acc.splice(existingIdx, 1); // Remove older duplicate
+        }
       }
       
       let itemWorks: string[] = [];
@@ -492,7 +505,7 @@ export function Reports() {
     let matchesWork = true;
     let matchesStatus = true;
 
-    if (selectedModule?.id === 'vehicles') {
+    if (selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers') {
       matchesWork = filterWork.length === 0 || filterWork.includes('Todas as Obras') || 
         (Array.isArray(item.costCenter) 
           ? item.costCenter.some((c: string) => filterWork.includes(c)) 
@@ -1032,7 +1045,7 @@ export function Reports() {
                       className="w-full bg-white dark:bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all shadow-sm h-[40px]"
                     />
                   </div>
-                  {selectedModule?.id === 'vehicles' && (
+                  {(selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers') && (
                     <>
                       <MultiSelect 
                         label="Obras"
