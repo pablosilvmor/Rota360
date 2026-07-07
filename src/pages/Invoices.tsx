@@ -507,7 +507,7 @@ export function Invoices() {
           return match ? match[1] : null;
         };
 
-        const key = extract(/infNFe Id="NFe(\d+)"/);
+        const key = extract(/Id="NFe(\d+)"/i) || extract(/<chNFe>(\d+)<\/chNFe>/i);
         
         // Verificação de Duplicidade
         if (key && existingKeys.has(key)) {
@@ -715,7 +715,8 @@ export function Invoices() {
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "bold");
-    const barcodeText = invoice.key || 'NÃO INFORMADA';
+    const realKey = (invoice.xmlContent ? (invoice.xmlContent.match(/Id="NFe(\d+)"/i)?.[1] || invoice.xmlContent.match(/<chNFe>(\d+)<\/chNFe>/i)?.[1]) : null) || invoice.key;
+    const barcodeText = realKey || 'NÃO INFORMADA';
     doc.text(barcodeText.replace(/(\d{4})/g, '$1 ').trim(), 95, currentY + 12);
     
     doc.line(90, currentY + 20, 200, currentY + 20);
@@ -2283,7 +2284,7 @@ export function Invoices() {
                         <div className="w-1/2 p-4 flex flex-col justify-center">
                            <div className="mb-4">
                              <p className="text-[9px] uppercase font-bold text-slate-600 mb-1">Chave de Accesso</p>
-                             <p className="text-[12px] font-mono tracking-widest font-black border border-transparent py-1 leading-none break-all text-slate-950">{previewInvoice.key || 'NÃO INFORMADA'}</p>
+                             <p className="text-[12px] font-mono tracking-widest font-black border border-transparent py-1 leading-none break-all text-slate-950">{((previewInvoice.xmlContent ? (previewInvoice.xmlContent.match(/Id="NFe(\d+)"/i)?.[1] || previewInvoice.xmlContent.match(/<chNFe>(\d+)<\/chNFe>/i)?.[1]) : null) || previewInvoice.key) || 'NÃO INFORMADA'}</p>
                            </div>
                            <div className="text-center mt-auto border-t border-slate-300 pt-2">
                              <p className="text-[9px] uppercase font-bold text-slate-600 mb-1">Consulta de Autenticidade</p>
