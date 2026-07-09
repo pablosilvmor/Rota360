@@ -455,6 +455,62 @@ function InspectionForm({
     date: new Date().toISOString().split('T')[0]
   });
 
+  const [isChecklistAvailable, setIsChecklistAvailable] = useState(false);
+  const [isMaintenanceAvailable, setIsMaintenanceAvailable] = useState(false);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkAvailability = async () => {
+      if (!showExportModal || !exportConfig.date || !resolvedVehicleId) return;
+      
+      setIsCheckingAvailability(true);
+      try {
+        // Check Checklist
+        const qChecklist = query(
+          collection(db, "checklist_history"),
+          where("vehicleId", "==", resolvedVehicleId),
+          where("date", "==", exportConfig.date),
+          limit(1)
+        );
+        const snapChecklist = await getDocs(qChecklist);
+        if (!isMounted) return;
+        const checklistFound = !snapChecklist.empty;
+        setIsChecklistAvailable(checklistFound);
+
+        // Check OS
+        const targetDateStr = exportConfig.date.split('-').reverse().join('-');
+        const qMaintenance = query(
+          collection(db, "maintenance"),
+          where("vehicleId", "==", resolvedVehicleId),
+          where("status", "==", "Concluído")
+        );
+        const snapMaintenance = await getDocs(qMaintenance);
+        if (!isMounted) return;
+        const maintenanceFound = snapMaintenance.docs.some(o => {
+          const data = o.data();
+          return data.title && data.title.includes(targetDateStr) && data.title.includes("OS Automática");
+        });
+        setIsMaintenanceAvailable(maintenanceFound);
+
+        // Update config if currently selected but not available
+        setExportConfig(prev => ({
+          ...prev,
+          checklist: prev.checklist && checklistFound,
+          maintenance: prev.maintenance && maintenanceFound
+        }));
+
+      } catch (error) {
+        console.error("Error checking document availability:", error);
+      } finally {
+        if (isMounted) setIsCheckingAvailability(false);
+      }
+    };
+
+    checkAvailability();
+    return () => { isMounted = false; };
+  }, [showExportModal, exportConfig.date, resolvedVehicleId]);
+
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [manualDateInput, setManualDateInput] = useState("");
   const [pickerDate, setPickerDate] = useState(() => {
@@ -1668,26 +1724,41 @@ function InspectionForm({
                         <p className="text-xs text-on-surface-variant">O status técnico da frota com base na última auditoria.</p>
                       </div>
                     </label>
-                    <label className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface-container-low/50 cursor-pointer transition-colors">
-                      <input type="checkbox" className="w-5 h-5 rounded border-outline text-primary focus:ring-primary" checked={exportConfig.checklist} onChange={e => setExportConfig({...exportConfig, checklist: e.target.checked})} />
+                    <label className={`flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 transition-colors ${!isChecklistAvailable && !isCheckingAvailability ? 'opacity-50 grayscale cursor-not-allowed bg-surface-container-low/20' : 'hover:bg-surface-container-low/50 cursor-pointer'}`}>
+                      <input 
+                        type="checkbox" 
+                        disabled={!isChecklistAvailable && !isCheckingAvailability}
+                        className="w-5 h-5 rounded border-outline text-primary focus:ring-primary disabled:opacity-50" 
+                        checked={exportConfig.checklist} 
+                        onChange={e => setExportConfig({...exportConfig, checklist: e.target.checked})} 
+                      />
                       <div>
                         <p className="font-semibold text-on-surface text-sm">Histórico de Checklist</p>
-                        <p className="text-xs text-on-surface-variant">O registro diário do checklist realizado numa data específica.</p>
+                        <p className="text-xs text-on-surface-variant">
+                          {isCheckingAvailability ? 'Verificando disponibilidade...' : (!isChecklistAvailable ? 'Nenhum checklist encontrado para esta data.' : 'O registro diário do checklist realizado numa data específica.')}
+                        </p>
                       </div>
                     </label>
-                    <label className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface-container-low/50 cursor-pointer transition-colors">
-                      <input type="checkbox" className="w-5 h-5 rounded border-outline text-primary focus:ring-primary" checked={exportConfig.maintenance} onChange={e => setExportConfig({...exportConfig, maintenance: e.target.checked})} />
+                    <label className={`flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 transition-colors ${!isMaintenanceAvailable && !isCheckingAvailability ? 'opacity-50 grayscale cursor-not-allowed bg-surface-container-low/20' : 'hover:bg-surface-container-low/50 cursor-pointer'}`}>
+                      <input 
+                        type="checkbox" 
+                        disabled={!isMaintenanceAvailable && !isCheckingAvailability}
+                        className="w-5 h-5 rounded border-outline text-primary focus:ring-primary disabled:opacity-50" 
+                        checked={exportConfig.maintenance} 
+                        onChange={e => setExportConfig({...exportConfig, maintenance: e.target.checked})} 
+                      />
                       <div>
                         <p className="font-semibold text-on-surface text-sm">Manutenção (OS Automática)</p>
-                        <p className="text-xs text-on-surface-variant">A OS automática vinculada ao checklist selecionado.</p>
+                        <p className="text-xs text-on-surface-variant">
+                          {isCheckingAvailability ? 'Verificando disponibilidade...' : (!isMaintenanceAvailable ? 'Nenhuma OS automática encontrada para esta data.' : 'A OS automática vinculada ao checklist selecionado.')}
+                        </p>
                       </div>
                     </label>
                   </div>
                 </div>
 
-                {(exportConfig.checklist || exportConfig.maintenance) && (
-                  <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
-                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Data de Referência (Checklist/OS)</label>
+                <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="block text-sm font-semibold text-on-surface-variant mb-2">Data de Referência (Checklist/OS)</label>
                     <div className="relative">
                       <div className="relative flex items-center">
                         <input
@@ -1821,9 +1892,8 @@ function InspectionForm({
                           </div>
                         </div>
                       )}
-                    </div>
                   </div>
-                )}
+                </div>
               </div>
               <div className="p-4 bg-surface-container-low border-t border-outline-variant/30 flex justify-end gap-3">
                 <button onClick={() => setShowExportModal(false)} className="px-5 py-2.5 text-sm font-bold text-on-surface-variant hover:bg-surface-container-high rounded-xl transition-all">
