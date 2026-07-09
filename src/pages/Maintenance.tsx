@@ -355,8 +355,12 @@ export function Maintenance() {
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(30, 41, 59);
           
-          const createdDateFormatted = new Date(os.createdAt).toLocaleDateString();
-          const cleanDate = createdDateFormatted.replace(/(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1");
+          let cleanDate = new Date(os.createdAt).toLocaleDateString().replace(/(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1");
+
+          if (os.title && os.title.startsWith("OS Automática: Checklist ")) {
+            const extractedDate = os.title.replace("OS Automática: Checklist ", "").trim();
+            cleanDate = extractedDate.replace(/-/g, "/");
+          }
 
           pdf.text(cleanDate, pageWidth - 90, startY + 11);
           pdf.text(`Prestador: ${os.provider}`, pageWidth - 90, startY + 16);
@@ -1136,6 +1140,13 @@ export function Maintenance() {
                            </div>
                         ) : (
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                               onClick={(e) => { e.stopPropagation(); exportOsPDF(os); }}
+                              title="Exportar PDF"
+                              className="p-2 hover:bg-surface-container-high hover:text-on-surface rounded-full transition-colors"
+                            >
+                              <span className="material-symbols-outlined">picture_as_pdf</span>
+                            </button>
                             {os.status !== 'Concluído' && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleCompleteOS(os); }}
