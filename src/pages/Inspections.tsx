@@ -546,6 +546,7 @@ function InspectionForm({
         
         let localHistoryKM = null;
         let localConcludedMaintenanceOrders = [];
+        let historicalRecords: Record<string, any> = {};
         let dateLabel = isChecklistHistory ? exportConfig.date.split('-').reverse().join('/') : "-";
 
         if (isChecklistHistory) {
@@ -553,15 +554,40 @@ function InspectionForm({
           const qKm = query(
             collection(db, "checklist_history"),
             where("vehicleId", "==", resolvedVehicleId),
-            where("date", "==", exportConfig.date),
-            where("status", "==", "Concluído"),
-            orderBy("createdAt", "desc"),
-            limit(1)
+            where("date", "==", exportConfig.date)
           );
           const snapKm = await getDocs(qKm);
           if (!snapKm.empty) {
-            const docData = snapKm.docs[0].data();
+            // Get the latest one if multiple exist for the same day
+            const docs = snapKm.docs.map(d => ({...d.data(), createdAt: d.data().createdAt?.toDate?.() || new Date(0)}));
+            docs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            const docData = docs[0] as any;
+
             localHistoryKM = docData.kmAtClosure ?? docData.vehicleKM ?? null;
+            
+            // Map historical inspection items to a record object
+            const historicalItems = docData.items || docData.inspectionItems || [];
+            if (historicalItems) {
+              historicalItems.forEach((item: any) => {
+                const itemId = item.id || item.itemId;
+                if (itemId) {
+                  // Normalize fields: Checklist.tsx uses 'conformidade' and 'service'
+                  let conformity = item.conformity || item.conformidade || "-";
+                  if (conformity === "Em conformidade") conformity = "SIM";
+                  if (conformity === "Não conforme") conformity = "NÃO";
+
+                  let serviceExecuted = item.serviceExecuted || (item.service && item.service !== "NÃO" ? "SIM" : "NÃO");
+                  
+                  historicalRecords[itemId] = {
+                    ...item,
+                    conformity: conformity,
+                    serviceExecuted: serviceExecuted
+                  };
+                }
+              });
+            }
+          } else {
+            console.warn(`Histórico de Checklist não encontrado para ${exportConfig.date}`);
           }
 
           const qOs = query(
@@ -570,7 +596,14 @@ function InspectionForm({
           );
           const snapOs = await getDocs(qOs);
           const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() } as any));
+          
+          const targetDateStr = exportConfig.date.split('-').reverse().join('-'); // DD-MM-YYYY
+
           localConcludedMaintenanceOrders = orders.filter(os => {
+            // First check by title (more reliable for automatic ones: OS Automática: Checklist DD-MM-YYYY)
+            if (os.title && os.title.includes(targetDateStr)) return true;
+
+            // Then check by createdAt date
             const createdAt = os.createdAt?.toDate ? os.createdAt.toDate() : (os.createdAt ? new Date(os.createdAt) : null);
             if (!createdAt) return false;
             const y = createdAt.getFullYear();
@@ -579,7 +612,7 @@ function InspectionForm({
             return `${y}-${m}-${d}` === exportConfig.date;
           });
         } else {
-          localHistoryKM = historyKM; // from state if any, but actually for "current state" it's typically null
+          localHistoryKM = historyKM; 
           localConcludedMaintenanceOrders = concludedMaintenanceOrders;
         }
 
@@ -592,15 +625,38 @@ function InspectionForm({
         const tableData = [];
         sortedItems.forEach((item) => {
           if (!item || !item.id) return;
-          const record = (records[item.id] || { conformity: "", serviceExecuted: "", lastMaintenanceKM: 0, nextMaintenanceKM: 0, lastMaintenanceDate: null, nextMaintenanceDate: null, id: "", itemId: "" }) as InspectionRecord;
-          const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
+          
+          let record: any;
+          if (isChecklistHistory) {
+            record = historicalRecords[item.id] || { 
+              conformity: "-", 
+              serviceExecuted: "-", 
+              lastMaintenanceKM: 0, 
+              nextMaintenanceKM: 0, 
+              lastMaintenanceDate: null, 
+              nextMaintenanceDate: null 
+            };
+          } else {
+            record = (records[item.id] || { 
+              conformity: "", 
+              serviceExecuted: "", 
+              lastMaintenanceKM: 0, 
+              nextMaintenanceKM: 0, 
+              lastMaintenanceDate: null, 
+              nextMaintenanceDate: null, 
+              id: "", 
+              itemId: "" 
+            }) as InspectionRecord;
+          }
+
+          const currentVehicleKM = isChecklistHistory ? (localHistoryKM || vehicle.currentKM || 0) : (vehicle.currentKM || vehicle.odometer || 0);
 
           let conformityVal = record.conformity || "-";
           
           const { progressPercent, remainingNumber, isOutdated, descRemaining } = calculateProgress(item, record, currentVehicleKM);
           const progressText = `${Math.round(progressPercent)}%`;
 
-          const rawServiceExec = (isChecklistHistory ? checkServiceExecuted(item.id) : (record.serviceExecuted || "-")) as string;
+          const rawServiceExec = (isChecklistHistory ? (record.serviceExecuted === "-" ? checkServiceExecuted(item.id) : record.serviceExecuted) : (record.serviceExecuted || "-")) as string;
           const serviceExecText = ["SIM", "NÃO", "NaKM"].includes(rawServiceExec) ? rawServiceExec : (String(rawServiceExec) === "CONTROLEAR" || String(rawServiceExec) === "Controlar" ? "-" : rawServiceExec);
 
           tableData.push([
@@ -631,7 +687,7 @@ function InspectionForm({
               pdf.setFontSize(16);
               pdf.setFont("helvetica", "bold");
               pdf.setTextColor(0, 0, 0);
-              pdf.text(`Inspeção: ${vehicle.plate}`, 54, startY + 8);
+              pdf.text(`${isChecklistHistory ? 'Histórico de Checklist' : 'Inspeção'}: ${vehicle.plate}`, 54, startY + 8);
               pdf.setFontSize(10);
               pdf.setFont("helvetica", "normal");
               pdf.setTextColor(100, 100, 100);
@@ -640,7 +696,7 @@ function InspectionForm({
               pdf.setFontSize(16);
               pdf.setFont("helvetica", "bold");
               pdf.setTextColor(0, 0, 0);
-              pdf.text(`Inspeção: ${vehicle.plate}`, 14, startY + 8);
+              pdf.text(`${isChecklistHistory ? 'Histórico de Checklist' : 'Inspeção'}: ${vehicle.plate}`, 14, startY + 8);
               pdf.setFontSize(10);
               pdf.setFont("helvetica", "normal");
               pdf.setTextColor(100, 100, 100);
@@ -696,8 +752,11 @@ function InspectionForm({
               const item = sortedItems[rowIndex];
               if (!item) return;
 
-              const record = (records[item.id] || { lastMaintenanceKM: 0, conformity: "", serviceExecuted: "", nextMaintenanceKM: 0, id: "", itemId: "" }) as InspectionRecord;
-              const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
+              const record = (isChecklistHistory 
+                ? (historicalRecords[item.id] || { conformity: "-", serviceExecuted: "-", lastMaintenanceKM: 0, nextMaintenanceKM: 0, lastMaintenanceDate: null, nextMaintenanceDate: null }) 
+                : (records[item.id] || { lastMaintenanceKM: 0, conformity: "", serviceExecuted: "", nextMaintenanceKM: 0, id: "", itemId: "" })) as any;
+              
+              const currentVehicleKM = isChecklistHistory ? (localHistoryKM || vehicle.currentKM || 0) : (vehicle.currentKM || vehicle.odometer || 0);
               const { progressPercent } = calculateProgress(item, record, currentVehicleKM);
 
               const cell = data.cell;
@@ -731,7 +790,14 @@ function InspectionForm({
         );
         const snapOs = await getDocs(qOs);
         const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        
+        const targetDateStr = exportConfig.date.split('-').reverse().join('-'); // DD-MM-YYYY
+
         const os = orders.find(o => {
+          // Check by title (DD-MM-YYYY)
+          if (o.title && o.title.includes(targetDateStr) && o.title.includes("OS Automática")) return true;
+
+          // Fallback check by createdAt
           const createdAt = o.createdAt?.toDate ? o.createdAt.toDate() : (o.createdAt ? new Date(o.createdAt) : null);
           if (!createdAt) return false;
           if (!o.title?.includes("OS Automática")) return false;
@@ -743,7 +809,7 @@ function InspectionForm({
         });
 
         if (!os) {
-          alert(`Não foi encontrada OS Automática para a data ${exportConfig.date.split('-').reverse().join('/')}`);
+          console.warn(`Não foi encontrada OS Automática para a data ${exportConfig.date}`);
           return;
         }
 
