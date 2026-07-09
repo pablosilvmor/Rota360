@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MaintenanceAlertsConfig } from '../components/MaintenanceAlertsConfig';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, getDoc, getDocs, updateDoc, serverTimestamp, collectionGroup, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, addDoc, getDoc, getDocs, updateDoc, serverTimestamp, collectionGroup, limit, where } from 'firebase/firestore';
 import { auditDelete } from '../lib/audit';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { useAuth } from '../contexts/AuthContext';
@@ -103,11 +103,44 @@ export function Maintenance() {
     };
   }, []);
 
+  const [checklistKM, setChecklistKM] = useState<number | null>(null);
+
   useEffect(() => {
     if (selectedOS) {
       setClosingNotes(selectedOS.closingNotes || '');
+      
+      // Buscar o KM atual do checklist
+      if (selectedOS.title?.startsWith("OS Automática: Checklist ")) {
+        setChecklistKM(null);
+        if (selectedOS.kmAtClosure !== undefined && selectedOS.kmAtClosure !== null) {
+          setChecklistKM(selectedOS.kmAtClosure);
+        } else {
+          // Buscar do checklist_history (compatibilidade antiga)
+          const extractedDate = selectedOS.title.replace("OS Automática: Checklist ", "").trim();
+          const parts = extractedDate.split('-');
+          if (parts.length === 3) {
+            const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            const q = query(
+              collection(db, "checklist_history"),
+              where("vehicleId", "==", selectedOS.vehicleId),
+              where("date", "==", formattedDate)
+            );
+            getDocs(q).then(snapshot => {
+              if (!snapshot.empty) {
+                const docData = snapshot.docs[0].data();
+                setChecklistKM(docData.kmAtClosure || docData.vehicleKM || null);
+              }
+            }).catch(err => {
+              console.error("Erro ao buscar KM do checklist:", err);
+            });
+          }
+        }
+      } else {
+        setChecklistKM(null);
+      }
     } else {
       setClosingNotes('');
+      setChecklistKM(null);
     }
   }, [selectedOS]);
 
@@ -198,6 +231,34 @@ export function Maintenance() {
     try {
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
+
+      // Buscar o kmAtClosure caso seja uma OS Automática
+      let kmAtClosure: number | null = null;
+      if (os.title?.startsWith("OS Automática: Checklist ")) {
+        if (os.kmAtClosure !== undefined && os.kmAtClosure !== null) {
+          kmAtClosure = os.kmAtClosure;
+        } else {
+          try {
+            const extractedDate = os.title.replace("OS Automática: Checklist ", "").trim();
+            const parts = extractedDate.split('-');
+            if (parts.length === 3) {
+              const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              const q = query(
+                collection(db, "checklist_history"),
+                where("vehicleId", "==", os.vehicleId),
+                where("date", "==", formattedDate)
+              );
+              const snapshot = await getDocs(q);
+              if (!snapshot.empty) {
+                const docData = snapshot.docs[0].data();
+                kmAtClosure = docData.kmAtClosure || docData.vehicleKM || null;
+              }
+            }
+          } catch (e) {
+            console.error("Error fetching KM for OS PDF:", e);
+          }
+        }
+      }
 
       const pdf = new jsPDF();
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -344,7 +405,8 @@ export function Maintenance() {
 
           // Box informativos (Data)
           pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(pageWidth - 94, startY, 80, 20, 2, 2, "F");
+          const boxHeight = (kmAtClosure !== null && kmAtClosure !== undefined) ? 24 : 20;
+          pdf.roundedRect(pageWidth - 94, startY, 80, boxHeight, 2, 2, "F");
 
           pdf.setFontSize(7);
           pdf.setFont("helvetica", "bold");
@@ -364,6 +426,10 @@ export function Maintenance() {
 
           pdf.text(cleanDate, pageWidth - 90, startY + 11);
           pdf.text(`Prestador: ${os.provider}`, pageWidth - 90, startY + 16);
+
+          if (kmAtClosure !== null && kmAtClosure !== undefined) {
+            pdf.text(`KM Checklist: ${kmAtClosure.toLocaleString('pt-BR')}`, pageWidth - 90, startY + 21);
+          }
         },
       });
 
@@ -1098,8 +1164,10 @@ export function Maintenance() {
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex flex-col">
-                          <span className="text-base font-bold">{os.title}</span>
-                          <span className="text-xs text-on-surface-variant mt-1">{os.description}</span>
+                          <span className="text-base font-bold">{os.title?.replace(/(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1")}</span>
+                          {!os.title?.startsWith("OS Automática:") && (
+                            <span className="text-xs text-on-surface-variant mt-1">{os.description}</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-5 text-base"><PrivateValue value={os.provider} /></td>
@@ -1246,6 +1314,12 @@ export function Maintenance() {
                       <span className="material-symbols-outlined text-[18px]">directions_car</span>
                       <PrivateValue value={selectedOS.plate || 'N/A'} />
                     </span>
+                    {checklistKM !== null && (
+                      <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[18px]">speed</span>
+                        <span>{checklistKM.toLocaleString('pt-BR')} KM</span>
+                      </span>
+                    )}
                     <span className="text-sm font-medium text-on-surface-variant flex items-center gap-1">
                       <span className="material-symbols-outlined text-[18px]">calendar_today</span>
                       {new Date(selectedOS.createdAt).toLocaleDateString('pt-BR')}

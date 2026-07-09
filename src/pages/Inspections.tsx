@@ -447,230 +447,456 @@ function InspectionForm({
     }
   };
 
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportConfig, setExportConfig] = useState({
+    inspection: true,
+    checklist: false,
+    maintenance: false,
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [manualDateInput, setManualDateInput] = useState("");
+  const [pickerDate, setPickerDate] = useState(() => {
+    return new Date();
+  });
+
+  const [exportStep, setExportStep] = useState("");
+  const [exportProgressVal, setExportProgressVal] = useState(0);
+
   const exportToPDF = async () => {
+    setShowExportModal(true);
+    const d = new Date(exportConfig.date + "T12:00:00");
+    const validDate = isNaN(d.getTime()) ? new Date() : d;
+    setPickerDate(validDate);
+    setManualDateInput(validDate.toLocaleDateString('pt-BR'));
+  };
+
+  const handleManualDateChange = (val: string) => {
+    // Máscara simples DD/MM/YYYY
+    let clean = val.replace(/\D/g, "");
+    if (clean.length > 8) clean = clean.substring(0, 8);
+    
+    let formatted = clean;
+    if (clean.length > 2) formatted = clean.substring(0, 2) + "/" + clean.substring(2);
+    if (clean.length > 4) formatted = formatted.substring(0, 5) + "/" + formatted.substring(5);
+    
+    setManualDateInput(formatted);
+
+    if (clean.length === 8) {
+      const day = parseInt(clean.substring(0, 2));
+      const month = parseInt(clean.substring(2, 4)) - 1;
+      const year = parseInt(clean.substring(4, 8));
+      const d = new Date(year, month, day, 12, 0, 0);
+      
+      if (!isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === month && d.getDate() === day) {
+        const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        setExportConfig(prev => ({ ...prev, date: isoDate }));
+        setPickerDate(d);
+      }
+    }
+  };
+
+  const confirmExportUnifiedPDF = async () => {
     setIsExporting(true);
+    setExportProgressVal(5);
+    setExportStep("Iniciando exportação unificada...");
+    setShowExportModal(false);
     try {
+      setExportStep("Carregando geradores de PDF...");
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
 
+      setExportProgressVal(15);
+      setExportStep("Criando estrutura do documento...");
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-
       pdf.setFont("helvetica");
 
-      // Preparar Dados da Tabela
-      const tableData: any[] = [];
+      let hasPages = false;
 
-      sortedItems.forEach((item) => {
-        if (!item || !item.id) return;
-        const record = records[item.id] || {
-          id: "",
-          itemId: item.id,
-          conformity: "",
-          serviceExecuted: "",
-          lastMaintenanceKM: 0,
-          nextMaintenanceKM: 0,
-          lastMaintenanceDate: null,
-          nextMaintenanceDate: null,
-        };
-        const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
-
-        const { progressPercent, remainingNumber, isOutdated, descRemaining } =
-          calculateProgress(item, record, currentVehicleKM);
-        const progressText = `${Math.round(progressPercent)}%`;
-
-        const rawServiceExec = (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "-")) as string;
-        const serviceExecText = ["SIM", "NÃO", "NaKM"].includes(rawServiceExec) ? rawServiceExec : (rawServiceExec === "CONTROLEAR" || rawServiceExec === "Controlar" ? "-" : rawServiceExec);
-
-        tableData.push([
-          `${item.name}\nPeriodicidade: ${formatKM(item.periodicityKM)} ${item.unit || "km"}`,
-          record.conformity || "-",
-          serviceExecText,
-          isTimeBasedUnit(item.unit)
-            ? record.lastMaintenanceDate
-              ? new Date(
-                  record.lastMaintenanceDate + "T12:00:00",
-                ).toLocaleDateString("pt-BR")
-              : "-"
-            : formatKM(record.lastMaintenanceKM),
-          `Próx: ${isTimeBasedUnit(item.unit) ? (record.nextMaintenanceDate ? new Date(record.nextMaintenanceDate + "T12:00:00").toLocaleDateString("pt-BR") : "-") : formatKM(record.nextMaintenanceKM)}\n${descRemaining}\nProgresso: ${progressText}\n`,
-        ]);
-      });
-
-      // Garantir que a imagem do veículo esteja carregada antes de exportar
+      // Garantir que a imagem do veículo esteja carregada
       let finalImgDataUrl = vehicleImgDataUrl;
+      setExportProgressVal(25);
+      setExportStep("Processando imagem do veículo...");
       if (!finalImgDataUrl && vehicle.imageUrl) {
         try {
           const imgUrl = vehicle.imageUrl;
           const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}&w=400&output=jpeg`;
           const resp = await fetch(proxyUrl);
-          const blob = await resp.blob();
-          finalImgDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
+          if (resp.ok) {
+            const blob = await resp.blob();
+            finalImgDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+          }
         } catch (e) {
           console.warn("Could not load image for PDF:", e);
         }
       }
 
-      autoTable(pdf, {
-        startY: 40,
-        margin: { top: 40, bottom: 20, left: 14, right: 14 },
-        head: [
-          [
-            "ITEM",
-            "AÇÕES EM CONFORMIDADE",
-            "SERVIÇO EXECUTADO",
-            "ÚLTIMA MANUT.",
-            "PROGRESSO",
-          ],
-        ],
-        body: tableData,
-        theme: "grid",
-        styles: {
-          font: "helvetica",
-          fontSize: 8,
-          cellPadding: { top: 4, right: 4, bottom: 6, left: 4 }, // Mais padding inferior para a barra
-          valign: "middle",
-        },
-        headStyles: {
-          fillColor: [248, 250, 252],
-          textColor: [100, 116, 139],
-          fontStyle: "bold",
-          fontSize: 7,
-          halign: "left",
-          lineColor: [226, 232, 240],
-          lineWidth: 0.1,
-        },
-        bodyStyles: {
-          lineColor: [226, 232, 240],
-          lineWidth: 0.1,
-        },
-        columnStyles: {
-          0: { cellWidth: 55 },
-          1: { halign: "center", cellWidth: 35 },
-          2: { halign: "center", cellWidth: 35 },
-          3: { halign: "center", cellWidth: 25 },
-          4: { halign: "left", fontStyle: "bold" },
-        },
-        didDrawPage: function (data) {
-          // Cabeçalho (renderizado em todas as páginas)
-          let startY = 15;
+      // Função helper para desenhar a Inspeção / Checklist
+      const drawInspectionPage = async (isChecklistHistory) => {
+        if (hasPages) {
+           pdf.addPage();
+        }
+        
+        let localHistoryKM = null;
+        let localConcludedMaintenanceOrders = [];
+        let dateLabel = isChecklistHistory ? exportConfig.date.split('-').reverse().join('/') : "-";
 
-          // Imagem do veículo
-          if (finalImgDataUrl) {
-            // Aumentando largura para 35mm e mantendo altura de 20mm para evitar distorção
-            pdf.addImage(finalImgDataUrl, "JPEG", 14, startY, 35, 20);
-            pdf.setFontSize(16);
-            pdf.setFont("helvetica", "bold");
-            pdf.setTextColor(0, 0, 0);
-            // Ajustando X para 54 para dar espaço à imagem mais larga
-            pdf.text(`Inspeção: ${vehicle.plate}`, 54, startY + 8);
-            pdf.setFontSize(10);
-            pdf.setFont("helvetica", "normal");
-            pdf.setTextColor(100, 100, 100);
-            pdf.text(`${vehicle.model}`, 54, startY + 14);
-          } else {
-            pdf.setFontSize(16);
-            pdf.setFont("helvetica", "bold");
-            pdf.setTextColor(0, 0, 0);
-            pdf.text(`Inspeção: ${vehicle.plate}`, 14, startY + 8);
-            pdf.setFontSize(10);
-            pdf.setFont("helvetica", "normal");
-            pdf.setTextColor(100, 100, 100);
-            pdf.text(`${vehicle.model}`, 14, startY + 14);
+        if (isChecklistHistory) {
+          // Fetch historical records for exportConfig.date
+          const qKm = query(
+            collection(db, "checklist_history"),
+            where("vehicleId", "==", resolvedVehicleId),
+            where("date", "==", exportConfig.date),
+            where("status", "==", "Concluído"),
+            orderBy("createdAt", "desc"),
+            limit(1)
+          );
+          const snapKm = await getDocs(qKm);
+          if (!snapKm.empty) {
+            const docData = snapKm.docs[0].data();
+            localHistoryKM = docData.kmAtClosure ?? docData.vehicleKM ?? null;
           }
 
-          // Boxes informativos (KM Atual, Data Checklist, KM Checklist)
-          const infoBoxWidth = 24;
-          const infoBoxHeight = 16;
-          const infoSpacing = 2;
-          const rightMargin = 10;
+          const qOs = query(
+            collection(db, "maintenance"),
+            where("vehicleId", "==", resolvedVehicleId)
+          );
+          const snapOs = await getDocs(qOs);
+          const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() } as any));
+          localConcludedMaintenanceOrders = orders.filter(os => {
+            const createdAt = os.createdAt?.toDate ? os.createdAt.toDate() : (os.createdAt ? new Date(os.createdAt) : null);
+            if (!createdAt) return false;
+            const y = createdAt.getFullYear();
+            const m = String(createdAt.getMonth() + 1).padStart(2, "0");
+            const d = String(createdAt.getDate()).padStart(2, "0");
+            return `${y}-${m}-${d}` === exportConfig.date;
+          });
+        } else {
+          localHistoryKM = historyKM; // from state if any, but actually for "current state" it's typically null
+          localConcludedMaintenanceOrders = concludedMaintenanceOrders;
+        }
+
+        const checkServiceExecuted = (itemId) => {
+          return localConcludedMaintenanceOrders.some(os => 
+              os.inspectionItems?.some((i) => i.id === itemId || i.itemId === itemId)
+          ) ? "SIM" : "NÃO";
+        };
+
+        const tableData = [];
+        sortedItems.forEach((item) => {
+          if (!item || !item.id) return;
+          const record = (records[item.id] || { conformity: "", serviceExecuted: "", lastMaintenanceKM: 0, nextMaintenanceKM: 0, lastMaintenanceDate: null, nextMaintenanceDate: null, id: "", itemId: "" }) as InspectionRecord;
+          const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
+
+          let conformityVal = record.conformity || "-";
           
-          // KM Atual
-          pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(pageWidth - infoBoxWidth - rightMargin, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
-          pdf.setFontSize(5);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(100, 116, 139);
-          pdf.text("KM ATUAL", pageWidth - infoBoxWidth - rightMargin + 3, startY + 5);
-          pdf.setFontSize(8);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(30, 41, 59);
-          pdf.text(formatKM(currentKM), pageWidth - infoBoxWidth - rightMargin + 3, startY + 12);
+          const { progressPercent, remainingNumber, isOutdated, descRemaining } = calculateProgress(item, record, currentVehicleKM);
+          const progressText = `${Math.round(progressPercent)}%`;
 
-          // Data Checklist
-          const dateBoxX = pageWidth - (infoBoxWidth * 2) - infoSpacing - rightMargin;
-          pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(dateBoxX, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
-          pdf.setFontSize(5);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(100, 116, 139);
-          pdf.text("DATA CHECKLIST", dateBoxX + 3, startY + 5);
-          pdf.setFontSize(8);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(30, 41, 59);
-          pdf.text(checklistDate ? checklistDate.split('-').reverse().join('/') : "-", dateBoxX + 3, startY + 12);
+          const rawServiceExec = (isChecklistHistory ? checkServiceExecuted(item.id) : (record.serviceExecuted || "-")) as string;
+          const serviceExecText = ["SIM", "NÃO", "NaKM"].includes(rawServiceExec) ? rawServiceExec : (String(rawServiceExec) === "CONTROLEAR" || String(rawServiceExec) === "Controlar" ? "-" : rawServiceExec);
 
-          // KM Checklist
-          const kmChecklistX = pageWidth - (infoBoxWidth * 3) - (infoSpacing * 2) - rightMargin;
-          pdf.setFillColor(241, 245, 249);
-          pdf.roundedRect(kmChecklistX, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
-          pdf.setFontSize(5);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(100, 116, 139);
-          pdf.text("KM CHECKLIST", kmChecklistX + 3, startY + 5);
-          pdf.setFontSize(8);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(30, 41, 59);
-          pdf.text(historyKM !== null ? formatKM(historyKM) : "-", kmChecklistX + 3, startY + 12);
-        },
-        didDrawCell: function (data) {
-          if (data.section === "body" && data.column.index === 4) {
-            const rowIndex = data.row.index;
-            const item = sortedItems[rowIndex];
-            if (!item) return;
+          tableData.push([
+            `${item.name}\nPeriodicidade: ${(item.periodicityKM ?? 0).toLocaleString('pt-BR')} ${item.unit || "km"}`,
+            conformityVal,
+            serviceExecText,
+            isTimeBasedUnit(item.unit)
+              ? record.lastMaintenanceDate ? new Date(record.lastMaintenanceDate + "T12:00:00").toLocaleDateString("pt-BR") : "-"
+              : record.lastMaintenanceKM?.toLocaleString('pt-BR') || '0',
+            `Próx: ${isTimeBasedUnit(item.unit) ? (record.nextMaintenanceDate ? new Date(record.nextMaintenanceDate + "T12:00:00").toLocaleDateString("pt-BR") : "-") : record.nextMaintenanceKM?.toLocaleString('pt-BR') || '0'}\n${descRemaining}\nProgresso: ${progressText}\n`,
+          ]);
+        });
 
-            const record = records[item.id] || { lastMaintenanceKM: 0 };
-            const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
-
-            const { progressPercent } = calculateProgress(
-              item,
-              record as InspectionRecord,
-              currentVehicleKM,
-            );
-
-            const cell = data.cell;
-            const barWidth = cell.width - 8;
-            const barHeight = 4; // Barra mais grossa
-            const x = cell.x + 4;
-            const y = cell.y + cell.height - 6; // Posicionamento mais visível
-
-            // Fundo da barra
-            pdf.setFillColor(226, 232, 240); // bg-slate-200
-            pdf.rect(x, y, barWidth, barHeight, "F");
-
-            // Preenchimento da barra
-            if (progressPercent > 0) {
-              if (progressPercent >= 100) {
-                pdf.setFillColor(239, 68, 68); // vermelho error
-              } else {
-                pdf.setFillColor(14, 165, 233); // azul primário
-              }
-              const filledWidth = (progressPercent / 100) * barWidth;
-              pdf.rect(x, y, filledWidth, barHeight, "F");
+        autoTable(pdf, {
+          startY: 40,
+          margin: { top: 40, bottom: 20, left: 14, right: 14 },
+          head: [["ITEM", "AÇÕES EM CONFORMIDADE", "SERVIÇO EXECUTADO", "ÚLTIMA MANUT.", "PROGRESSO"]],
+          body: tableData,
+          theme: "grid",
+          styles: { font: "helvetica", fontSize: 8, cellPadding: { top: 4, right: 4, bottom: 6, left: 4 }, valign: "middle" },
+          headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: "bold", fontSize: 7, halign: "left", lineColor: [226, 232, 240], lineWidth: 0.1 },
+          bodyStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+          columnStyles: { 0: { cellWidth: 55 }, 1: { halign: "center", cellWidth: 35 }, 2: { halign: "center", cellWidth: 35 }, 3: { halign: "center", cellWidth: 25 }, 4: { halign: "left", fontStyle: "bold" } },
+          didDrawPage: function (data) {
+            let startY = 15;
+            if (finalImgDataUrl) {
+              pdf.addImage(finalImgDataUrl, "JPEG", 14, startY, 35, 20);
+              pdf.setFontSize(16);
+              pdf.setFont("helvetica", "bold");
+              pdf.setTextColor(0, 0, 0);
+              pdf.text(`Inspeção: ${vehicle.plate}`, 54, startY + 8);
+              pdf.setFontSize(10);
+              pdf.setFont("helvetica", "normal");
+              pdf.setTextColor(100, 100, 100);
+              pdf.text(`${vehicle.model}`, 54, startY + 14);
+            } else {
+              pdf.setFontSize(16);
+              pdf.setFont("helvetica", "bold");
+              pdf.setTextColor(0, 0, 0);
+              pdf.text(`Inspeção: ${vehicle.plate}`, 14, startY + 8);
+              pdf.setFontSize(10);
+              pdf.setFont("helvetica", "normal");
+              pdf.setTextColor(100, 100, 100);
+              pdf.text(`${vehicle.model}`, 14, startY + 14);
             }
 
-            // Reset de cores
-            pdf.setTextColor(0, 0, 0);
-          }
-        },
-      });
+            const infoBoxWidth = 24;
+            const infoBoxHeight = 16;
+            const infoSpacing = 2;
+            const rightMargin = 10;
+            
+            // KM Atual
+            pdf.setFillColor(241, 245, 249);
+            pdf.roundedRect(pageWidth - infoBoxWidth - rightMargin, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
+            pdf.setFontSize(5);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(100, 116, 139);
+            pdf.text("KM ATUAL", pageWidth - infoBoxWidth - rightMargin + 3, startY + 5);
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(30, 41, 59);
+            pdf.text((vehicle.currentKM || vehicle.odometer || 0).toLocaleString('pt-BR'), pageWidth - infoBoxWidth - rightMargin + 3, startY + 12);
 
-      // Adicionar paginação inteligente e assinatura
+            // Data Checklist
+            const dateBoxX = pageWidth - (infoBoxWidth * 2) - infoSpacing - rightMargin;
+            pdf.setFillColor(241, 245, 249);
+            pdf.roundedRect(dateBoxX, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
+            pdf.setFontSize(5);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(100, 116, 139);
+            pdf.text("DATA CHECKLIST", dateBoxX + 3, startY + 5);
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(30, 41, 59);
+            pdf.text(dateLabel, dateBoxX + 3, startY + 12);
+
+            // KM Checklist
+            const kmChecklistX = pageWidth - (infoBoxWidth * 3) - (infoSpacing * 2) - rightMargin;
+            pdf.setFillColor(241, 245, 249);
+            pdf.roundedRect(kmChecklistX, startY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
+            pdf.setFontSize(5);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(100, 116, 139);
+            pdf.text("KM CHECKLIST", kmChecklistX + 3, startY + 5);
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(30, 41, 59);
+            pdf.text((localHistoryKM !== null && localHistoryKM !== undefined) ? localHistoryKM.toLocaleString('pt-BR') : "-", kmChecklistX + 3, startY + 12);
+          },
+          didDrawCell: function (data) {
+            if (data.section === "body" && data.column.index === 4) {
+              const rowIndex = data.row.index;
+              const item = sortedItems[rowIndex];
+              if (!item) return;
+
+              const record = (records[item.id] || { lastMaintenanceKM: 0, conformity: "", serviceExecuted: "", nextMaintenanceKM: 0, id: "", itemId: "" }) as InspectionRecord;
+              const currentVehicleKM = vehicle.currentKM || vehicle.odometer || 0;
+              const { progressPercent } = calculateProgress(item, record, currentVehicleKM);
+
+              const cell = data.cell;
+              const barWidth = cell.width - 8;
+              const barHeight = 4;
+              const x = cell.x + 4;
+              const y = cell.y + cell.height - 6;
+
+              pdf.setFillColor(226, 232, 240);
+              pdf.rect(x, y, barWidth, barHeight, "F");
+
+              if (progressPercent > 0) {
+                if (progressPercent >= 100) pdf.setFillColor(239, 68, 68);
+                else pdf.setFillColor(14, 165, 233);
+                const filledWidth = (Math.min(progressPercent, 100) / 100) * barWidth;
+                pdf.rect(x, y, filledWidth, barHeight, "F");
+              }
+              pdf.setTextColor(0, 0, 0);
+            }
+          },
+        });
+        
+        hasPages = true;
+      };
+
+      // Função helper para desenhar Manutenção (OS Automática)
+      const drawMaintenancePage = async () => {
+        const qOs = query(
+          collection(db, "maintenance"),
+          where("vehicleId", "==", resolvedVehicleId)
+        );
+        const snapOs = await getDocs(qOs);
+        const orders = snapOs.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        const os = orders.find(o => {
+          const createdAt = o.createdAt?.toDate ? o.createdAt.toDate() : (o.createdAt ? new Date(o.createdAt) : null);
+          if (!createdAt) return false;
+          if (!o.title?.includes("OS Automática")) return false;
+
+          const y = createdAt.getFullYear();
+          const m = String(createdAt.getMonth() + 1).padStart(2, "0");
+          const d = String(createdAt.getDate()).padStart(2, "0");
+          return `${y}-${m}-${d}` === exportConfig.date;
+        });
+
+        if (!os) {
+          alert(`Não foi encontrada OS Automática para a data ${exportConfig.date.split('-').reverse().join('/')}`);
+          return;
+        }
+
+        let kmAtClosure = os.kmAtClosure || null;
+        if (!kmAtClosure && os.title?.startsWith("OS Automática: Checklist ")) {
+          try {
+            const extractedDate = os.title.replace("OS Automática: Checklist ", "").trim();
+            const parts = extractedDate.split('-');
+            if (parts.length === 3) {
+              const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              const q = query(
+                collection(db, "checklist_history"),
+                where("vehicleId", "==", resolvedVehicleId),
+                where("date", "==", formattedDate)
+              );
+              const snapshot = await getDocs(q);
+              if (!snapshot.empty) {
+                const docData = snapshot.docs[0].data();
+                kmAtClosure = docData.kmAtClosure || docData.vehicleKM || null;
+              }
+            }
+          } catch (e) {
+            console.error("Error fetching KM for Maintenance page in Inspections PDF:", e);
+          }
+        }
+
+        if (hasPages) {
+           pdf.addPage();
+        }
+
+        const tableData = [];
+        let totalItems = 0;
+        const isFirestoreId = (str) => typeof str === 'string' && str.length >= 20 && /^[a-zA-Z0-9]+$/.test(str);
+
+        const itemsWithValidTitles = os.inspectionItems?.filter(i => {
+          const label = i.itemTitle || i.description || i.title || i.item || (items.find(it => it.id === i.itemId)?.name);
+          return label && !isFirestoreId(label);
+        }) || [];
+
+        if (itemsWithValidTitles.length > 0) {
+          itemsWithValidTitles.forEach((i) => {
+            const label = i.itemTitle || i.description || i.title || i.item || (items.find(it => it.id === i.itemId)?.name) || "Item Indefinido";
+            tableData.push([label, "Manutenção Solicitada", os.status, ""]);
+            totalItems++;
+          });
+        } else {
+          const descItems = os.description?.split('\n') || [os.description];
+          descItems.forEach((itemLine) => {
+            const trimmed = itemLine.trim();
+            if (trimmed !== '' && trimmed !== 'Gerado a partir do checklist diário.' && trimmed !== 'Itens:' && !trimmed.match(/^[a-zA-Z0-9]{20}$/)) {
+              let label = trimmed.replace(/^- /, '');
+              const matchedItem = items.find(it => it.id === label);
+              if (isFirestoreId(label) && matchedItem) {
+                label = matchedItem.name;
+              }
+              tableData.push([label, "Manutenção Solicitada", os.status, ""]);
+              totalItems++;
+            }
+          });
+        }
+
+        autoTable(pdf, {
+          startY: 55,
+          margin: { top: 55, bottom: 20, left: 14, right: 14 },
+          head: [["ITEM / SERVIÇO", "CATEGORIA", "STATUS", "OBSERVAÇÕES"]],
+          body: tableData,
+          theme: "grid",
+          styles: { font: "helvetica", fontSize: 8, cellPadding: { top: 4, right: 4, bottom: 4, left: 4 }, valign: "middle" },
+          headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: "bold", fontSize: 7, halign: "left", lineColor: [226, 232, 240], lineWidth: 0.1 },
+          bodyStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+          didDrawPage: function (data) {
+            let startY = 15;
+            if (finalImgDataUrl) {
+              pdf.addImage(finalImgDataUrl, "JPEG", 14, startY, 35, 20);
+              pdf.setFontSize(16);
+              pdf.setFont("helvetica", "bold");
+              pdf.setTextColor(0, 0, 0);
+              pdf.text(`OS: ${os.plate}`, 54, startY + 8);
+              pdf.setFontSize(10);
+              pdf.setFont("helvetica", "normal");
+              pdf.setTextColor(100, 100, 100);
+              pdf.text(`${vehicle.brand} ${vehicle.model}`, 54, startY + 14);
+            } else {
+              pdf.setFontSize(16);
+              pdf.setFont("helvetica", "bold");
+              pdf.setTextColor(0, 0, 0);
+              pdf.text(`OS: ${os.plate}`, 14, startY + 8);
+              pdf.setFontSize(10);
+              pdf.setFont("helvetica", "normal");
+              pdf.setTextColor(100, 100, 100);
+              pdf.text(`${vehicle.brand} ${vehicle.model}`, 14, startY + 14);
+            }
+
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(30, 41, 59);
+            pdf.text(`TOTAL ITENS: ${totalItems}`, 14, startY + 22);
+
+            pdf.setFillColor(241, 245, 249);
+            const boxHeight = (kmAtClosure !== null && kmAtClosure !== undefined) ? 24 : 20;
+            pdf.roundedRect(pageWidth - 94, startY, 80, boxHeight, 2, 2, "F");
+
+            pdf.setFontSize(7);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(100, 116, 139);
+            pdf.text("DATA DE CRIAÇÃO", pageWidth - 90, startY + 6);
+
+            pdf.setFontSize(9);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(30, 41, 59);
+            
+            let cleanDate = new Date(os.createdAt).toLocaleDateString().replace(/(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1");
+            if (os.title && os.title.startsWith("OS Automática: Checklist ")) {
+              const extractedDate = os.title.replace("OS Automática: Checklist ", "").trim();
+              cleanDate = extractedDate.replace(/-/g, "/");
+            }
+            pdf.text(cleanDate, pageWidth - 90, startY + 11);
+            pdf.text(`Prestador: ${os.provider || 'Não informado'}`, pageWidth - 90, startY + 16);
+
+            if (kmAtClosure !== null && kmAtClosure !== undefined) {
+              pdf.text(`KM Checklist: ${kmAtClosure.toLocaleString('pt-BR')}`, pageWidth - 90, startY + 21);
+            }
+          },
+        });
+        hasPages = true;
+      };
+
+      // Execution sequence
+      if (exportConfig.inspection) {
+        setExportStep("Gerando página de inspeção atual...");
+        setExportProgressVal(45);
+        await drawInspectionPage(false);
+      }
+      if (exportConfig.checklist) {
+        setExportStep("Gerando página do histórico de checklist...");
+        setExportProgressVal(70);
+        await drawInspectionPage(true);
+      }
+      if (exportConfig.maintenance) {
+        setExportStep("Gerando página de manutenção (OS)...");
+        setExportProgressVal(85);
+        await drawMaintenancePage();
+      }
+
+      if (!hasPages) {
+         setIsExporting(false);
+         return;
+      }
+
+      setExportStep("Configurando paginação e assinaturas...");
+      setExportProgressVal(90);
+
+      // Pagination and Signature
       const totalPages = (pdf as any).internal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
@@ -679,16 +905,11 @@ function InspectionForm({
         pdf.setFont("helvetica", "normal");
         pdf.text("ROTA 360 - Gestão de Frota", 14, pageHeight - 10);
         const pageStr = `Pág. ${i}/${totalPages}`;
-        pdf.text(
-          pageStr,
-          pageWidth - 14 - pdf.getTextWidth(pageStr),
-          pageHeight - 10,
-        );
+        pdf.text(pageStr, pageWidth - 14 - pdf.getTextWidth(pageStr), pageHeight - 10);
       }
 
-      // Campo de assinatura na última página
       pdf.setPage(totalPages);
-      const finalY = (pdf as any).lastAutoTable.finalY || 40;
+      const finalY = (pdf as any).lastAutoTable?.finalY || 40;
       let signatureY = finalY + 20;
       let signatureHeight = 40;
 
@@ -699,8 +920,8 @@ function InspectionForm({
 
       // Generate digital signature
       const signatureId = await createSignature({
-         documentType: 'Relatório de Inspeção',
-         documentTitle: `Inspeção - Veículo ${vehicle.plate}`
+         documentType: 'Relatório Unificado',
+         documentTitle: `Inspeção / Manutenção - Veículo ${vehicle.plate}`
       });
 
       if (signatureId) {
@@ -713,9 +934,7 @@ function InspectionForm({
         pdf.setLineWidth(0.1);
         pdf.roundedRect(14, signatureY, pageWidth - 28, signatureHeight, 3, 3, "S");
         
-        if (qrCodeDataUrl) {
-           pdf.addImage(qrCodeDataUrl, "JPEG", 20, signatureY + 5, 30, 30);
-        }
+        if (qrCodeDataUrl) pdf.addImage(qrCodeDataUrl, "JPEG", 20, signatureY + 5, 30, 30);
         
         pdf.setFontSize(10);
         pdf.setTextColor(30, 41, 59);
@@ -739,7 +958,6 @@ function InspectionForm({
         pdf.setFontSize(7);
         pdf.text(`Código de Validação: ${signatureId}`, 56, signatureY + 36);
 
-        // Add Seal Logo on the right
         try {
           const sealUrl = "https://i.imgur.com/1DaE4Bm.png";
           const sealResp = await fetch(sealUrl);
@@ -749,24 +967,17 @@ function InspectionForm({
             reader.onloadend = () => resolve(reader.result as string);
             reader.readAsDataURL(sealBlob);
           });
-          
+            
           const h = 14;
           const w = h * (1.0);
           pdf.addImage(sealDataUrl, 'PNG', pageWidth - 14 - w - 10, signatureY + 6, w, h, '', 'FAST');
         } catch (sealErr) {
           console.warn("Could not add seal logo to Inspections PDF", sealErr);
         }
-      } else {
-        pdf.setLineWidth(0.5);
-        pdf.setDrawColor(200);
-        pdf.line(pageWidth / 2 - 45, signatureY + 20, pageWidth / 2 + 45, signatureY + 20);
-        pdf.setFontSize(10);
-        pdf.setTextColor(50);
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Assinatura do Responsável", pageWidth / 2, signatureY + 26, {
-          align: "center",
-        });
       }
+
+      setExportStep("Fazendo download do arquivo...");
+      setExportProgressVal(98);
 
       const today = new Date();
       const day = String(today.getDate()).padStart(2, '0');
@@ -774,12 +985,12 @@ function InspectionForm({
       const year = String(today.getFullYear()).slice(-2);
       const dateStr = `${day}.${month}.${year}`;
 
-      pdf.save(`${dateStr}_${vehicle.plate}_INSPECAO.pdf`);
+      pdf.save(`${dateStr}_${vehicle.plate}_UNIFICADO.pdf`);
+      setExportProgressVal(100);
+      setExportStep("Documento gerado com sucesso!");
     } catch (error) {
       console.error("Erro ao exportar PDF:", error);
-      alert(
-        "Houve um problema ao gerar o PDF. Se o erro persistir, atualize a página.",
-      );
+      alert("Houve um problema ao gerar o PDF. Se o erro persistir, atualize a página.");
     } finally {
       setIsExporting(false);
     }
@@ -1364,7 +1575,265 @@ function InspectionForm({
   }
 
   return (
-    <div className="space-y-6" id="inspection-print-container">
+    <>
+      <AnimatePresence>
+        {showExportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-surface dark:bg-surface-container rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-outline-variant/30"
+            >
+              <div className="px-6 py-4 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-low/50">
+                <h3 className="text-lg font-bold text-on-surface">Exportar PDF Unificado</h3>
+                <button onClick={() => setShowExportModal(false)} className="p-2 hover:bg-surface-container-high rounded-full transition-colors text-on-surface-variant">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div>
+                  <p className="text-sm text-on-surface-variant mb-4">Selecione quais documentos deseja incluir no PDF unificado:</p>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface-container-low/50 cursor-pointer transition-colors">
+                      <input type="checkbox" className="w-5 h-5 rounded border-outline text-primary focus:ring-primary" checked={exportConfig.inspection} onChange={e => setExportConfig({...exportConfig, inspection: e.target.checked})} />
+                      <div>
+                        <p className="font-semibold text-on-surface text-sm">Inspeção (Estado Atual)</p>
+                        <p className="text-xs text-on-surface-variant">O status técnico da frota com base na última auditoria.</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface-container-low/50 cursor-pointer transition-colors">
+                      <input type="checkbox" className="w-5 h-5 rounded border-outline text-primary focus:ring-primary" checked={exportConfig.checklist} onChange={e => setExportConfig({...exportConfig, checklist: e.target.checked})} />
+                      <div>
+                        <p className="font-semibold text-on-surface text-sm">Histórico de Checklist</p>
+                        <p className="text-xs text-on-surface-variant">O registro diário do checklist realizado numa data específica.</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface-container-low/50 cursor-pointer transition-colors">
+                      <input type="checkbox" className="w-5 h-5 rounded border-outline text-primary focus:ring-primary" checked={exportConfig.maintenance} onChange={e => setExportConfig({...exportConfig, maintenance: e.target.checked})} />
+                      <div>
+                        <p className="font-semibold text-on-surface text-sm">Manutenção (OS Automática)</p>
+                        <p className="text-xs text-on-surface-variant">A OS automática vinculada ao checklist selecionado.</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {(exportConfig.checklist || exportConfig.maintenance) && (
+                  <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="block text-sm font-semibold text-on-surface-variant mb-2">Data de Referência (Checklist/OS)</label>
+                    <div className="relative">
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={manualDateInput}
+                          onChange={(e) => handleManualDateChange(e.target.value)}
+                          placeholder="DD/MM/AAAA"
+                          className="w-full bg-surface-container-lowest dark:bg-surface-variant/30 border border-outline-variant dark:border-outline/50 rounded-lg pl-11 pr-10 py-3 text-sm text-on-surface focus:outline-none focus:border-primary transition-colors"
+                        />
+                        <span className="absolute left-4 material-symbols-outlined text-[20px] text-primary pointer-events-none">calendar_today</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowDatePicker(!showDatePicker)}
+                          className="absolute right-2 p-1.5 hover:bg-surface-container-high rounded-full text-on-surface-variant transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[20px]" style={{ transform: showDatePicker ? 'rotate(180deg)' : 'rotate(0)' }}>
+                            expand_more
+                          </span>
+                        </button>
+                      </div>
+
+                      {showDatePicker && (
+                        <div className="absolute right-0 left-0 z-[60] bottom-full mb-2 bg-white dark:bg-surface-container border border-outline-variant rounded-xl shadow-xl p-4 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                          <div className="flex items-center justify-between mb-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newDate = new Date(pickerDate);
+                                newDate.setMonth(newDate.getMonth() - 1);
+                                setPickerDate(newDate);
+                              }}
+                              className="p-1.5 hover:bg-surface-container-high rounded-lg text-on-surface-variant transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                            </button>
+                            <span className="font-bold text-on-surface text-sm">
+                              {pickerDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newDate = new Date(pickerDate);
+                                newDate.setMonth(newDate.getMonth() + 1);
+                                setPickerDate(newDate);
+                              }}
+                              className="p-1.5 hover:bg-surface-container-high rounded-lg text-on-surface-variant transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                            {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, i) => (
+                              <span key={i} className="text-xs font-semibold text-on-surface-variant/60">{day}</span>
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-7 gap-1">
+                            {(() => {
+                              const year = pickerDate.getFullYear();
+                              const month = pickerDate.getMonth();
+                              const daysInMonth = new Date(year, month + 1, 0).getDate();
+                              const firstDayIndex = new Date(year, month, 1).getDay();
+                              
+                              const cells = [];
+                              // Empty cells for prior month
+                              for (let i = 0; i < firstDayIndex; i++) {
+                                cells.push(<div key={`empty-${i}`} />);
+                              }
+                              
+                              // Days of current month
+                              const currentSelectedDateStr = exportConfig.date;
+                              for (let day = 1; day <= daysInMonth; day++) {
+                                const dayStr = String(day).padStart(2, '0');
+                                const monthStr = String(month + 1).padStart(2, '0');
+                                const fullDateStr = `${year}-${monthStr}-${dayStr}`;
+                                const isSelected = fullDateStr === currentSelectedDateStr;
+                                const isToday = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}` === fullDateStr;
+                                
+                                cells.push(
+                                  <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => {
+                                      setExportConfig({ ...exportConfig, date: fullDateStr });
+                                      setManualDateInput(`${dayStr}/${monthStr}/${year}`);
+                                      setShowDatePicker(false);
+                                    }}
+                                    className={`h-8 w-8 text-xs font-bold rounded-lg flex items-center justify-center transition-all ${
+                                      isSelected 
+                                        ? 'bg-primary text-on-primary shadow-sm shadow-primary/30' 
+                                        : isToday 
+                                          ? 'border border-primary text-primary hover:bg-primary-container/20' 
+                                          : 'text-on-surface hover:bg-surface-container-high'
+                                    }`}
+                                  >
+                                    {day}
+                                  </button>
+                                );
+                              }
+                              return cells;
+                            })()}
+                          </div>
+                          
+                          <div className="mt-3 pt-3 border-t border-outline-variant/30 flex justify-between">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const now = new Date();
+                                const year = now.getFullYear();
+                                const month = String(now.getMonth() + 1).padStart(2, '0');
+                                const day = String(now.getDate()).padStart(2, '0');
+                                const todayStr = `${year}-${month}-${day}`;
+                                
+                                setExportConfig({ ...exportConfig, date: todayStr });
+                                setManualDateInput(`${day}/${month}/${year}`);
+                                setPickerDate(new Date());
+                                setShowDatePicker(false);
+                              }}
+                              className="text-xs font-bold text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-colors"
+                            >
+                              Hoje
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowDatePicker(false)}
+                              className="text-xs font-bold text-on-surface-variant hover:bg-surface-container-high px-2 py-1 rounded-lg transition-colors"
+                            >
+                              Fechar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="p-4 bg-surface-container-low border-t border-outline-variant/30 flex justify-end gap-3">
+                <button onClick={() => setShowExportModal(false)} className="px-5 py-2.5 text-sm font-bold text-on-surface-variant hover:bg-surface-container-high rounded-xl transition-all">
+                  Cancelar
+                </button>
+                <button onClick={confirmExportUnifiedPDF} disabled={isExporting || (!exportConfig.inspection && !exportConfig.checklist && !exportConfig.maintenance)} className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold shadow-sm hover:shadow hover:opacity-90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                  <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                  {isExporting ? "Gerando..." : "Exportar PDF"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Indicador de progresso estilizado para exportação de PDF */}
+      <AnimatePresence>
+        {isExporting && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-surface dark:bg-surface-container rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-outline-variant/30 text-center space-y-4"
+            >
+              <div className="flex justify-center">
+                <div className="relative flex items-center justify-center">
+                  {/* Spinner Animado Circular de Progresso */}
+                  <svg className="w-20 h-20 transform -rotate-90">
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="34"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="transparent"
+                      className="text-surface-container-high dark:text-surface-container-low"
+                    />
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="34"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="transparent"
+                      strokeDasharray={2 * Math.PI * 34}
+                      strokeDashoffset={2 * Math.PI * 34 * (1 - exportProgressVal / 100)}
+                      className="text-primary transition-all duration-300 ease-out"
+                    />
+                  </svg>
+                  <span className="absolute text-sm font-bold text-on-surface">
+                    {exportProgressVal}%
+                  </span>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <h4 className="text-base font-bold text-on-surface">Gerando Relatório Unificado</h4>
+                <p className="text-xs text-on-surface-variant animate-pulse font-medium">
+                  {exportStep || "Processando documentos..."}
+                </p>
+              </div>
+              
+              {/* Barra de Progresso Horizontal */}
+              <div className="w-full bg-surface-container-high dark:bg-surface-container-low rounded-full h-1.5 overflow-hidden">
+                <motion.div
+                  className="bg-primary h-full rounded-full"
+                  animate={{ width: `${exportProgressVal}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <div className="space-y-6" id="inspection-print-container">
       {customAlert && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
@@ -2262,6 +2731,7 @@ function InspectionForm({
         </div>
       </div>
     </div>
+    </>
   );
 }
 

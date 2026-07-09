@@ -422,6 +422,7 @@ export function Checklist({ preselectedVehicleId, autoAlertaId, hideHeader = fal
           createdAt: Date.now(),
           updatedAt: Date.now(),
           source: 'checklist',
+          kmAtClosure: vehicle?.currentKM || vehicle?.odometer || 0,
           autoAlertaId: (autoAlertaId || queryAutoAlertaId) || null,
           inspectionItems: nonConformingItems.map(i => ({ 
             id: i.id, 
