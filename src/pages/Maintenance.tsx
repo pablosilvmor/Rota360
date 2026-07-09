@@ -476,11 +476,18 @@ export function Maintenance() {
   };
 
   const handleCompleteOS = async (os: any) => {
+    const invalidProviders = ['', 'A Definir', 'Selecione um parceiro ou oficina interna'];
+    if (!os.provider || invalidProviders.includes(os.provider.trim())) {
+      alert("Por favor, informe o fornecedor antes de concluir a OS.");
+      return;
+    }
+
     setCompletingId(os.id);
     try {
       // Atualizar status da OS
       await updateDoc(doc(db, 'maintenance', os.id), {
         status: 'Concluído',
+        provider: os.provider || '',
         closingNotes: closingNotes,
         updatedAt: Date.now()
       });
@@ -646,12 +653,20 @@ export function Maintenance() {
                   </div>
                   <div className="col-span-2 shadow-none">
                      <label className="block text-sm font-semibold text-on-surface-variant mb-2">Fornecedor / Oficina</label>
-                    <select value={newOS.provider} onChange={e => setNewOS({...newOS, provider: e.target.value})} className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary">
-                      <option>Selecione um parceiro ou oficina interna</option>
-                      <option>Oficina Interna Matriz</option>
-                      <option>Precision Auto Motors</option>
-                      <option>Fleet Master Garage</option>
-                    </select>
+                    <input 
+                      list="providers-list" 
+                      value={newOS.provider} 
+                      onChange={e => setNewOS({...newOS, provider: e.target.value})} 
+                      className="w-full bg-white border border-outline-variant rounded-lg px-4 py-3 focus:outline-none focus:border-primary" 
+                      placeholder="Selecione ou digite um fornecedor..." 
+                    />
+                    <datalist id="providers-list">
+                      <option value="Mecânico Interno" />
+                      <option value="Mecânico Terceiro" />
+                      <option value="Oficina Interna Matriz" />
+                      <option value="Precision Auto Motors" />
+                      <option value="Fleet Master Garage" />
+                    </datalist>
                   </div>
                   <div className="col-span-2 md:col-span-1">
                     <label className="block text-sm font-semibold text-on-surface-variant mb-2">Custo Estimado (R$)</label>
@@ -1252,14 +1267,17 @@ export function Maintenance() {
                   <div className="bg-surface-container-lowest border border-outline-variant/30 p-4 rounded-2xl col-span-2 sm:col-span-2">
                     <span className="text-xs font-semibold text-on-surface-variant block mb-1 uppercase tracking-wider">Fornecedor</span>
                     {selectedOS.status !== 'Concluído' ? (
-                      <input
-                        type="text"
-                        value={selectedOS.provider}
-                        onChange={(e) => setSelectedOS({ ...selectedOS, provider: e.target.value })}
-                        onBlur={(e) => handleUpdateOSProvider(selectedOS.id, e.target.value)}
-                        className="w-full bg-white border border-outline-variant rounded px-2 py-1 text-sm font-medium text-on-surface focus:outline-none focus:border-primary"
-                        placeholder="Nome do Fornecedor..."
-                      />
+                      <>
+                        <input
+                          type="text"
+                          value={selectedOS.provider}
+                          onChange={(e) => setSelectedOS({ ...selectedOS, provider: e.target.value })}
+                          onBlur={(e) => handleUpdateOSProvider(selectedOS.id, e.target.value)}
+                          className="w-full bg-white border border-outline-variant rounded px-2 py-1 text-sm font-medium text-on-surface focus:outline-none focus:border-primary"
+                          placeholder="Nome do Fornecedor..."
+                          list="providers-list"
+                        />
+                      </>
                     ) : (
                       <span className="font-medium text-on-surface"><PrivateValue value={selectedOS.provider} /></span>
                     )}

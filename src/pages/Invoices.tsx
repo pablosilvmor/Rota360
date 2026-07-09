@@ -2283,7 +2283,7 @@ export function Invoices() {
                         </div>
                         <div className="w-1/2 p-4 flex flex-col justify-center">
                            <div className="mb-4">
-                             <p className="text-[9px] uppercase font-bold text-slate-600 mb-1">Chave de Accesso</p>
+                             <p className="text-[9px] uppercase font-bold text-slate-600 mb-1">Chave de Acesso</p>
                              <p className="text-[12px] font-mono tracking-widest font-black border border-transparent py-1 leading-none break-all text-slate-950">{((previewInvoice.xmlContent ? (previewInvoice.xmlContent.match(/Id="NFe(\d+)"/i)?.[1] || previewInvoice.xmlContent.match(/<chNFe>(\d+)<\/chNFe>/i)?.[1]) : null) || previewInvoice.key) || 'NÃO INFORMADA'}</p>
                            </div>
                            <div className="text-center mt-auto border-t border-slate-300 pt-2">

@@ -480,10 +480,13 @@ function InspectionForm({
           calculateProgress(item, record, currentVehicleKM);
         const progressText = `${Math.round(progressPercent)}%`;
 
+        const rawServiceExec = (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "-")) as string;
+        const serviceExecText = ["SIM", "NÃO", "NaKM"].includes(rawServiceExec) ? rawServiceExec : (rawServiceExec === "CONTROLEAR" || rawServiceExec === "Controlar" ? "-" : rawServiceExec);
+
         tableData.push([
           `${item.name}\nPeriodicidade: ${formatKM(item.periodicityKM)} ${item.unit || "km"}`,
           record.conformity || "-",
-          record.serviceExecuted || "-",
+          serviceExecText,
           isTimeBasedUnit(item.unit)
             ? record.lastMaintenanceDate
               ? new Date(
@@ -2120,7 +2123,7 @@ function InspectionForm({
                       </td>
                       <td className="p-4">
                         <select
-                          value={checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")}
+                          value={["SIM", "NÃO", "NaKM"].includes(checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) ? (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) : "NÃO"}
                           onChange={(e) => {
                             if (!isAdmin) return;
                             updateRecord(item.id, {
@@ -2129,9 +2132,9 @@ function InspectionForm({
                           }}
                           disabled={!isAdmin || !!checklistDate}
                           className={`text-sm px-2 py-1 rounded border outline-none dark:bg-surface-variant/30 ${isAdmin && !checklistDate ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
-                            (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) === "SIM"
+                            (["SIM", "NÃO", "NaKM"].includes(checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) ? (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) : "NÃO") === "SIM"
                               ? "bg-primary-container text-on-primary-container border-primary-container dark:border-primary/50 dark:text-emerald-400 font-semibold"
-                              : (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) === "NaKM"
+                              : (["SIM", "NÃO", "NaKM"].includes(checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) ? (checklistDate ? isServiceExecuted(item.id) : (record.serviceExecuted || "NÃO")) : "NÃO") === "NaKM"
                                 ? "bg-warning-container/50 text-warning-dark border-warning/50 dark:text-amber-400 font-semibold"
                                 : "bg-surface-container border-outline-variant text-on-surface-variant dark:border-outline/50 dark:text-on-surface-variant"
                           }`}
