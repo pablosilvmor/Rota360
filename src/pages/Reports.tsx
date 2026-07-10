@@ -734,7 +734,7 @@ export function Reports() {
     const isTelemetryReport = selectedModule.id === 'telemetry';
 
     // Calculate telemetry stats if needed
-    const telemetryStats = isTelemetryReport ? sortedData.reduce((acc, item) => {
+    const telemetryStats = isTelemetryReport ? data.reduce((acc, item) => {
       const provider = (item.telemetryProvider || 'Sem Telemetria').toLowerCase();
       if (provider.includes('solusat')) acc.solusat++;
       else if (provider.includes('gaussfleet')) acc.gaussfleet++;
@@ -828,7 +828,7 @@ export function Reports() {
             doc.setFontSize(10);
             doc.setTextColor(100);
             doc.setFont('helvetica', 'normal');
-            doc.text(`Total de Veículos na Frota: ${sortedData.length}`, marginX, 39);
+            doc.text(`Total de Veículos na Frota: ${data.length}`, marginX, 39);
           }
 
           if (isTelemetryReport && telemetryStats) {
