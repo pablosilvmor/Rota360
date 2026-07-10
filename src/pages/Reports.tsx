@@ -98,6 +98,21 @@ const MODULES: ModuleData[] = [
     ]
   },
   {
+    id: 'telemetry',
+    name: 'Veículos por Telemetria',
+    collectionId: 'vehicles',
+    icon: 'satellite_alt',
+    columns: [
+      { key: 'telemetryProvider', label: 'Provedor de Telemetria', renderer: (val) => val || 'Sem Telemetria' },
+      { key: 'plate', label: 'Placa', renderer: (val) => <PrivateValue value={val} /> },
+      { key: 'brand', label: 'Marca' },
+      { key: 'model', label: 'Modelo' },
+      { key: 'currentKM', label: 'KM Atual', align: 'center', renderer: (val: any, item: any) => (item?.currentKM || item?.odometer || 0).toLocaleString() },
+      { key: 'lastSyncCheck', label: 'Última Atualização', align: 'center', renderer: (val: any) => val ? new Date(val).toLocaleString('pt-BR') : '-' },
+      { key: 'status', label: 'Status' }
+    ]
+  },
+  {
     id: 'drivers',
     name: 'Motoristas',
     collectionId: 'drivers',
@@ -466,8 +481,8 @@ export function Reports() {
 
   const validWorksList = works.map(w => w.name);
   const displayData = worksLoaded ? data.reduce((acc: any[], item: any) => {
-    if (selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers') {
-      if (selectedModule?.id === 'vehicles') {
+    if (selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers' || selectedModule?.id === 'telemetry') {
+      if (selectedModule?.id === 'vehicles' || selectedModule?.id === 'telemetry') {
         // Deduplicate by plate
         const existingIdx = acc.findIndex(v => v.plate && item.plate && v.plate.replace(/[^A-Z0-9]/g, '') === item.plate.replace(/[^A-Z0-9]/g, ''));
         if (existingIdx !== -1) {
@@ -505,7 +520,7 @@ export function Reports() {
     let matchesWork = true;
     let matchesStatus = true;
 
-    if (selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers') {
+    if (selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers' || selectedModule?.id === 'telemetry') {
       matchesWork = filterWork.length === 0 || filterWork.includes('Todas as Obras') || 
         (Array.isArray(item.costCenter) 
           ? item.costCenter.some((c: string) => filterWork.includes(c)) 
@@ -621,7 +636,7 @@ export function Reports() {
       })
     );
 
-    const isFleetReport = selectedModule.id === 'vehicles';
+    const isFleetReport = selectedModule.id === 'vehicles' || selectedModule.id === 'telemetry';
 
     autoTable(doc, {
       head: [tableCols],
@@ -1070,6 +1085,27 @@ export function Reports() {
                   )}
                 </div>
               </div>
+
+              {selectedModule?.id === 'telemetry' && data.length > 0 && (
+                <div className="p-6 border-b border-outline-variant/30 bg-surface-container-low/30">
+                   <div className="flex gap-2 items-center mb-4">
+                      <span className="material-symbols-outlined text-primary text-[20px]">insights</span>
+                      <h4 className="font-bold text-on-surface text-sm uppercase tracking-wide">Resumo da Frota</h4>
+                   </div>
+                   <div className="flex flex-wrap gap-4">
+                     {Object.entries(sortedData.reduce((acc, curr) => {
+                         const prov = curr.telemetryProvider || 'Sem Telemetria';
+                         acc[prov] = (acc[prov] || 0) + 1;
+                         return acc;
+                     }, {} as Record<string, number>)).sort((a: any, b: any) => b[1] - a[1]).map(([prov, count]: any) => (
+                         <div key={prov} className="bg-white dark:bg-surface-container-low border border-outline-variant/50 rounded-2xl px-5 py-4 flex flex-col min-w-[140px] shadow-sm animate-in fade-in zoom-in-95 duration-300">
+                            <span className="text-3xl font-black text-primary">{count}</span>
+                            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mt-1 truncate">{prov}</span>
+                         </div>
+                     ))}
+                   </div>
+                </div>
+              )}
 
               <div 
                 ref={scrollRef}

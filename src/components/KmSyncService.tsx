@@ -267,7 +267,8 @@ export function KmSyncService() {
                                    lastSyncCheck: generalLastCheck,
                                    lastTrackerUpdate: trackerTime,
                                    lastSyncStatus: 'success',
-                                   lastSyncError: null
+                                   lastSyncError: null,
+                                   telemetryProvider: provider.name || "Desconhecido"
                                  };
 
                                  if ((currentKmApi > currentInDb || currentInDb === 0 || (currentInDb > 1000000 || (currentInDb > (currentKmApi * 5) && currentInDb > 200000))) && currentKmApi > 0) {
@@ -370,7 +371,8 @@ export function KmSyncService() {
                                lastSyncCheck: generalLastCheck,
                                lastTrackerUpdate: trackerTime,
                                lastSyncStatus: 'success',
-                               lastSyncError: null
+                               lastSyncError: null,
+                                   telemetryProvider: provider.name || "Desconhecido"
                              };
 
                              if (currentKmApi > 0 && (currentKmApi > currentInDb || currentInDb === 0)) {
