@@ -426,7 +426,7 @@ export function Reports() {
               const url = provider.url || '';
               const token = provider.token || '';
               
-              if (url.includes('solusat')) {
+              if (url.toLowerCase().includes('solusat') || provider.name.toLowerCase().includes('solusat')) {
                 const [apiKey, apiToken] = token.split(',');
                 if (apiKey && apiToken) {
                   try {
@@ -448,7 +448,7 @@ export function Reports() {
                     }
                   } catch (e) { console.error('Error fetching Solusat for report:', e); }
                 }
-              } else if (url.includes('gaussfleet')) {
+              } else if (url.toLowerCase().includes('gaussfleet') || provider.name.toLowerCase().includes('gaussfleet')) {
                 try {
                   const now = new Date();
                   const dateParam = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
@@ -737,15 +737,13 @@ export function Reports() {
       body: tableData,
       startY: isFleetReport ? 45 : 40,
       margin: { top: 45, bottom: 30, left: 8, right: 8 },
-      rowPageBreak: 'avoid',
+      
       styles: {
         fontSize: isFleetReport ? 7.5 : 9,
         cellPadding: 3,
         valign: 'middle'
       },
-      bodyStyles: {
-        minCellHeight: imageColIdx !== -1 ? 20 : undefined
-      },
+      bodyStyles: imageColIdx !== -1 ? { minCellHeight: 20 } : {},
       headStyles: {
         fillColor: [20, 24, 27],
         textColor: 255,
