@@ -257,12 +257,12 @@ export function Reports() {
   const [selectedModuleId, setSelectedModuleId] = useLocalStorageState<string | null>('reports_selectedModuleId', null);
   const selectedModule = MODULES.find(m => m.id === selectedModuleId) || null;
   
-  const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>('reports_selectedColumns', []);
+  const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>('reports_selectedColumns_v3', []);
   const [data, setData] = useState<any[]>([]);
   const [reportSearchTerm, setReportSearchTerm] = useLocalStorageState('reports_searchTerm', '');
-  const [filterWork, setFilterWork] = useLocalStorageState<string[]>('reports_filterWork', []);
-  const [filterStatus, setFilterStatus] = useLocalStorageState<string[]>('reports_filterStatus', []);
-  const [filterProvider, setFilterProvider] = useLocalStorageState<string[]>('reports_filterProvider', []);
+  const [filterWork, setFilterWork] = useLocalStorageState<string[]>('reports_filterWork_v2', []);
+  const [filterStatus, setFilterStatus] = useLocalStorageState<string[]>('reports_filterStatus_v2', []);
+  const [filterProvider, setFilterProvider] = useLocalStorageState<string[]>('reports_filterProvider_v2', []);
   const [works, setWorks] = useState<any[]>([]);
   const [worksLoaded, setWorksLoaded] = useState(false);
   const [statuses, setStatuses] = useState<any[]>([]);
@@ -738,10 +738,12 @@ export function Reports() {
       startY: isFleetReport ? 45 : 40,
       margin: { top: 45, bottom: 30, left: 8, right: 8 },
       
+      
       styles: {
         fontSize: isFleetReport ? 7.5 : 9,
         cellPadding: 3,
-        valign: 'middle'
+        valign: 'middle',
+        minCellHeight: 15
       },
       bodyStyles: imageColIdx !== -1 ? { minCellHeight: 20 } : {},
       headStyles: {
