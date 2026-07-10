@@ -1,5 +1,5 @@
 import { useState, useEffect, ReactNode } from 'react';
-import { collection, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -107,6 +107,17 @@ const MODULES: ModuleData[] = [
       { key: 'plate', label: 'Placa', renderer: (val) => <PrivateValue value={val} /> },
       { key: 'brand', label: 'Marca' },
       { key: 'model', label: 'Modelo' },
+      { 
+        key: 'costCenter', 
+        label: 'Obra',
+        renderer: (val: any) => {
+          const clean = (v: any) => String(v || '').replace(/logística - região sul/gi, '').replace(/logístic a - região sul/gi, '').replace(/,? ?$/, '').trim();
+          if (Array.isArray(val)) {
+            return val.map(clean).filter(Boolean).join(', ') || '-';
+          }
+          return clean(val) || '-';
+        }
+      },
       { key: 'currentKM', label: 'KM Atual', align: 'center', renderer: (val: any, item: any) => (item?.currentKM || item?.odometer || 0).toLocaleString() },
       { key: 'lastSyncCheck', label: 'Última Atualização', align: 'center', renderer: (val: any) => val ? new Date(val).toLocaleString('pt-BR') : '-' },
       { key: 'status', label: 'Status' }
@@ -251,6 +262,7 @@ export function Reports() {
   const [reportSearchTerm, setReportSearchTerm] = useLocalStorageState('reports_searchTerm', '');
   const [filterWork, setFilterWork] = useLocalStorageState<string[]>('reports_filterWork', []);
   const [filterStatus, setFilterStatus] = useLocalStorageState<string[]>('reports_filterStatus', []);
+  const [filterProvider, setFilterProvider] = useLocalStorageState<string[]>('reports_filterProvider', []);
   const [works, setWorks] = useState<any[]>([]);
   const [worksLoaded, setWorksLoaded] = useState(false);
   const [statuses, setStatuses] = useState<any[]>([]);
@@ -380,7 +392,7 @@ export function Reports() {
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       let docs = snapshot.docs.map(d => ({id: d.id, ...d.data() as any}));
 
-      if (mod.id === 'vehicles') {
+      if (mod.id === 'vehicles' || mod.id === 'telemetry') {
         const driversSnap = await getDocs(query(collection(db, 'drivers')));
         const driversData = driversSnap.docs.map(d => d.data());
         docs = docs.map((v: any) => {
@@ -391,6 +403,87 @@ export function Reports() {
             imageUrl: v.imageUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800"
           };
         });
+      }
+
+      if (mod.id === 'telemetry') {
+        try {
+          // Fetch settings to get telemetry providers
+          const docRef = doc(db, 'settings', 'integrations');
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            let providers: any[] = [];
+            if (data.providers) {
+              providers = data.providers;
+            } else if (data.telemetryUrl || data.telemetryToken) {
+              providers = [{ id: '1', name: 'Provedor Padrão', url: data.telemetryUrl || '', token: data.telemetryToken || '' }];
+            }
+
+            const plateToProvider: Record<string, string> = {};
+
+            // Fetch from each provider
+            for (const provider of providers) {
+              const url = provider.url || '';
+              const token = provider.token || '';
+              
+              if (url.includes('solusat')) {
+                const [apiKey, apiToken] = token.split(',');
+                if (apiKey && apiToken) {
+                  try {
+                    const res = await fetch(`/api/proxy/solusat/vehicles?t=${Date.now()}`, {
+                      headers: { 'apiKey': apiKey, 'apiToken': apiToken }
+                    });
+                    if (res.ok) {
+                      const json = await res.json();
+                      if (json.status && json.data) {
+                        Object.keys(json.data).forEach(groupKey => {
+                           const apiVehicles = Array.isArray(json.data[groupKey]) ? json.data[groupKey] : Object.values(json.data[groupKey] || {});
+                           apiVehicles.forEach((av: any) => {
+                              const plate = (av.ras_vei_placa || av.ras_vei_veiculo || av.veiculo_placa || av.vei_placa || "").toString();
+                              const cleanPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                              if (cleanPlate) plateToProvider[cleanPlate] = provider.name || 'Solusat';
+                           });
+                        });
+                      }
+                    }
+                  } catch (e) { console.error('Error fetching Solusat for report:', e); }
+                }
+              } else if (url.includes('gaussfleet')) {
+                try {
+                  const now = new Date();
+                  const dateParam = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                  const res = await fetch(`/api/proxy/gaussfleet/hourmeter`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-AUTH-TOKEN': token },
+                    body: JSON.stringify({ date_time: dateParam })
+                  });
+                  if (res.ok) {
+                    const json = await res.json();
+                    if (json && json.msg && Array.isArray(json.msg)) {
+                      json.msg.forEach((av: any) => {
+                         const plate = (av.vehicle_name || "").toString();
+                         const cleanPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                         if (cleanPlate) plateToProvider[cleanPlate] = provider.name || 'GaussFleet';
+                      });
+                    }
+                  }
+                } catch (e) { console.error('Error fetching GaussFleet for report:', e); }
+              }
+            }
+
+            // Map the providers to the documents
+            docs = docs.map((v: any) => {
+               const cleanVPlate = (v.plate || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+               const prov = plateToProvider[cleanVPlate] || v.telemetryProvider || '';
+               return {
+                 ...v,
+                 telemetryProvider: prov
+               };
+            });
+          }
+        } catch (e) {
+          console.error("Error setting up telemetry mapping for report", e);
+        }
       }
 
       const preparedData = docs.map((item: any) => {
@@ -519,6 +612,7 @@ export function Reports() {
 
     let matchesWork = true;
     let matchesStatus = true;
+    let matchesProvider = true;
 
     if (selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers' || selectedModule?.id === 'telemetry') {
       matchesWork = filterWork.length === 0 || filterWork.includes('Todas as Obras') || 
@@ -530,7 +624,7 @@ export function Reports() {
         filterStatus.includes(item.status);
     }
 
-    return matchesSearch && matchesWork && matchesStatus;
+    return matchesSearch && matchesWork && matchesStatus && matchesProvider;
   });
 
   const sortedData = sortData(filteredData);
@@ -1060,8 +1154,22 @@ export function Reports() {
                       className="w-full bg-white dark:bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-all shadow-sm h-[40px]"
                     />
                   </div>
-                  {(selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers') && (
+                  {(selectedModule?.id === 'vehicles' || selectedModule?.id === 'drivers' || selectedModule?.id === 'telemetry') && (
                     <>
+                      {selectedModule?.id === 'telemetry' && (
+                        <MultiSelect 
+                          label="Provedor"
+                          placeholder="Provedor de Telemetria"
+                          options={[
+                            { name: 'Todos os Provedores' },
+                            { name: 'GaussFleet' },
+                            { name: 'Solusat' },
+                            { name: 'Sem Telemetria' }
+                          ]}
+                          selected={filterProvider}
+                          onChange={setFilterProvider}
+                        />
+                      )}
                       <MultiSelect 
                         label="Obras"
                         placeholder="Obras"
