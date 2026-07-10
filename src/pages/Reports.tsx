@@ -731,12 +731,22 @@ export function Reports() {
     );
 
     const isFleetReport = selectedModule.id === 'vehicles' || selectedModule.id === 'telemetry';
+    const isTelemetryReport = selectedModule.id === 'telemetry';
+
+    // Calculate telemetry stats if needed
+    const telemetryStats = isTelemetryReport ? sortedData.reduce((acc, item) => {
+      const provider = (item.telemetryProvider || 'Sem Telemetria').toLowerCase();
+      if (provider.includes('solusat')) acc.solusat++;
+      else if (provider.includes('gaussfleet')) acc.gaussfleet++;
+      else acc.none++;
+      return acc;
+    }, { solusat: 0, gaussfleet: 0, none: 0 }) : null;
 
     autoTable(doc, {
       head: [tableCols],
       body: tableData,
-      startY: isFleetReport ? 45 : 40,
-      margin: { top: 45, bottom: 30, left: 8, right: 8 },
+      startY: isTelemetryReport ? 75 : (isFleetReport ? 45 : 40),
+      margin: { top: isTelemetryReport ? 75 : 45, bottom: 30, left: 8, right: 8 },
       
       
       styles: {
@@ -819,6 +829,49 @@ export function Reports() {
             doc.setTextColor(100);
             doc.setFont('helvetica', 'normal');
             doc.text(`Total de Veículos na Frota: ${sortedData.length}`, marginX, 39);
+          }
+
+          if (isTelemetryReport && telemetryStats) {
+            // Draw Fleet Summary Section
+            const summaryY = 48;
+            doc.setFontSize(10);
+            doc.setTextColor(20, 24, 27);
+            doc.setFont('helvetica', 'bold');
+            doc.text("RESUMO DA FROTA", marginX + 6, summaryY);
+            
+            // Draw small blue icon line next to title
+            doc.setDrawColor(37, 99, 235);
+            doc.setLineWidth(1.5);
+            doc.line(marginX, summaryY - 3, marginX + 4, summaryY - 3);
+            doc.line(marginX + 1, summaryY - 1, marginX + 3, summaryY - 1);
+
+            const cardWidth = (pageWidth - (marginX * 2) - 10) / 3;
+            const cardHeight = 18;
+            const cardY = summaryY + 4;
+
+            const drawCard = (x: number, value: number, label: string) => {
+              // Card background
+              doc.setDrawColor(230, 230, 230);
+              doc.setLineWidth(0.1);
+              doc.setFillColor(252, 252, 253);
+              doc.roundedRect(x, cardY, cardWidth, cardHeight, 3, 3, 'FD');
+
+              // Value
+              doc.setFontSize(18);
+              doc.setTextColor(37, 99, 235); // Primary Blue
+              doc.setFont('helvetica', 'bold');
+              doc.text(String(value), x + (cardWidth / 2), cardY + 9, { align: 'center' });
+
+              // Label
+              doc.setFontSize(7);
+              doc.setTextColor(100);
+              doc.setFont('helvetica', 'bold');
+              doc.text(label, x + (cardWidth / 2), cardY + 14, { align: 'center' });
+            };
+
+            drawCard(marginX, telemetryStats.none, "SEM TELEMETRIA");
+            drawCard(marginX + cardWidth + 5, telemetryStats.solusat, "SOLUSAT");
+            drawCard(marginX + (cardWidth + 5) * 2, telemetryStats.gaussfleet, "GAUSSFLEET");
           }
         }
 
