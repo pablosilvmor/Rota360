@@ -4,8 +4,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.resolve();
 
 async function startServer() {
   const PORT = 3000;
@@ -19,7 +18,13 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      setHeaders: (res, path) => {
+        if (path.endsWith('.webmanifest')) {
+          res.setHeader('Content-Type', 'application/manifest+json');
+        }
+      }
+    }));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
