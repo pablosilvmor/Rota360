@@ -1,0 +1,33 @@
+{
+  "short_name": "Rota 360",
+  "name": "Rota 360 - Gestão de Frota",
+  "description": "Sistema de Gestão de Frota Rota 360",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.imgur.com/1DaE4Bm.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "id": "/",
+  "start_url": "/",
+  "background_color": "#14181b",
+  "theme_color": "#14181b",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "scope": "/",
+  "orientation": "any"
+}
