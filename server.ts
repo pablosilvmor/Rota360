@@ -19,13 +19,26 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath, {
-      setHeaders: (res, path) => {
-        if (path.endsWith('manifest.json')) {
+      setHeaders: (res, filePath) => {
+        // Evitar cache no navegador para o SW, manifest e index.html para não travar o PWA
+        if (
+          filePath.endsWith('sw.js') || 
+          filePath.endsWith('manifest.json') || 
+          filePath.endsWith('index.html')
+        ) {
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+        if (filePath.endsWith('manifest.json')) {
           res.setHeader('Content-Type', 'application/manifest+json');
         }
       }
     }));
     app.get("*", (req, res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

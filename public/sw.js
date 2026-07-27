@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rota360-pwa-v24';
+const CACHE_NAME = 'rota360-pwa-v26';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -21,7 +21,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Ativação: Remove caches antigos e reivindica clientes
+// Ativação: Remove caches antigos, reivindica clientes e força recarregamento das abas ativas
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -33,7 +33,20 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    })
+    .then(() => self.clients.claim())
+    .then(() => {
+      // Envia uma mensagem para todas as janelas abertas para recarregarem a página imediatamente
+      return self.clients.matchAll({ type: 'window' }).then((clients) => {
+        clients.forEach((client) => {
+          try {
+            client.postMessage({ type: 'FORCE_RELOAD', version: CACHE_NAME });
+          } catch (err) {
+            console.error('Falha ao enviar postMessage para o cliente:', err);
+          }
+        });
+      });
+    })
   );
 });
 
