@@ -1,16 +1,17 @@
-const CACHE_NAME = 'rota360-v4';
-const OFFLINE_URL = '/index.html';
+const CACHE_NAME = 'rota360-v7';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/favicon.png',
+  '/icon-192.png',
+  '/icon-512.png'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        OFFLINE_URL,
-        '/manifest.json',
-        '/favicon.png',
-        '/icon-192.png',
-        '/icon-512.png'
-      ]);
+      return cache.addAll(ASSETS_TO_CACHE).catch(err => console.log('PWA cache error:', err));
     })
   );
   self.skipWaiting();
@@ -18,31 +19,36 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
+        keys.map((key) => {
+          if (key !== CACHE_NAME) return caches.delete(key);
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(OFFLINE_URL);
-      })
-    );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request);
-      })
-    );
-  }
+  if (event.request.method !== 'GET') return;
+  
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      }).catch(() => {
+        // Fallback for navigation requests
+        if (event.request.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
+      });
+      return cachedResponse || fetchPromise;
+    })
+  );
 });

@@ -4,11 +4,6 @@
   "description": "Sistema de Gestão de Frota Rota 360",
   "icons": [
     {
-      "src": "/favicon.png",
-      "sizes": "32x32",
-      "type": "image/png"
-    },
-    {
       "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
@@ -34,11 +29,11 @@
     }
   ],
   "id": "/",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "background_color": "#14181b",
   "theme_color": "#14181b",
   "display": "standalone",
   "scope": "/",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "prefer_related_applications": false
 }
