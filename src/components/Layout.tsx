@@ -44,31 +44,9 @@ export function Layout({ children }: LayoutProps) {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
-    } else {
-      alert("Para instalar o Rota 360 como Aplicativo:\n\n1. Toque nos três pontos (⋮) do seu navegador.\n2. Selecione 'Instalar aplicativo' ou 'Adicionar à tela inicial'.");
-    }
-  };
 
   useEffect(() => {
     // Check saved theme
@@ -734,15 +712,7 @@ export function Layout({ children }: LayoutProps) {
               className="h-8 max-h-9 w-auto object-contain"
             />
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleInstallApp}
-              className="p-2 hover:bg-surface-container text-primary rounded-lg flex items-center justify-center"
-              title="Instalar aplicativo Rota 360"
-            >
-              <span className="material-symbols-outlined text-[20px]">download_for_offline</span>
-            </button>
-          </div>
+          <div className="w-10"></div>
         </header>
 
         {/* Content Canvas */}
