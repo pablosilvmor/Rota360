@@ -41,6 +41,12 @@
             navigator.serviceWorker.register('/sw.js').catch(function() {});
           });
         }
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (event && event.reason && (String(event.reason).includes('WebSocket') || String(event.reason.message || '').includes('WebSocket'))) {
+            event.preventDefault();
+          }
+        });
       })();
     </script>
   </head>
