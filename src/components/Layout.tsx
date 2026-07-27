@@ -705,7 +705,13 @@ export function Layout({ children }: LayoutProps) {
           >
             <span className="material-symbols-outlined">menu</span>
           </button>
-          <div className="font-bold text-sm">Rota 360</div>
+          <div className="flex items-center justify-center">
+            <img 
+              src="https://i.imgur.com/9iZCsf6.png" 
+              alt="Rota 360" 
+              className="h-8 max-h-9 w-auto object-contain"
+            />
+          </div>
           <div className="w-10"></div>
         </header>
 
