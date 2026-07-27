@@ -20,7 +20,7 @@ async function startServer() {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath, {
       setHeaders: (res, path) => {
-        if (path.endsWith('.webmanifest')) {
+        if (path.endsWith('manifest.json')) {
           res.setHeader('Content-Type', 'application/manifest+json');
         }
       }
