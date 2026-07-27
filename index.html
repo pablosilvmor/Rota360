@@ -6,7 +6,7 @@
     <title>Rota 360 - Gestão de Frota</title>
 
     <!-- Web App Manifest & PWA Configuration -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/manifest.json?v=29" crossorigin="use-credentials" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -37,7 +37,7 @@
         } catch (e) {}
 
         // Script profissional de limpeza e reset único para atualizar usuários travados no cache anterior
-        var RESET_KEY = 'rota360_pwa_reset_v28_final_blast';
+        var RESET_KEY = 'rota360_pwa_reset_v29_ultra_blast';
         try {
           if (!localStorage.getItem(RESET_KEY)) {
             if ('serviceWorker' in navigator) {

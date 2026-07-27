@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rota360-pwa-v28';
+const CACHE_NAME = 'rota360-pwa-v29';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
