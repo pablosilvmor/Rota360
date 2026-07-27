@@ -44,6 +44,9 @@ export function Layout({ children }: LayoutProps) {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -55,6 +58,17 @@ export function Layout({ children }: LayoutProps) {
       document.documentElement.classList.add('dark');
       setIsDarkMode(true);
     }
+
+    // Check PWA Standalone status
+    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true || document.referrer.includes('android-app://');
+    setIsStandalone(isStandaloneMode);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      console.log('PWA: Capturei beforeinstallprompt!');
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     const handleScroll = () => {
       setShowBackToTop(window.scrollY > 300);
@@ -103,10 +117,22 @@ export function Layout({ children }: LayoutProps) {
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       document.removeEventListener("mousedown", handleClickOutside);
       unsubscribeAlerts();
     };
   }, []);
+
+  const handleInstallPwa = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log('PWA outcome:', outcome);
+      setDeferredPrompt(null);
+    } else {
+      setIsPwaModalOpen(true);
+    }
+  };
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -254,6 +280,16 @@ export function Layout({ children }: LayoutProps) {
           <p className="text-[10px] text-center font-normal text-on-primary-container uppercase tracking-wider mt-2">
             BEMON ENGENHARIA E MONTAGENS LTDA.
           </p>
+          {!isStandalone && (
+            <button
+              onClick={handleInstallPwa}
+              className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow flex items-center justify-center gap-1.5 transition-all active:scale-95"
+              title="Instalar Aplicativo Rota 360"
+            >
+              <span className="material-symbols-outlined text-[16px]">download_for_offline</span>
+              <span>Instalar App Rota 360</span>
+            </button>
+          )}
 
           <div className="w-full mt-6 space-y-4 border-t border-b border-white/10 py-6">
             <button
@@ -712,7 +748,18 @@ export function Layout({ children }: LayoutProps) {
               className="h-8 max-h-9 w-auto object-contain"
             />
           </div>
-          <div className="w-10"></div>
+          <div>
+            {!isStandalone && (
+              <button
+                onClick={handleInstallPwa}
+                className="px-2.5 py-1 bg-primary text-on-primary rounded-lg text-xs font-bold shadow flex items-center gap-1 active:scale-95 transition-transform"
+                title="Instalar Rota 360"
+              >
+                <span className="material-symbols-outlined text-[16px]">download_for_offline</span>
+                <span>Instalar</span>
+              </button>
+            )}
+          </div>
         </header>
 
         {/* Content Canvas */}
@@ -1023,6 +1070,87 @@ export function Layout({ children }: LayoutProps) {
                   </Link>
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Instruções de Instalação PWA */}
+      <AnimatePresence>
+        {isPwaModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl text-on-surface dark:text-slate-100 relative"
+            >
+              <button
+                onClick={() => setIsPwaModalOpen(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+
+              <div className="flex items-center gap-3 mb-4">
+                <img src="/icon-192.png" alt="Rota 360" className="w-12 h-12 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 object-cover" />
+                <div>
+                  <h3 className="font-bold text-lg text-slate-900 dark:text-white">Instalar Rota 360</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Modo Tela Cheia (Sem barra de endereço)</p>
+                </div>
+              </div>
+
+              {deferredPrompt ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    Clique no botão abaixo para instalar o aplicativo Rota 360 diretamente no seu dispositivo com o ícone personalizado.
+                  </p>
+                  <button
+                    onClick={handleInstallPwa}
+                    className="w-full bg-primary hover:bg-primary/90 text-on-primary font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95 text-sm"
+                  >
+                    <span className="material-symbols-outlined">download_for_offline</span>
+                    Instalar Agora na Tela Inicial
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                    Para instalar o aplicativo no seu dispositivo e abrir em tela cheia sem a barra de endereço do navegador:
+                  </p>
+
+                  <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-700 space-y-2">
+                    <p className="font-bold text-xs uppercase tracking-wider text-primary flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">android</span>
+                      No Android (Google Chrome):
+                    </p>
+                    <ol className="list-decimal list-inside text-xs space-y-1.5 text-slate-700 dark:text-slate-300">
+                      <li>Toque no menu de três pontos (<strong>⋮</strong>) no canto superior direito.</li>
+                      <li>Procure e toque em <strong>"Instalar aplicativo"</strong> (ou "Adicionar à tela inicial").</li>
+                      <li>Confirme a instalação. O aplicativo abrirá em modo standalone com o ícone próprio!</li>
+                    </ol>
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-700 space-y-2">
+                    <p className="font-bold text-xs uppercase tracking-wider text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">apple</span>
+                      No iPhone / iPad (Safari):
+                    </p>
+                    <ol className="list-decimal list-inside text-xs space-y-1.5 text-slate-700 dark:text-slate-300">
+                      <li>Toque no botão <strong>Compartilhar (⎋)</strong> na barra inferior.</li>
+                      <li>Role a lista e toque em <strong>"Adicionar à Tela de Início"</strong>.</li>
+                      <li>Toque em <strong>"Adicionar"</strong> no canto superior.</li>
+                    </ol>
+                  </div>
+
+                  <button
+                    onClick={() => setIsPwaModalOpen(false)}
+                    className="w-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-bold py-2.5 rounded-xl transition-colors text-xs"
+                  >
+                    Entendi
+                  </button>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
