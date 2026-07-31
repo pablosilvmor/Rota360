@@ -522,7 +522,9 @@ function InspectionForm({
 
   const exportToPDF = async () => {
     setShowExportModal(true);
-    const d = new Date(exportConfig.date + "T12:00:00");
+    const targetDate = checklistDate || new Date().toISOString().split('T')[0];
+    setExportConfig(prev => ({ ...prev, date: targetDate }));
+    const d = new Date(targetDate + "T12:00:00");
     const validDate = isNaN(d.getTime()) ? new Date() : d;
     setPickerDate(validDate);
     setManualDateInput(validDate.toLocaleDateString('pt-BR'));
@@ -603,7 +605,10 @@ function InspectionForm({
         let localHistoryKM = null;
         let localConcludedMaintenanceOrders = [];
         let historicalRecords: Record<string, any> = {};
-        let dateLabel = isChecklistHistory ? exportConfig.date.split('-').reverse().join('/') : "-";
+        const rawDate = exportConfig.date || checklistDate || new Date().toISOString().split('T')[0];
+        const dateLabel = rawDate.includes('-') 
+          ? rawDate.split('-').reverse().join('/') 
+          : rawDate;
 
         if (isChecklistHistory) {
           // Fetch historical records for exportConfig.date
